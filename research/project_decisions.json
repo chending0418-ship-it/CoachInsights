@@ -13,7 +13,13 @@
       "baseball batting",
       "baseball pitching"
     ],
-    "batTrajectory": "semi-automatic from the first implementation; user initializes and can correct tip and knob",
+    "batTrajectory": false,
+    "poseAnalysis": true,
+    "excludedFeatures": [
+      "bat tip and knob tracking",
+      "bat trajectory visualization",
+      "dedicated trajectory correction tools"
+    ],
     "coreVideoTools": [
       "capture/import",
       "slow playback",
@@ -23,7 +29,8 @@
       "local persistence",
       "export/share"
     ],
-    "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services."
+    "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services.",
+    "poseAnalysisMode": "2D skeleton overlay and image-plane elbow/knee/trunk-angle estimates; no trajectory view"
   },
   "research": {
     "sample": "IMG_9673.mov (provided locally; not included in the repository)",
@@ -39,10 +46,10 @@
       "OpenCV CSRT",
       "BootsTAPIR"
     ],
+    "trackingStatus": "Archived research only. Bat trajectory was removed from version 1.0 on 2026-10-20; tracking engines are not active application dependencies.",
     "qualification": "Desktop feasibility comparison; results do not establish iPhone/iPad latency, battery use or overall accuracy.",
     "provisionalSelection": {
       "pose": "Apple Vision by native integration cost; no accuracy superiority established",
-      "batTracking": "BootsTAPIR 256x256, pending iOS model conversion and device qualification",
       "alternativePose": "MediaPipe Full",
       "limitations": [
         "One batting sample only",
@@ -51,5 +58,20 @@
         "No iPhone or iPad device latency/memory validation yet"
       ]
     }
+  },
+  "decisionHistory": [
+    {
+      "date": "2026-10-20",
+      "change": "User removed bat trajectory from the current version. Retain video tools, manual annotations, dual-video comparison and human pose analysis. Archive existing bat-tracking experiments."
+    }
+  ],
+  "developmentPlan": {
+    "executor": "Codex",
+    "scheduling": "No staffing or calendar schedule; implementation follows dependencies and acceptance gates",
+    "todo": "TODO.md",
+    "plan": "docs/v1.0-development-plan.md",
+    "initialDeploymentTarget": "iOS / iPadOS 17+",
+    "executionStatus": "Planning complete; native iOS application tasks not yet implemented",
+    "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction"
   }
 }

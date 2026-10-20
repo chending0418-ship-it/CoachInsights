@@ -2,8 +2,16 @@ Coach Inside: first local engine study, 2026-10-20
 
 Scope from the user
 - Version 1.0 supports both iPhone and iPad, with device-local storage and no iCloud sync.
-- Start bat-path analysis with semi-automatic tracking, including initialization and user corrections.
+- Bat trajectory and its semi-automatic tracking/correction tools were removed from version 1.0 on 2026-10-20.
+- Video tools, drawing annotations, dual-video comparison and human pose analysis remain in scope.
 - Current work is engine evaluation; a production iOS app is not implemented by this study.
+
+Archived tracking study
+The first study originally evaluated semi-automatic bat tracking. Its code, measurements and
+reproduction steps below are retained as historical research. They are not active 1.0 work.
+BootsTAPIR and the tracking-specific research dependencies are not application dependencies.
+Current product scope is recorded in project_decisions.json; it supersedes the scope text
+embedded in the original benchmarks/2026-10-20/summary.json snapshot.
 
 Results
 - results/report.html: readable report, with local videos.

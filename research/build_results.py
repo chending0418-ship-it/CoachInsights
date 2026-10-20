@@ -179,7 +179,7 @@ def main():
     canvas.save(BASE/"pose_contact_sheet.jpg",quality=95)
     results={"sample":load("metadata"),"pose":pose_stats,"tracking":errors,
         "sampleCount":1,"analysisFrameSize":[1280,720],"executionPlatform":"macOS Apple Silicon, not iOS device",
-        "scope":"iPhone + iPad, local only, semi-automatic tracking in v1"}
+        "scope":"iPhone + iPad, local only, video tools and human pose analysis; bat trajectory removed from v1 on 2026-10-20. Tracking results are historical research."}
     for key in ["bootstapir","bootstapir_corrected","bootstapir_256","bootstapir_corrected_256"]:
         path=BASE/f"{key}.json"
         if path.exists():results[key+"Run"]={k:v for k,v in json.loads(path.read_text()).items() if k!='frames'}

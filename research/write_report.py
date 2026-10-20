@@ -26,10 +26,10 @@ doc=f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="view
 </style><main>
 <div class="eyebrow">COACH INSIDE / ENGINE STUDY 01 / 2026.10.20</div>
 <h1>人体姿态与球棒半自动追踪<br>第一轮本机实测</h1>
-<div class="chips"><span>1.0 支持 iPhone + iPad</span><span>各设备本地保存</span><span>无 iCloud 同步</span><span>首版直接半自动追踪</span></div>
+<div class="chips"><span>1.0 支持 iPhone + iPad</span><span>各设备本地保存</span><span>无 iCloud 同步</span><span>球棒轨迹研究已归档</span></div>
 <p class="muted">素材 IMG_9673.mov · 3840 × 2160 · {s['sample']['duration']:.3f} 秒 · 约 29.98 fps · 解码 78 帧。两组测试共用 1280 × 720 图像与原始帧时间戳。视频没有上传到云端推理服务。</p>
-<div class="callout"><strong>本轮建议：</strong>人体姿态以 Apple Vision 作为 1.0 默认方案进入原生验证，保留 MediaPipe Full 的替换接口；球棒半自动追踪以 BootsTAPIR 作为下一轮 iOS 部署验证候选。通用框追踪和纯光流在此素材上均有明显漂移，适合作为基线或局部辅助。</div>
-<p>这里的选择依据是当前能力与集成成本。一个视频不足以证明人体模型的精度胜负。BootsTAPIR 也尚未完成 iOS 模型转换与 iPhone / iPad 真机验证，因此本报告不能视作最终可发布引擎的验收。</p>
+<div class="callout"><strong>范围更新 · 2026-10-20：</strong>1.0 已移除球棒轨迹、半自动棒头/握柄追踪及专用轨迹校正工具。保留拍摄、慢放、逐帧、通用标注、双视频对比与人体姿态分析。人体姿态暂选 Apple Vision，保留 MediaPipe Full 的替换接口；下文球棒追踪实验仅作为历史研究资料。</div>
+<p>人体方案的选择依据是当前能力与集成成本。一个视频不足以证明人体模型的精度胜负，仍需在 iPhone / iPad 真机上验证。BootsTAPIR 不作为当前 1.0 的开发或部署依赖。</p>
 <h2>人体姿态：三种方案均能持续检出人体</h2>
 <table><thead><tr><th>方案</th><th>有人体输出的帧数</th><th>稳态接口耗时中位数</th></tr></thead><tbody>{pose_rows}</tbody></table>
 <p class="muted">耗时来自 Mac Apple Silicon。Vision 使用系统默认计算路径，MediaPipe 使用 Python CPU / XNNPACK 路径；硬件后端未统一，且模型初始化与首帧不计入中位数。不能换算为 iPhone / iPad 速度，也不能用检出帧数代表准确率。</p>
@@ -48,13 +48,13 @@ doc=f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="view
 <p>两次人工校正在第 18 帧（{frames[18]['seconds']:.3f}s）和第 42 帧（{frames[42]['seconds']:.3f}s）加入，校正帧从上表评价中排除。它们通过额外查询点并选择相应轨迹段模拟，尚不是已完成的 iOS 交互界面。校正后的后半段仍有低置信输出，需要用户确认，不能直接作为可靠路径。</p>
 <p>同一检查点下，BootsTAPIR 的原始预测比四个传统基线更接近参考位置；两次修正后进一步改善。但它在拖影最重的挥棒过程中仍会失跟。握柄也会受双手遮挡影响，应单独验收，不能把棒头测试结果扩展为球棒方向已经可靠。</p>
 <div class="note"><strong>关键限制：</strong>此素材约 30fps，快速挥棒出现扇形拖影。模糊帧中无法可靠确定唯一瞬时棒头位置。产品应保留未确认段，不能把模型猜测或插值包装为测量结果。</div>
-<h2>直接从半自动开始的 1.0 交互</h2>
+<h2>历史交互设想（已移出 1.0）</h2>
 <p>点选棒头 / 握柄 → 本机追踪 → 在时间轴标出待确认段 → 放大查看并拖动修正 → 更新轨迹 → 由用户确认后导出。iPhone 使用放大镜辅助点选；iPad 同时支持手指与 Apple Pencil，放大修正区域。两端功能保持一致，视频与分析数据分别存于各自设备。</p>
-<h2>进入 iOS 的下一道验证</h2>
-<ul><li>验证 BootsTAPIR 的端侧模型转换、算子支持、包体积、峰值内存、短片处理时间及校正后的重算方式。当前官方 PyTorch 权重约 219MB，不能直接当作已完成 iOS 适配。</li>
-<li>本次 256 × 448 的另一个输入设置效果更差，已保留原始结果。部署时必须固定并校验预处理和坐标映射，不能假设提高分辨率就会改善结果。</li>
-<li>在实际 iPhone 和 iPad 上检查同一批视频；模拟器不能替代相机、高帧率、GPU / Neural Engine 和发热验收。</li>
-<li>扩大到不同颜色球棒、左右手、机位、场地以及投球素材，并加入 120 / 240fps 视频。当前仅验证这一个打击片段，未验证投球或普遍适用性。</li></ul>
+<h2>当前人体姿态验证与归档说明</h2>
+<ul><li>后续引擎验证聚焦人体姿态与视频工具，不继续推进球棒追踪的 iOS 模型转换或专用修正界面。</li>
+<li>在实际 iPhone 和 iPad 上检查人体姿态质量、处理耗时、内存和发热；模拟器不能替代真机验收。</li>
+<li>人体测试素材需要覆盖左右手、不同机位、场地及投球动作，并加入高帧率视频。当前一个打击片段不足以证明普遍适用性。</li>
+<li>保留本次球棒实验与两种输入尺寸的原始结果，供历史查阅；它们不构成当前 1.0 的交付范围。</li></ul>
 <h2>依据与可复现材料</h2>
 <p><a href="https://developer.apple.com/documentation/vision/vndetecthumanbodyposerequest">Apple Vision 人体姿态</a> · <a href="https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/ios">MediaPipe 官方 iOS 接入</a> · <a href="https://github.com/google-deepmind/tapnet">BootsTAPIR 官方实现与模型许可</a>。TAPIR 仓库说明本次使用的预训练模型与代码采用 Apache 2.0；仍需随最终版本保留对应许可文件。</p>
 <p><a href="summary.json">汇总数据</a> · <a href="reference_points.json">目视参考与不确定度</a> · <a href="frames.json">原始帧时间戳</a> · <a href="tapir_coordinate_sanity.json">点坐标平移校验</a> · <a href="../README.txt">复现步骤</a></p>
