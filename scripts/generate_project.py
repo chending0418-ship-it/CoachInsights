@@ -35,6 +35,7 @@ for name in targets:
         }
         if app:
             settings["INFOPLIST_FILE"] = "Config/Info.plist"
+            settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = "AppIcon"
             settings["SWIFT_EMIT_LOC_STRINGS"] = "YES"
         elif name == "CoachInsightsTests":
             settings["TEST_HOST"] = '"$(BUILT_PRODUCTS_DIR)/CoachInsights.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoachInsights"'
