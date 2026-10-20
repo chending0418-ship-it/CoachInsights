@@ -1,0 +1,15 @@
+{
+  "method": "Assistant visually selected approximate bat-cap centers on 1280x720 decoded frames. Not expert ground truth. High-blur frames are excluded because a unique instantaneous endpoint cannot be reliably located.",
+  "initializationFrameExcluded": 0,
+  "checkpoints": [
+    {"index": 12, "tip": [725, 52], "visualUncertaintyPx": 10},
+    {"index": 18, "tip": [648, 90], "visualUncertaintyPx": 10},
+    {"index": 21, "tip": [630, 104], "visualUncertaintyPx": 10},
+    {"index": 42, "tip": [548, 367], "visualUncertaintyPx": 18},
+    {"index": 60, "tip": [802, 154], "visualUncertaintyPx": 18},
+    {"index": 77, "tip": [553, 611], "visualUncertaintyPx": 25}
+  ],
+  "excludedFastSwingFrames": [24, 25, 26, 27, 28, 29, 30],
+  "correctionAnchors": [{"index":18,"tip":[647,90]},{"index":42,"tip":[546,368]}],
+  "correctedRunEvaluation": "Exclude frame 18 and frame 42 because they are supplied as user corrections. Compare remaining checkpoints only."
+}

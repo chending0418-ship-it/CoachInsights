@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-20",
+  "product": "Coach Inside",
+  "version1": {
+    "platforms": [
+      "iPhone",
+      "iPad"
+    ],
+    "storage": "local to each device",
+    "iCloudSync": false,
+    "accountRequired": false,
+    "sports": [
+      "baseball batting",
+      "baseball pitching"
+    ],
+    "batTrajectory": "semi-automatic from the first implementation; user initializes and can correct tip and knob",
+    "coreVideoTools": [
+      "capture/import",
+      "slow playback",
+      "frame stepping",
+      "drawing annotations",
+      "dual-video comparison",
+      "local persistence",
+      "export/share"
+    ],
+    "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services."
+  },
+  "research": {
+    "sample": "IMG_9673.mov (provided locally; not included in the repository)",
+    "poseCandidates": [
+      "Apple Vision",
+      "MediaPipe Pose Landmarker Lite",
+      "MediaPipe Pose Landmarker Full"
+    ],
+    "trackingCandidates": [
+      "Apple Vision object tracker",
+      "Apple Vision dense flow revision 1",
+      "OpenCV pyramidal LK",
+      "OpenCV CSRT",
+      "BootsTAPIR"
+    ],
+    "qualification": "Desktop feasibility comparison; results do not establish iPhone/iPad latency, battery use or overall accuracy.",
+    "provisionalSelection": {
+      "pose": "Apple Vision by native integration cost; no accuracy superiority established",
+      "batTracking": "BootsTAPIR 256x256, pending iOS model conversion and device qualification",
+      "alternativePose": "MediaPipe Full",
+      "limitations": [
+        "One batting sample only",
+        "Fast-swing blur remains unreliable",
+        "Pitching not tested",
+        "No iPhone or iPad device latency/memory validation yet"
+      ]
+    }
+  }
+}

@@ -1,0 +1,326 @@
+{
+  "sample": {
+    "duration": 2.6016666666666666,
+    "height": 2160,
+    "minFrameDuration": 0.03333333333333333,
+    "nominalFPS": 29.98078155517578,
+    "preferredTransform": [
+      1,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    "width": 3840
+  },
+  "pose": {
+    "vision": {
+      "detectedFrames": 78,
+      "frames": 78,
+      "medianMSExcludingFirst": 4.111051559448242,
+      "firstFrameMS": 246.64294719696045,
+      "meanCommonPointsAboveThreshold": 10.076923076923077,
+      "qualification": "Confidence coverage is not accuracy. Vision and MediaPipe scores are not calibrated to each other; backends differ."
+    },
+    "mediapipe_lite": {
+      "detectedFrames": 78,
+      "frames": 78,
+      "medianMSExcludingFirst": 4.567708005197346,
+      "firstFrameMS": 12.437416007742286,
+      "meanCommonPointsAboveThreshold": 10.897435897435898,
+      "qualification": "Confidence coverage is not accuracy. Vision and MediaPipe scores are not calibrated to each other; backends differ."
+    },
+    "mediapipe_full": {
+      "detectedFrames": 78,
+      "frames": 78,
+      "medianMSExcludingFirst": 5.257458076812327,
+      "firstFrameMS": 12.574583059176803,
+      "meanCommonPointsAboveThreshold": 10.717948717948717,
+      "qualification": "Confidence coverage is not accuracy. Vision and MediaPipe scores are not calibrated to each other; backends differ."
+    }
+  },
+  "tracking": {
+    "vision": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 14.115899971642348,
+          "modelAccepts": true
+        },
+        {
+          "index": 18,
+          "errorPx": 60.12872273222076,
+          "modelAccepts": false
+        },
+        {
+          "index": 21,
+          "errorPx": 80.3674073766287,
+          "modelAccepts": true
+        },
+        {
+          "index": 42,
+          "errorPx": 251.63581905700315,
+          "modelAccepts": true
+        },
+        {
+          "index": 60,
+          "errorPx": 165.06496459191627,
+          "modelAccepts": true
+        },
+        {
+          "index": 77,
+          "errorPx": 486.89375902435023,
+          "modelAccepts": true
+        }
+      ],
+      "meanApproximateErrorPx": 176.3677621256269,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    },
+    "vision_flow": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 8.114737944217554,
+          "modelAccepts": null
+        },
+        {
+          "index": 18,
+          "errorPx": 73.65726905647041,
+          "modelAccepts": null
+        },
+        {
+          "index": 21,
+          "errorPx": 59.39485752777529,
+          "modelAccepts": null
+        },
+        {
+          "index": 42,
+          "errorPx": 284.22812225248816,
+          "modelAccepts": null
+        },
+        {
+          "index": 60,
+          "errorPx": 185.6973857726634,
+          "modelAccepts": null
+        },
+        {
+          "index": 77,
+          "errorPx": 539.2244665416522,
+          "modelAccepts": null
+        }
+      ],
+      "meanApproximateErrorPx": 191.7194731825445,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    },
+    "opencv_lk": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 4.773750710719592,
+          "modelAccepts": false
+        },
+        {
+          "index": 18,
+          "errorPx": 66.44321858248138,
+          "modelAccepts": false
+        },
+        {
+          "index": 21,
+          "errorPx": 48.568971682832576,
+          "modelAccepts": false
+        },
+        {
+          "index": 42,
+          "errorPx": 284.26399892893096,
+          "modelAccepts": true
+        },
+        {
+          "index": 60,
+          "errorPx": 147.23756171851093,
+          "modelAccepts": true
+        },
+        {
+          "index": 77,
+          "errorPx": 538.7184242907371,
+          "modelAccepts": true
+        }
+      ],
+      "meanApproximateErrorPx": 181.66765431903542,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    },
+    "opencv_csrt": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 7.810249675906654,
+          "modelAccepts": true
+        },
+        {
+          "index": 18,
+          "errorPx": 4.47213595499958,
+          "modelAccepts": true
+        },
+        {
+          "index": 21,
+          "errorPx": 0.7071067811865476,
+          "modelAccepts": true
+        },
+        {
+          "index": 42,
+          "errorPx": 298.187860249206,
+          "modelAccepts": true
+        },
+        {
+          "index": 60,
+          "errorPx": 156.56468311851177,
+          "modelAccepts": true
+        },
+        {
+          "index": 77,
+          "errorPx": 535.4941643006018,
+          "modelAccepts": true
+        }
+      ],
+      "meanApproximateErrorPx": 167.20603334673538,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    },
+    "bootstapir_256": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 5.422944555730583,
+          "modelAccepts": true
+        },
+        {
+          "index": 18,
+          "errorPx": 3.3016493793106765,
+          "modelAccepts": true
+        },
+        {
+          "index": 21,
+          "errorPx": 5.522593667222266,
+          "modelAccepts": true
+        },
+        {
+          "index": 42,
+          "errorPx": 13.992609319739708,
+          "modelAccepts": false
+        },
+        {
+          "index": 60,
+          "errorPx": 32.74979972312101,
+          "modelAccepts": false
+        },
+        {
+          "index": 77,
+          "errorPx": 131.04358916352624,
+          "modelAccepts": false
+        }
+      ],
+      "meanApproximateErrorPx": 32.00553096810841,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    },
+    "bootstapir_corrected_256": {
+      "checks": [
+        {
+          "index": 12,
+          "errorPx": 5.422944555730583,
+          "modelAccepts": true
+        },
+        {
+          "index": 21,
+          "errorPx": 4.0538236328591974,
+          "modelAccepts": true
+        },
+        {
+          "index": 60,
+          "errorPx": 13.988180482875139,
+          "modelAccepts": false
+        },
+        {
+          "index": 77,
+          "errorPx": 34.78912076879873,
+          "modelAccepts": false
+        }
+      ],
+      "meanApproximateErrorPx": 14.563517360065912,
+      "qualification": "Approximate human visual checkpoints, one sample. Corrected runs exclude supplied anchors. Not dataset accuracy. Initial frame and ambiguous fast-swing frames excluded. Coordinates in 1280x720 analysis images."
+    }
+  },
+  "sampleCount": 1,
+  "analysisFrameSize": [
+    1280,
+    720
+  ],
+  "executionPlatform": "macOS Apple Silicon, not iOS device",
+  "scope": "iPhone + iPad, local only, semi-automatic tracking in v1",
+  "bootstapirRun": {
+    "torchVersion": "2.14.1",
+    "device": "mps",
+    "inputWidth": 448,
+    "inputHeight": 256,
+    "elapsedSeconds": 9.061559792025946,
+    "checkpoint": "bootstapir_checkpoint_v2.pt",
+    "semantics": "Offline noncausal inference; uses the whole clip. No iOS performance claim."
+  },
+  "bootstapir_correctedRun": {
+    "torchVersion": "2.14.1",
+    "device": "mps",
+    "inputWidth": 448,
+    "inputHeight": 256,
+    "elapsedSeconds": 9.061559792025946,
+    "checkpoint": "bootstapir_checkpoint_v2.pt",
+    "semantics": "Offline noncausal inference; uses the whole clip. No iOS performance claim.",
+    "corrections": [
+      {
+        "index": 18,
+        "tip": [
+          647,
+          90
+        ]
+      },
+      {
+        "index": 42,
+        "tip": [
+          546,
+          368
+        ]
+      }
+    ]
+  },
+  "bootstapir_256Run": {
+    "torchVersion": "2.14.1",
+    "device": "mps",
+    "inputWidth": 256,
+    "inputHeight": 256,
+    "elapsedSeconds": 1.8344377499306574,
+    "checkpoint": "bootstapir_checkpoint_v2.pt",
+    "semantics": "Offline noncausal inference; uses the whole clip. No iOS performance claim."
+  },
+  "bootstapir_corrected_256Run": {
+    "torchVersion": "2.14.1",
+    "device": "mps",
+    "inputWidth": 256,
+    "inputHeight": 256,
+    "elapsedSeconds": 1.8344377499306574,
+    "checkpoint": "bootstapir_checkpoint_v2.pt",
+    "semantics": "Offline noncausal inference; uses the whole clip. No iOS performance claim.",
+    "corrections": [
+      {
+        "index": 18,
+        "tip": [
+          647,
+          90
+        ]
+      },
+      {
+        "index": 42,
+        "tip": [
+          546,
+          368
+        ]
+      }
+    ]
+  }
+}

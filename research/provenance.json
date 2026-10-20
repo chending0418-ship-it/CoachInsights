@@ -1,0 +1,44 @@
+{
+  "models": [
+    {
+      "name": "pose_landmarker_lite.task",
+      "bytes": 5777746,
+      "sha256": "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a"
+    },
+    {
+      "name": "bootstapir_checkpoint_v2.pt",
+      "bytes": 218886140,
+      "sha256": "8493c7a69e02c85b9382fbb3c7b8b539b36bc08ede744b9e99feb739a0129f4b"
+    },
+    {
+      "name": "pose_landmarker_full.task",
+      "bytes": 9398198,
+      "sha256": "5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "vendor/tapnet/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vendor/tapnet/torch/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vendor/tapnet/torch/utils.py",
+      "sha256": "a4267b3a6bd8ecf2dfe5effacab9f7a43664dc5d08966c98f6a0cc68f5ccedd3"
+    },
+    {
+      "path": "vendor/tapnet/torch/tapir_model.py",
+      "sha256": "87c05fb17d48d0f4353a00b67c9d40d3a264e13e43d88e3f7b5829119845e3ba"
+    },
+    {
+      "path": "vendor/tapnet/torch/nets.py",
+      "sha256": "4961a8e4882e8c9ac219c4714f6f2c811cc1ab665a439d4d2e79942002a9517c"
+    }
+  ],
+  "source": "https://github.com/google-deepmind/tapnet (official main branch, retrieved 2026-10-20)",
+  "checkpointURL": "https://storage.googleapis.com/dm-tapnet/bootstap/bootstapir_checkpoint_v2.pt",
+  "mediapipeModelURLPattern": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_{lite|full}/float16/1/pose_landmarker_{lite|full}.task"
+}

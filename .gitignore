@@ -1,0 +1,23 @@
+.venv/
+research/models/
+research/downloads/
+research/results/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Device-local footage and derived media are not repository assets.
+*.mov
+*.MOV
+*.mp4
+*.MP4
+*.m4v
+
+# Local configuration and build output.
+.env
+.env.*
+!.env.example
+.build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
