@@ -1,0 +1,49 @@
+{
+  "product": "Coach Insights",
+  "date": "2026-10-20",
+  "environment": {
+    "xcode": "26.1.1 (17B100)",
+    "runtime": "iOS 26.1 (23B86)",
+    "verification": "simulators only"
+  },
+  "devices": {
+    "iphone": {
+      "model": "iPhone 16e",
+      "testsPassed": 15,
+      "testsSkipped": 1,
+      "testsFailed": 0,
+      "sampleFrames": 78,
+      "maximumFrameTimeErrorMS": 0,
+      "frameLatencyMS": {
+        "min": 25.187969207763672,
+        "mean": 40.68939685821533,
+        "max": 57.296037673950195
+      },
+      "dualTimebaseMaximumDriftMS": 0.006208000000007541,
+      "dualElapsedSeconds": 0.386372042,
+      "cacheMiB": 35.15625,
+      "sampledResidentMemoryMiB": 377.578125,
+      "visionStatus": "runtimeUnavailable",
+      "visionFailure": "com.apple.Vision 9: Unable to setup request in VNDetectHumanBodyPoseRequest"
+    },
+    "ipad": {
+      "model": "iPad mini (A17 Pro)",
+      "testsPassed": 16,
+      "testsSkipped": 0,
+      "testsFailed": 0,
+      "sampleFrames": 78,
+      "maximumFrameTimeErrorMS": 0,
+      "frameLatencyMS": {
+        "min": 22.758007049560547,
+        "mean": 44.260215759277344,
+        "max": 72.82805442810059
+      },
+      "dualTimebaseMaximumDriftMS": 0.010125999999999191,
+      "dualElapsedSeconds": 0.387114521,
+      "cacheMiB": 35.15625,
+      "sampledResidentMemoryMiB": 384.0,
+      "visionStatus": "runtimeUnavailable",
+      "visionFailure": "com.apple.Vision 9: Unable to setup request in VNDetectHumanBodyPoseRequest"
+    }
+  }
+}

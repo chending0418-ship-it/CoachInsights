@@ -1,4 +1,4 @@
-Coach Inside: first local engine study, 2026-10-20
+Coach Insights: first local engine study, 2026-10-20
 
 Scope from the user
 - Version 1.0 supports both iPhone and iPad, with device-local storage and no iCloud sync.
@@ -31,12 +31,12 @@ The fastest blurred swing frames are not assigned precise reference points.
 Reproduction on macOS Apple Silicon (from the project root)
 1. Create a Python 3.12 virtual environment and install research/requirements.lock.txt.
    Set the local input path, for example:
-   export COACH_INSIDE_VIDEO="$HOME/Downloads/IMG_9673.mov"
+   export COACH_INSIGHTS_VIDEO="$HOME/Downloads/IMG_9673.mov"
    .venv/bin/python research/prepare_study.py
 2. swiftc -parse-as-library research/inspect_video.swift -o .venv/inspect_video
-   .venv/inspect_video "$COACH_INSIDE_VIDEO" research/results
+   .venv/inspect_video "$COACH_INSIGHTS_VIDEO" research/results
 3. swiftc -parse-as-library research/extract_frames.swift -o .venv/extract_frames
-   .venv/extract_frames "$COACH_INSIDE_VIDEO" research/results/frames
+   .venv/extract_frames "$COACH_INSIGHTS_VIDEO" research/results/frames
 4. swiftc -parse-as-library research/vision_benchmark.swift -o .venv/vision_benchmark
    .venv/vision_benchmark research/results
 5. swiftc -parse-as-library research/optical_flow.swift -o .venv/optical_flow

@@ -1,6 +1,6 @@
 {
   "date": "2026-10-20",
-  "product": "Coach Inside",
+  "product": "Coach Insights",
   "version1": {
     "platforms": [
       "iPhone",
@@ -52,10 +52,10 @@
       "pose": "Apple Vision by native integration cost; no accuracy superiority established",
       "alternativePose": "MediaPipe Full",
       "limitations": [
-        "One batting sample only",
-        "Fast-swing blur remains unreliable",
-        "Pitching not tested",
-        "No iPhone or iPad device latency/memory validation yet"
+        "One batting sample only; pitching not tested",
+        "No iOS pose accuracy qualification yet",
+        "iOS 26.1 simulator Vision setup fails due to missing human-pose weights",
+        "Simulator media/storage/UI validation does not establish physical-device energy or camera characteristics"
       ]
     }
   },
@@ -63,6 +63,14 @@
     {
       "date": "2026-10-20",
       "change": "User removed bat trajectory from the current version. Retain video tools, manual annotations, dual-video comparison and human pose analysis. Archive existing bat-tracking experiments."
+    },
+    {
+      "date": "2026-10-20",
+      "change": "User requires simulator-only development and acceptance for iPhone/iPad; no physical-device verification gate."
+    },
+    {
+      "date": "2026-10-20",
+      "change": "Correct product name to Coach Insights throughout app, native project, identifiers, tests, docs and research presentation; use burgundy #722F37 theme."
     }
   ],
   "developmentPlan": {
@@ -71,7 +79,7 @@
     "todo": "TODO.md",
     "plan": "docs/v1.0-development-plan.md",
     "initialDeploymentTarget": "iOS / iPadOS 17+",
-    "executionStatus": "Planning complete; native iOS application tasks not yet implemented",
+    "executionStatus": "A–C implemented and verified on iPhone/iPad simulators; D–J pending. Vision runtime probe reports missing model weights, not successful pose qualification.",
     "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction"
   }
 }

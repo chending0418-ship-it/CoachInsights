@@ -20,11 +20,11 @@ pose_rows=''
 for key,row in s['pose'].items():
  pose_rows+=f'<tr><td>{key}</td><td>{row["detectedFrames"]} / {row["frames"]}</td><td>{row["medianMSExcludingFirst"]:.1f} ms</td></tr>'
 doc=f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Coach Inside · 识别引擎第一轮实测</title>
+<title>Coach Insights · 识别引擎第一轮实测</title>
 <style>
 :root{{color-scheme:light;--ink:#152532;--muted:#536473;--line:#dce5e8;--green:#136d54}}*{{box-sizing:border-box}}body{{margin:0;background:#eef3f4;color:var(--ink);font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}}main{{max-width:1120px;margin:32px auto;padding:36px 42px;background:white;border-radius:22px}}h1{{font-size:34px;line-height:1.25;margin:12px 0 16px}}h2{{font-size:23px;margin:36px 0 12px}}p{{margin:12px 0}}.eyebrow{{color:var(--green);font-weight:700;letter-spacing:.08em}}.muted{{color:var(--muted)}}.chips{{display:flex;gap:8px;flex-wrap:wrap}}.chips span{{background:#e8f3ed;color:#15533e;padding:5px 12px;border-radius:100px;font-size:14px}}.callout{{background:#eff7f3;border-left:4px solid #2c8966;padding:14px 18px;border-radius:0 12px 12px 0;margin:22px 0}}.note{{background:#fff5e8;padding:14px 18px;border-radius:12px}}table{{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}}th,td{{padding:12px 10px;text-align:left;border-bottom:1px solid var(--line)}}th{{background:#f1f5f6;font-weight:650}}.scroll{{overflow-x:auto}}video,img{{display:block;width:100%;height:auto;border-radius:12px;background:#101620;margin:16px 0}}a{{color:var(--green)}}code{{font:13px ui-monospace,monospace;background:#edf2f4;padding:2px 4px;border-radius:4px}}ul{{padding-left:24px}}footer{{border-top:1px solid var(--line);margin-top:36px;padding-top:18px;font-size:13px;color:var(--muted)}}@media(max-width:700px){{main{{margin:0;border-radius:0;padding:24px 18px}}h1{{font-size:27px}}th,td{{padding:9px 6px}}}}
 </style><main>
-<div class="eyebrow">COACH INSIDE / ENGINE STUDY 01 / 2026.10.20</div>
+<div class="eyebrow">COACH INSIGHTS / ENGINE STUDY 01 / 2026.10.20</div>
 <h1>人体姿态与球棒半自动追踪<br>第一轮本机实测</h1>
 <div class="chips"><span>1.0 支持 iPhone + iPad</span><span>各设备本地保存</span><span>无 iCloud 同步</span><span>球棒轨迹研究已归档</span></div>
 <p class="muted">素材 IMG_9673.mov · 3840 × 2160 · {s['sample']['duration']:.3f} 秒 · 约 29.98 fps · 解码 78 帧。两组测试共用 1280 × 720 图像与原始帧时间戳。视频没有上传到云端推理服务。</p>
