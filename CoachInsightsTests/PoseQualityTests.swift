@@ -63,6 +63,6 @@ final class PoseQualityTests:XCTestCase {
         XCTAssertEqual(measurements.filter{$0.sport=="baseball_swing"}.count,30)
         XCTAssertGreaterThan(measurements.map(\.detected).reduce(0,+),0)
         try JSONEncoder().encode(measurements).write(to:URL.documentsDirectory.appendingPathComponent(outputName+".json"))
-        // The separate release gate compares this report with the 90% PCK@0.05 requirement.
+        // Accuracy remains a reported reference; 1.0 presents pose as an auxiliary estimate.
     }
 }

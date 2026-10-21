@@ -53,9 +53,12 @@ enum AnalysisRenderer {
         UIGraphicsPopContext(); context.restoreGState()
         let cropPoints = [CGPoint(x: crop.minX, y: crop.minY), CGPoint(x: crop.maxX, y: crop.minY),
                           CGPoint(x: crop.maxX, y: crop.maxY), CGPoint(x: crop.minX, y: crop.maxY)].map { geometry.viewPoint(from: $0) }
+        context.saveGState()
         context.beginPath(); context.addLines(between: cropPoints); context.closePath(); context.clip()
         for annotation in annotations { draw(annotation, context: context, geometry: geometry) }
         if let pose { drawPose(pose, context: context, geometry: geometry, confidence: confidence, showAngles: showAngles) }
+        context.restoreGState()
+        drawPoseNotice(pose, context: context, size: size, confidence: confidence)
     }
     static func draw(_ annotation: Annotation, context: CGContext, geometry: VideoGeometry) {
         let points = annotation.points.map { geometry.viewPoint(from: $0.cgPoint) }
@@ -112,6 +115,23 @@ enum AnalysisRenderer {
                 text("\(angle.name) \(Int(angle.degrees.rounded()))°", at: geometry.viewPoint(from: angle.point), color: .cyan, size: 13)
             }
         }
+    }
+    static func drawPoseNotice(_ pose: PoseFrame?, context: CGContext, size: CGSize, confidence: Float) {
+        guard let pose, pose.joints.contains(where: { $0.confidence >= confidence }), size.width > 24, size.height > 24 else { return }
+        context.saveGState(); defer { context.restoreGState() }
+        UIGraphicsPushContext(context); defer { UIGraphicsPopContext() }
+        let margin = max(4, min(12, size.width / 40))
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: max(9, min(22, min(size.width, size.height) * 0.04)), weight: .semibold),
+            .foregroundColor: UIColor.white]
+        let message = PoseGuidance.badge as NSString
+        let measured = message.boundingRect(with: CGSize(width: size.width - 2 * margin - 12, height: .greatestFiniteMagnitude),
+                                            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil).integral
+        let box = CGRect(x: margin, y: max(margin, size.height - margin - measured.height - 8),
+                         width: min(size.width - 2 * margin, measured.width + 12), height: measured.height + 8)
+        context.setFillColor(UIColor.black.withAlphaComponent(0.75).cgColor)
+        context.addPath(UIBezierPath(roundedRect: box, cornerRadius: 4).cgPath); context.fillPath()
+        message.draw(with: box.insetBy(dx: 6, dy: 4), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil)
     }
     static func text(_ text: String, at point: CGPoint, color: UIColor, size: CGFloat) {
         (text as NSString).draw(at: CGPoint(x: point.x + 4, y: point.y + 4), withAttributes: [

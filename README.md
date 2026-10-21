@@ -7,7 +7,7 @@
 - 同时支持 iPhone 和 iPad，视频与分析数据分别保存在各自设备。
 - 不使用 iCloud 同步，不要求登录账号。
 - 支持拍摄、导入、慢放、逐帧查看、画面标注和双视频对比。
-- 支持人体姿态叠加与分析结果导出分享。
+- 人体识别作为辅助估算，支持骨架 / 二维角度叠加与分析结果导出分享，点位需要人工复核。
 
 球棒轨迹、棒头/握柄自动追踪及专用轨迹校正工具已从 1.0 范围移除。通用画面标注仍支持直线、圆框与自由手绘。
 
@@ -20,9 +20,11 @@
 
 ## 当前进度
 
+按已确认的辅助估算范围，1.0 的 62 项 Todo 已完成，新版 Release 已安装并启动于 iPhone / iPad 项目专用模拟器。
+
 已接入完整的本机视频流程：拍摄 / 相册 / 文件导入、逐帧与五档慢放、可编辑标注、关键帧、双视频同步、离线骨架和二维角度、截图 / 单视频 / 双路合成导出。iPhone、iPad 共用原生 Universal 工程，主题为勃艮第红 `#722F37`，使用已确认的棒球瞳孔图标。
 
-[1.0 验收记录](docs/v1.0-validation.md) 说明代码、测试和构建。**人体定位质量尚未达到原定门槛**：可运行和可导出不等于识别准确。具体样本、Full / Heavy 对比及未完成条件见 [姿态引擎验证](docs/pose-engine-validation.md)；TODO 不会把该门禁自动勾选为通过。
+[1.0 验收记录](docs/v1.0-validation.md) 说明代码、测试和构建。2026-10-22 用户确认人体识别以**辅助估算**交付，原 90% 定位目标保留为研究参考，不作为 1.0 发布门槛。遮挡、模糊、侧身和多人场景可能出现点位偏移、左右肢混淆或缺失，高置信度也可能出错；请逐帧人工复核。分析、对比、导出和使用说明均提示限制，带骨架的导出保留估算标识。具体样本与 Full / Heavy 实测数据见 [姿态引擎验证](docs/pose-engine-validation.md)，不将原始结果表述为已达到 90%。
 
 开发与验收统一使用模拟器，不要求真机。模拟器直接使用原生 MediaPipe Full，避开当前运行时缺少 Vision 模型及准备阶段停滞的问题；实际 iOS 代码保留 Vision 优先及错误回退。模型随 App 离线提供，视频不上传。历史球棒追踪研究保留查阅，没有进入 1.0 App。
 
@@ -57,7 +59,7 @@ python3 scripts/build_simulator_release.py --install
 | `CoachInsightsTests/` / `CoachInsightsUITests/` | 媒体、几何、数据安全与双端界面自动化 |
 | `scripts/verify.py` / `build_simulator_release.py` | 双端验证、Release 构建和安装 |
 | `Packages/MediaPipeTasks/` | 固定原生 SDK 清单及许可，二进制不入 Git |
-| `docs/v1.0-validation.md` / `pose-engine-validation.md` | 功能验收与单独的人体质量门禁 |
+| `docs/v1.0-validation.md` / `pose-engine-validation.md` | 功能验收与人体估算的实测限制 |
 | `TODO.md` | 1.0 开发任务与完成状态 |
 | `docs/v1.0-development-plan.md` | 1.0 技术方案和验收依据 |
 | `research/project_decisions.json` | 已确认的产品范围与阶段性技术选择 |

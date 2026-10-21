@@ -7,7 +7,9 @@ struct PoseToolsView: View {
     private var statusMessage:String { workspace.poseBusy ? "正在本机逐帧分析…" : workspace.issue ?? workspace.notice ?? "选定片段与主体区域后开始分析。" }
     var body: some View {
         Form {
-            Section("二维人体姿态") {
+            Section("人体识别 · 辅助估算") {
+                Text(PoseGuidance.limitations)
+                    .font(.callout).accessibilityIdentifier("poseLimitations")
                 Picker("识别引擎",selection:$workspace.poseSettings.engine) {
                     Text("Apple Vision（不可用时自动切换）").tag("Apple Vision")
                     Text("MediaPipe Full · 本机模型").tag(MediaPipePoseEngine.identity)
@@ -17,8 +19,6 @@ struct PoseToolsView: View {
                     Text("关节最低置信度 \(workspace.poseSettings.minimumConfidence, specifier:"%.2f")")
                     Slider(value:$workspace.poseSettings.minimumConfidence,in:0.3...0.9)
                 }.disabled(workspace.poseBusy)
-                Text("肘角、膝角、躯干倾斜均为画面估算，请逐帧复核关节点。置信度不代表定位误差；遮挡、模糊或多人场景可能没有结果。数值不代表三维生物力学测量。")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("指定分析区域") {
                 if let frame=workspace.frame {

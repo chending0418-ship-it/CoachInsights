@@ -30,13 +30,14 @@
       "export/share"
     ],
     "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services.",
-    "poseAnalysisMode": "2D skeleton overlay and image-plane elbow/knee/trunk-angle estimates; no trajectory view",
+    "poseAnalysisMode": "Auxiliary estimates of 2D skeleton and image-plane elbow/knee/trunk angles, with manual frame review and explicit limitations; no trajectory view",
     "poseEngine": {
       "default": "Apple Vision revision 1",
       "fallback": "MediaPipe Full v1 / native Tasks 1.1.1",
       "offline": true,
-      "qualityGate": "not passed; see docs/pose-engine-validation.md",
-      "simulator": "Use bundled MediaPipe Full directly: missing Vision weights and intermittent setup stall are known runtime limitations."
+      "qualityGate": "Auxiliary-estimate delivery explicitly accepted by user on 2026-10-22. The historical 90% PCK@0.05 reference is informational and does not block version 1.0.",
+      "simulator": "Use bundled MediaPipe Full directly: missing Vision weights and intermittent setup stall are known runtime limitations.",
+      "limitations": "Joint offsets, left/right confusion and missing results can occur under occlusion, motion blur, side views or multiple people. High confidence is not proof of accuracy. Visible pose in preview/export carries an estimate notice."
     }
   },
   "research": {
@@ -82,6 +83,10 @@
     {
       "date": "2026-10-22",
       "change": "Reproducible Vision runtime gap justifies native MediaPipe Full fallback. Full and optional Heavy compared against a separate 60-frame human-labelled baseball acceptance set; neither passes the original quality gate. No automatic reduction of the quality commitment."
+    },
+    {
+      "date": "2026-10-22",
+      "change": "User explicitly accepts human-pose recognition as an auxiliary estimate with clear limitations. Remove the 90% release blocker, retain original accuracy measurements, add manual-review guidance and a shared estimate notice for preview/export, and complete remaining TODO on the development branch without merging main."
     }
   ],
   "developmentPlan": {
@@ -90,7 +95,7 @@
     "todo": "TODO.md",
     "plan": "docs/v1.0-development-plan.md",
     "initialDeploymentTarget": "iOS / iPadOS 17+",
-    "executionStatus": "Video workflow, editable annotations, synchronized comparison, offline pose pipeline and export implemented. Final iPhone/iPad simulator regression: 79 passed, zero failures, one device-specific skip; two additional size checks passed. Release compiled for arm64 simulator and iOS. Pose quality V1-048 and final delivery confirmation V1-062 remain open.",
+    "executionStatus": "All 62 version 1.0 TODO items completed under the user-approved auxiliary-estimate scope. iPhone/iPad simulator regression: 81 passed, zero failures, one device-specific skip. Updated Release compiled for arm64 simulator and iOS, installed and launched on both QA simulators. Historical accuracy measurements retained without a 90% release blocker; development branch only, no main merge.",
     "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction",
     "validationRecord": "docs/v1.0-validation.md",
     "poseQualityRecord": "docs/pose-engine-validation.md"

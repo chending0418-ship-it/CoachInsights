@@ -180,6 +180,7 @@ private final class CanvasOverlay: UIView {
         guard let context = UIGraphicsGetCurrentContext(), geometry.isValid else { return }
         let crop = geometry.crop
         let corners = [CGPoint(x: crop.minX, y: crop.minY), CGPoint(x: crop.maxX, y: crop.minY), CGPoint(x: crop.maxX, y: crop.maxY), CGPoint(x: crop.minX, y: crop.maxY)].map { geometry.viewPoint(from: $0) }
+        context.saveGState()
         context.addLines(between: corners); context.closePath(); context.clip()
         for annotation in annotations { AnalysisRenderer.draw(annotation, context: context, geometry: geometry) }
         if !draft.isEmpty {
@@ -194,6 +195,8 @@ private final class CanvasOverlay: UIView {
                 context.setStrokeColor(UIColor(hex: "#722F37").cgColor); context.strokeEllipse(in: CGRect(x:p.x-5,y:p.y-5,width:10,height:10))
             }
         }
+        context.restoreGState()
+        AnalysisRenderer.drawPoseNotice(pose, context: context, size: bounds.size, confidence: confidence)
     }
 }
 

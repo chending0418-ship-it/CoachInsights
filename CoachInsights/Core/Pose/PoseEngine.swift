@@ -160,7 +160,7 @@ extension AnalysisWorkspace {
                 actual.visible=poseSettings.visible
                 poseSettings=actual; snapshot.poseResults.removeAll { $0.videoID==asset.id }; snapshot.poseResults.append(result); save()
                 let usable=result.frames.filter { !$0.joints.isEmpty }.count
-                notice="分析完成：\(usable) / \(result.frames.count) 帧有可用关节。空缺帧请调整区域或检查遮挡。"; issue=nil
+                notice="分析完成（辅助估算）：\(usable) / \(result.frames.count) 帧有可用关节。请人工复核点位；空缺帧请调整区域或检查遮挡。"; issue=nil
             } catch is CancellationError { notice="已取消姿态分析，原有结果保留。" }
             catch { issue=error.localizedDescription }
         }

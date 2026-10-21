@@ -139,6 +139,9 @@ extension CoachInsightsUITests {
         XCTAssertTrue(readout.label.contains("第 3 /"),readout.label)
         XCUIDevice.shared.orientation = .portrait
         let poseTools=app.buttons["poseTools"];reveal(poseTools,in:app);poseTools.tap()
+        let limitations=app.staticTexts["poseLimitations"]
+        XCTAssertTrue(limitations.waitForExistence(timeout:5))
+        XCTAssertTrue(limitations.label.contains("辅助估算") && limitations.label.contains("高置信度也可能出错"))
         let runPose=app.buttons["runPose"];reveal(runPose,in:app);runPose.tap()
         let status=app.descendants(matching:.any).matching(identifier:"poseStatus").firstMatch
         XCTAssertTrue(status.waitForExistence(timeout:20))
@@ -149,6 +152,7 @@ extension CoachInsightsUITests {
         XCTAssertTrue(readout.waitForExistence(timeout:10));reveal(count,in:app)
         XCTAssertTrue(count.label.contains("1 个标注"));XCTAssertTrue(count.label.contains("1 个关键帧"))
         let export=app.staticTexts["导出分析"].firstMatch;reveal(export,in:app);export.tap()
+        XCTAssertTrue(app.staticTexts["exportPoseLimitations"].waitForExistence(timeout:5))
         let screenshot=app.buttons["exportScreenshot"];XCTAssertTrue(screenshot.waitForExistence(timeout:5));screenshot.tap()
         XCTAssertTrue(app.staticTexts["exportComplete"].waitForExistence(timeout:20))
         let share=app.buttons["shareExport"];reveal(share,in:app);XCTAssertTrue(share.isEnabled)

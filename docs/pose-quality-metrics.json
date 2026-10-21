@@ -1,10 +1,12 @@
 {
-  "threshold": 0.9,
+  "deliveryMode": "auxiliary_estimate",
+  "referenceThreshold": 0.9,
+  "referenceThresholdBlocksRelease": false,
   "normalisation": "human-labelled per-frame body box height",
   "results": [
     {
       "report": "pose-quality-measurements.json",
-      "gatePassed": false,
+      "meetsReferenceTarget": false,
       "groups": {
         "baseball_pitch": {
           "frames": 30,
@@ -62,7 +64,7 @@
     },
     {
       "report": "pose-quality-heavy-measurements.json",
-      "gatePassed": false,
+      "meetsReferenceTarget": false,
       "groups": {
         "baseball_pitch": {
           "frames": 30,

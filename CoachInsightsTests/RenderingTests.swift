@@ -3,6 +3,30 @@ import UIKit
 @testable import CoachInsights
 
 @MainActor final class RenderingTests:XCTestCase {
+    func testPoseEstimateNoticeSurvivesLetterboxAndIsAbsentWithoutVisibleJoints() throws {
+        let size=CGSize(width:400,height:400)
+        let image=UIGraphicsImageRenderer(size:CGSize(width:400,height:200)).image { c in
+            UIColor.black.setFill();c.fill(CGRect(x:0,y:0,width:400,height:200))
+        }.cgImage!
+        let joint=PoseJoint(name:"leftShoulder",position:.init(x:0.5,y:0.25),confidence:0.9)
+        let pose=PoseFrame(time:MediaTime(seconds:0),joints:[joint])
+        func brightPixels(_ frame:PoseFrame?,confidence:Float=0.3)->Int {
+            let result=AnalysisRenderer.render(image:image,size:size,settings:ViewSettings(),annotations:[],pose:frame,confidence:confidence).cgImage!
+            var data=[UInt8](repeating:0,count:400*400*4)
+            let context=CGContext(data:&data,width:400,height:400,bitsPerComponent:8,bytesPerRow:1600,
+                                  space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(result,in:CGRect(origin:.zero,size:size))
+            return (320..<396).reduce(0) { sum,y in sum+(4..<396).filter { x in
+                let index=(y*400+x)*4
+                return data[index]>150 && data[index+1]>150 && data[index+2]>150
+            }.count }
+        }
+        // The letterbox below y=300 has no source pixels or skeleton; only the shared notice can appear here.
+        XCTAssertGreaterThan(brightPixels(pose),100)
+        XCTAssertEqual(brightPixels(nil),0)
+        XCTAssertEqual(brightPixels(PoseFrame(time:MediaTime(seconds:0),joints:[])),0)
+        XCTAssertEqual(brightPixels(pose,confidence:0.95),0)
+    }
     func testAllVectorToolsAndPoseShareRotatedExportGeometry() throws {
         let image=UIGraphicsImageRenderer(size:CGSize(width:400,height:200)).image { c in
             UIColor.darkGray.setFill();c.fill(CGRect(x:0,y:0,width:400,height:200))

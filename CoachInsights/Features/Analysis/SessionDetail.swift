@@ -73,7 +73,7 @@ struct AnalysisEditor: View {
                             Button("人体分析", systemImage: "figure.stand") { w.pause(); showPose = true }.accessibilityIdentifier("poseTools")
                         }.buttonStyle(.bordered)
                         if let pose=w.currentPose {
-                            Text("关节点覆盖 \(pose.joints.filter { $0.name != "nose" }.count) / 12 · 角度为画面估算，请复核点位")
+                            Text("关节点覆盖 \(pose.joints.filter { $0.name != "nose" }.count) / 12 · 辅助估算，请逐帧复核点位")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         keyframes

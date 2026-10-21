@@ -28,7 +28,11 @@ struct ExportView:View {
                 if !assets.isEmpty {
                     Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
                     Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
-                    Toggle("包含可见骨架和角度",isOn:$includePose).disabled(busy)
+                    Toggle("包含可见骨架和角度（辅助估算）",isOn:$includePose).disabled(busy)
+                    if includePose {
+                        Text(PoseGuidance.exportNotice).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("exportPoseLimitations")
+                    }
                     if !compare {
                         Picker("视频速度",selection:$rate) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } }.disabled(busy)
                         Toggle("保留原声（仅 1×）",isOn:$audio).disabled(busy || rate != 1)

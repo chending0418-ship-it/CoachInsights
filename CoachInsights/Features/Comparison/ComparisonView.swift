@@ -52,6 +52,7 @@ struct ComparisonEditor:View {
                         }
                         Text("分别定位两路动作节点，设为同步点；共享时间 0 表示这两个节点。共同区间之外不会继续播放。")
                             .font(.caption).foregroundStyle(.secondary)
+                        Text(PoseGuidance.summary).font(.caption).foregroundStyle(.secondary)
                         NavigationLink("导出同屏视频") { ExportView(session:workspace.session,initialComparison:true) }
                     } else {
                         EmptyPanel(icon:"rectangle.split.2x1",title:"将两次动作放在一起",detail:"先在分析记录中导入两段本机视频，然后选择同步节点。")
