@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-20",
+  "date": "2026-10-22",
   "product": "Coach Insights",
   "version1": {
     "platforms": [
@@ -30,7 +30,14 @@
       "export/share"
     ],
     "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services.",
-    "poseAnalysisMode": "2D skeleton overlay and image-plane elbow/knee/trunk-angle estimates; no trajectory view"
+    "poseAnalysisMode": "2D skeleton overlay and image-plane elbow/knee/trunk-angle estimates; no trajectory view",
+    "poseEngine": {
+      "default": "Apple Vision revision 1",
+      "fallback": "MediaPipe Full v1 / native Tasks 1.1.1",
+      "offline": true,
+      "qualityGate": "not passed; see docs/pose-engine-validation.md",
+      "simulator": "Use bundled MediaPipe Full directly: missing Vision weights and intermittent setup stall are known runtime limitations."
+    }
   },
   "research": {
     "sample": "IMG_9673.mov (provided locally; not included in the repository)",
@@ -52,10 +59,10 @@
       "pose": "Apple Vision by native integration cost; no accuracy superiority established",
       "alternativePose": "MediaPipe Full",
       "limitations": [
-        "One batting sample only; pitching not tested",
-        "No iOS pose accuracy qualification yet",
-        "iOS 26.1 simulator Vision setup fails due to missing human-pose weights",
-        "Simulator media/storage/UI validation does not establish physical-device energy or camera characteristics"
+        "Original desktop experiment used one batting clip and did not qualify iOS accuracy.",
+        "iOS 26.1 simulator Vision lacks human-pose weights; native Full fallback now runs.",
+        "Independent 60-frame human-labelled acceptance set fails the original 90% PCK@0.05 gate for Full and Heavy.",
+        "Simulator acceptance does not establish physical camera, energy or thermal behaviour; physical-device validation is explicitly out of scope."
       ]
     }
   },
@@ -71,6 +78,10 @@
     {
       "date": "2026-10-20",
       "change": "Correct product name to Coach Insights throughout app, native project, identifiers, tests, docs and research presentation; use burgundy #722F37 theme."
+    },
+    {
+      "date": "2026-10-22",
+      "change": "Reproducible Vision runtime gap justifies native MediaPipe Full fallback. Full and optional Heavy compared against a separate 60-frame human-labelled baseball acceptance set; neither passes the original quality gate. No automatic reduction of the quality commitment."
     }
   ],
   "developmentPlan": {
@@ -79,7 +90,9 @@
     "todo": "TODO.md",
     "plan": "docs/v1.0-development-plan.md",
     "initialDeploymentTarget": "iOS / iPadOS 17+",
-    "executionStatus": "A–C implemented and verified on iPhone/iPad simulators; D–J pending. Vision runtime probe reports missing model weights, not successful pose qualification.",
-    "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction"
+    "executionStatus": "Video workflow, editable annotations, synchronized comparison, offline pose pipeline and export implemented. Final iPhone/iPad simulator regression: 79 passed, zero failures, one device-specific skip; two additional size checks passed. Release compiled for arm64 simulator and iOS. Pose quality V1-048 and final delivery confirmation V1-062 remain open.",
+    "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction",
+    "validationRecord": "docs/v1.0-validation.md",
+    "poseQualityRecord": "docs/pose-engine-validation.md"
   }
 }

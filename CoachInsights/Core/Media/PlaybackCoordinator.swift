@@ -12,6 +12,7 @@ import UIKit
         self.timeline = timeline
     }
     @discardableResult func seek(frame index: Int) async -> Bool {
+        guard !Task.isCancelled else { return false }
         generation &+= 1
         let token = generation
         player.pause()
@@ -40,7 +41,7 @@ struct ComparisonClock {
     var commonRange: ClosedRange<Double>? {
         let start = max(leftRange.lowerBound - leftAnchor, rightRange.lowerBound - rightAnchor)
         let end = min(leftRange.upperBound - leftAnchor, rightRange.upperBound - rightAnchor)
-        return start <= end ? start...end : nil
+        return start < end ? start...end : nil
     }
     func times(at analysisTime: Double) -> (Double, Double)? {
         guard let range = commonRange else { return nil }
@@ -55,18 +56,29 @@ struct ComparisonClock {
     init(left: PlaybackCoordinator, right: PlaybackCoordinator, clock: ComparisonClock) {
         self.left = left; self.right = right; self.clock = clock
     }
+    func frameIndices(at analysisTime:Double)->(Int,Int)? {
+        guard let times=clock.times(at:analysisTime),let range=clock.commonRange else { return nil }
+        let a=ClipRange(start:MediaTime(seconds:clock.leftRange.lowerBound),end:MediaTime(seconds:range.upperBound+clock.leftAnchor))
+        let b=ClipRange(start:MediaTime(seconds:clock.rightRange.lowerBound),end:MediaTime(seconds:range.upperBound+clock.rightAnchor))
+        guard let i=left.timeline.presentingFrame(at:MediaTime(seconds:times.0),in:a),let j=right.timeline.presentingFrame(at:MediaTime(seconds:times.1),in:b) else { return nil }
+        return (i,j)
+    }
     func prepare(at analysisTime: Double) async throws {
-        guard let (a, b) = clock.times(at: analysisTime) else { throw MediaFailure.invalidTiming }
+        guard clock.times(at: analysisTime) != nil else { throw MediaFailure.invalidTiming }
         try await waitUntilReady()
         // Preparation can complete separately; playback starts together on the shared host clock.
-        let first = await left.seek(frame: left.timeline.nearestFrame(to: MediaTime(seconds: a)))
-        let second = await right.seek(frame: right.timeline.nearestFrame(to: MediaTime(seconds: b)))
+        guard let indices=frameIndices(at:analysisTime) else { throw MediaFailure.invalidTiming }
+        let first = await left.seek(frame: indices.0)
+        let second = await right.seek(frame: indices.1)
         guard first && second else { throw MediaFailure.readFailed }
     }
     func start(at analysisTime: Double, rate: Float) throws {
         guard let (a, b) = clock.times(at: analysisTime), rate.isFinite, rate > 0 else {
             throw MediaFailure.invalidTiming
         }
+        guard let range=clock.commonRange else { throw MediaFailure.invalidTiming }
+        left.player.currentItem?.forwardPlaybackEndTime=MediaTime(seconds:range.upperBound+clock.leftAnchor).cmTime
+        right.player.currentItem?.forwardPlaybackEndTime=MediaTime(seconds:range.upperBound+clock.rightAnchor).cmTime
         let host = CMTimeAdd(CMClockGetTime(CMClockGetHostTimeClock()), CMTime(seconds: 0.15, preferredTimescale: 600_000))
         left.player.setRate(rate, time: MediaTime(seconds: a).cmTime, atHostTime: host)
         right.player.setRate(rate, time: MediaTime(seconds: b).cmTime, atHostTime: host)

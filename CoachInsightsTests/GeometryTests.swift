@@ -52,4 +52,19 @@ final class GeometryTests: XCTestCase {
         XCTAssertLessThanOrEqual(cache.totalCost, 10)
         cache.removeAll(); XCTAssertEqual(cache.totalCost, 0)
     }
+    func testVFRPresentationHoldsPreviousFrameAndFrameRangesAreExclusive() throws {
+        let times=[0.0,0.1,0.6,0.7]
+        let frames=times.enumerated().map { i,t in FrameSample(presentationTime:MediaTime(seconds:t),duration:MediaTime(seconds:i<3 ? times[i+1]-t:0.1)) }
+        let map=try MediaTimeMap(frames:frames,segments:[TimelineSegment(sourceID:"vfr",sourceStart:MediaTime(seconds:0),sourceDuration:MediaTime(seconds:0.8),presentationStart:MediaTime(seconds:0),presentationDuration:MediaTime(seconds:0.8))],duration:MediaTime(seconds:0.8))
+        XCTAssertEqual(map.nearestFrame(to:MediaTime(seconds:0.4)),2)
+        XCTAssertEqual(map.presentingFrame(at:MediaTime(seconds:0.4)),1)
+        XCTAssertEqual(map.presentingFrame(at:MediaTime(seconds:0.59)),1)
+        XCTAssertEqual(map.presentingFrame(at:MediaTime(seconds:0.6)),2)
+        let range=ClipRange(start:MediaTime(seconds:0.1),end:MediaTime(seconds:0.6))
+        XCTAssertEqual(map.presentingFrame(at:MediaTime(seconds:1),in:range),1)
+        let annotation=Annotation(videoID:UUID(),kind:"line",points:[.init(x:0,y:0),.init(x:1,y:1)],range:range)
+        XCTAssertTrue(AnalysisRenderer.visible(annotation,at:0.1,tolerance:0.00001))
+        XCTAssertFalse(AnalysisRenderer.visible(annotation,at:0.6,tolerance:0.00001))
+    }
+
 }

@@ -103,6 +103,31 @@ struct MediaTimeMap: Codable, Equatable, Sendable {
         return before <= after ? low - 1 : low
     }
 
+    // Playback holds a sample until the next PTS. Nearest-frame selection can show a future VFR frame early.
+    func presentingFrame(at time:MediaTime)->Int {
+        let target=time.seconds+0.000001 // Accommodate the app's 600000-tick seek-time quantisation.
+        var lower=0,upper=frames.count
+        while lower<upper {
+            let middle=(lower+upper)/2
+            if frames[middle].presentationTime.seconds<=target { lower=middle+1 } else { upper=middle }
+        }
+        return max(0,lower-1)
+    }
+    func presentingFrame(at time:MediaTime,in range:ClipRange)->Int? {
+        guard let bounds=frameBounds(in:range) else { return nil }
+        return min(bounds.upperBound,max(bounds.lowerBound,presentingFrame(at:time)))
+    }
+    func frameBounds(in range:ClipRange) -> ClosedRange<Int>? {
+        var lower=nearestFrame(to:range.start),upper=nearestFrame(to:range.end)
+        if frames[lower].presentationTime.seconds < range.start.seconds-0.000001 { lower+=1 }
+        if frames[upper].presentationTime.seconds >= range.end.seconds-0.000001 { upper-=1 }
+        guard lower<=upper,lower<frames.count,upper>=0 else { return nil }
+        return lower...upper
+    }
+    func frameIndex(at time:MediaTime,in range:ClipRange)->Int? {
+        guard let bounds=frameBounds(in:range) else { return nil }
+        return min(bounds.upperBound,max(bounds.lowerBound,nearestFrame(to:time)))
+    }
     func steppedIndex(from index: Int, by offset: Int) -> Int {
         let start = min(max(index, 0), frames.count - 1)
         if offset > 0 { return start + min(offset, frames.count - 1 - start) }

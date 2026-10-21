@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the dependency-free Universal Xcode project. Run after target/config changes."""
+"""Generate the Universal Xcode project with pinned local MediaPipe package."""
 from pathlib import Path
 import hashlib
 
@@ -15,6 +15,9 @@ def ref(name):
 def array(values):
     return "(" + ", ".join(values) + ",)"
 targets = ["CoachInsights", "CoachInsightsTests", "CoachInsightsUITests"]
+package = add("PosePackage", '{isa = XCLocalSwiftPackageReference; relativePath = Packages/MediaPipeTasks; }')
+poseProduct = add("PoseProduct", f'{{isa = XCSwiftPackageProductDependency; package = {package}; productName = MediaPipeTasksVision; }}')
+poseBuild = add("PoseBuild", f'{{isa = PBXBuildFile; productRef = {poseProduct}; }}')
 product = {}
 for name in targets:
     (ROOT / name).mkdir(exist_ok=True)
@@ -22,7 +25,7 @@ for name in targets:
     product[name] = add(name+"Product", f'{{isa = PBXFileReference; explicitFileType = {"wrapper.application" if app else "wrapper.cfbundle"}; path = {name}.{"app" if app else "xctest"}; sourceTree = BUILT_PRODUCTS_DIR; }}')
     add(name+"Group", f'{{isa = PBXFileSystemSynchronizedRootGroup; path = {name}; sourceTree = "<group>"; }}')
     for phase in ["Sources", "Frameworks", "Resources"]:
-        add(name+phase, f'{{isa = PBX{phase}BuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; }}')
+        add(name+phase, f'{{isa = PBX{phase}BuildPhase; buildActionMask = 2147483647; files = {array([poseBuild]) if app and phase == "Frameworks" else "()"}; runOnlyForDeploymentPostprocessing = 0; }}')
     for config in ["Debug", "Release"]:
         settings = {
             "PRODUCT_BUNDLE_IDENTIFIER": f"com.coachinsights.{name}",
@@ -52,15 +55,15 @@ for name in targets:
         proxy = add(name+"Proxy", f'{{isa = PBXContainerItemProxy; containerPortal = {ref("Project")}; proxyType = 1; remoteGlobalIDString = {ref("CoachInsightsTarget")}; remoteInfo = CoachInsights; }}')
         dependencies.append(add(name+"Dependency", f'{{isa = PBXTargetDependency; target = {ref("CoachInsightsTarget")}; targetProxy = {proxy}; }}'))
     kind = "application" if app else "bundle.unit-test" if name == "CoachInsightsTests" else "bundle.ui-testing"
-    add(name+"Target", f'{{isa = PBXNativeTarget; buildConfigurationList = {ref(name+"Configs")}; buildPhases = {array([ref(name+p) for p in ["Sources","Frameworks","Resources"]])}; buildRules = (); dependencies = {array(dependencies) if dependencies else "()"}; fileSystemSynchronizedGroups = ({ref(name+"Group")},); name = {name}; productName = {name}; productReference = {product[name]}; productType = "com.apple.product-type.{kind}"; }}')
+    add(name+"Target", f'{{isa = PBXNativeTarget; buildConfigurationList = {ref(name+"Configs")}; buildPhases = {array([ref(name+p) for p in ["Sources","Frameworks","Resources"]])}; buildRules = (); dependencies = {array(dependencies) if dependencies else "()"}; fileSystemSynchronizedGroups = ({ref(name+"Group")},); packageProductDependencies = {array([poseProduct]) if app else "()"}; name = {name}; productName = {name}; productReference = {product[name]}; productType = "com.apple.product-type.{kind}"; }}')
 add("Products", f'{{isa = PBXGroup; children = {array(list(product.values()))}; name = Products; sourceTree = "<group>"; }}')
 add("MainGroup", f'{{isa = PBXGroup; children = {array([ref(n+"Group") for n in targets]+[ref("Products")])}; sourceTree = "<group>"; }}')
 for config in ["Debug", "Release"]:
-    settings = 'CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; SDKROOT = iphoneos; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
+    settings = '"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; SDKROOT = iphoneos; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
     settings += ' DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)"); ONLY_ACTIVE_ARCH = YES;' if config == "Debug" else ' DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O";'
     add("Project"+config, f'{{isa = XCBuildConfiguration; buildSettings = {{{settings}}}; name = {config}; }}')
 add("ProjectConfigs", f'{{isa = XCConfigurationList; buildConfigurations = ({ref("ProjectDebug")}, {ref("ProjectRelease")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; }}')
-add("Project", f'{{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2610; }}; buildConfigurationList = {ref("ProjectConfigs")}; compatibilityVersion = "Xcode 16.0"; developmentRegion = zh-Hans; hasScannedForEncodings = 0; knownRegions = (en, "zh-Hans", Base); mainGroup = {ref("MainGroup")}; minimizedProjectReferenceProxies = 1; preferredProjectObjectVersion = 77; productRefGroup = {ref("Products")}; projectDirPath = ""; projectRoot = ""; targets = {array([ref(n+"Target") for n in targets])}; }}')
+add("Project", f'{{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2610; }}; buildConfigurationList = {ref("ProjectConfigs")}; compatibilityVersion = "Xcode 16.0"; developmentRegion = zh-Hans; hasScannedForEncodings = 0; knownRegions = (en, "zh-Hans", Base); mainGroup = {ref("MainGroup")}; minimizedProjectReferenceProxies = 1; preferredProjectObjectVersion = 77; productRefGroup = {ref("Products")}; packageReferences = ({package},); projectDirPath = ""; projectRoot = ""; targets = {array([ref(n+"Target") for n in targets])}; }}')
 project = ROOT / "CoachInsights.xcodeproj"
 project.mkdir(exist_ok=True)
 (project / "project.pbxproj").write_text("// !$*UTF8*$!\n{\narchiveVersion = 1;\nclasses = {};\nobjectVersion = 77;\nobjects = {\n" + "\n".join(f"{key} = {value};" for key,value in objects.items()) + f"\n}};\nrootObject = {ref('Project')};\n}}\n")

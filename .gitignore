@@ -25,3 +25,9 @@ artifacts/
 build/
 *.xcresult/
 .swiftpm/
+
+# Reproducibly downloaded, bundled offline pose model
+*.task
+
+# Optional private/public QA media and human reference coordinates
+CoachInsightsTests/LocalFixtures/

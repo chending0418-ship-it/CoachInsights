@@ -48,24 +48,28 @@ import SwiftData
         session.name = cleanName(name); session.updatedAt = Date()
         do { try context.save() } catch { context.rollback(); throw error }
     }
-    func importVideo(_ source: URL, into session: AnalysisSession) async throws -> VideoAsset {
+    func importVideo(_ source: URL, into session: AnalysisSession, timing: MediaMetadata? = nil,
+                     progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> VideoAsset {
         guard !importingSessions.contains(session.id) else { throw StorageFailure.busy }
         importingSessions.insert(session.id)
         defer { importingSessions.remove(session.id) }
-        let stored = try await files.importCopy(from: source)
+        let stored = try await files.importCopy(from: source, progress: progress)
         let url = try await files.existingURL(stored.relativePath)
         // Failed inspection leaves an unreferenced immutable file; recovery removes it safely.
-        let metadata = try await inspector.inspect(url: url)
+        let original = try await inspector.inspect(url: url)
+        let metadata = timing ?? original
+        try metadata.validateVersion()
+        try Task.checkCancellation()
         var snapshot = try session.snapshot()
         let asset: VideoAsset
-        if let existing = try assets().first(where: { $0.contentHash == stored.hash }) { asset = existing }
+        if let existing = try assets().first(where: { $0.contentHash == stored.hash && (try? $0.metadata()) == metadata }) { asset = existing }
         else {
             asset = try VideoAsset(relativePath: stored.relativePath, contentHash: stored.hash,
                                   originalName: stored.originalName, metadata: metadata)
             context.insert(asset)
         }
         if !snapshot.videoIDs.contains(asset.id) { snapshot.videoIDs.append(asset.id) }
-        snapshot.clips[asset.id.uuidString] = ClipRange(start: MediaTime(.zero), end: metadata.timeline.duration)
+        if snapshot.clips[asset.id.uuidString] == nil { snapshot.clips[asset.id.uuidString] = ClipRange(start: metadata.timeline.frames[0].presentationTime, end: metadata.timeline.duration) }
         do { try save(session, snapshot: snapshot); return asset }
         catch { context.rollback(); throw error }
     }

@@ -20,27 +20,34 @@
 
 ## 当前进度
 
-已建立原生 Universal Xcode 工程，当前交付范围为 TODO A–C（工程与页面骨架、媒体基础、本机数据）。主题为勃艮第红 `#722F37`。完整拍摄、分析编辑、对比和导出在 D–J 继续实现。
+已接入完整的本机视频流程：拍摄 / 相册 / 文件导入、逐帧与五档慢放、可编辑标注、关键帧、双视频同步、离线骨架和二维角度、截图 / 单视频 / 双路合成导出。iPhone、iPad 共用原生 Universal 工程，主题为勃艮第红 `#722F37`，使用已确认的棒球瞳孔图标。
 
-开发与验收统一使用 iPhone、iPad 模拟器，不要求实体设备。人体引擎暂选 Apple Vision；当前 iOS 26.1 模拟器的 Vision 人体模型缺失，探针已明确报告不可用，尚未通过识别可用性或质量门禁。后续 H 阶段需解决模拟器推理，再进行人体质量验收；保留 MediaPipe Full 备选。
+[1.0 验收记录](docs/v1.0-validation.md) 说明代码、测试和构建。**人体定位质量尚未达到原定门槛**：可运行和可导出不等于识别准确。具体样本、Full / Heavy 对比及未完成条件见 [姿态引擎验证](docs/pose-engine-validation.md)；TODO 不会把该门禁自动勾选为通过。
 
-已有球棒追踪代码、数值结果及报告作为历史研究资料保留；BootsTAPIR 不作为当前 1.0 的开发或部署依赖。
+开发与验收统一使用模拟器，不要求真机。模拟器直接使用原生 MediaPipe Full，避开当前运行时缺少 Vision 模型及准备阶段停滞的问题；实际 iOS 代码保留 Vision 优先及错误回退。模型随 App 离线提供，视频不上传。历史球棒追踪研究保留查阅，没有进入 1.0 App。
 
 ## 构建与验证
 
-使用 Xcode 打开 `CoachInsights.xcodeproj`，选择 `CoachInsights` scheme 与 iPhone / iPad 模拟器运行；最低部署版本为 iOS / iPadOS 17。当前验证环境为 Xcode 26.1.1、iOS 26.1。原生 App 无第三方依赖。
+使用 Apple Silicon Mac 与 Xcode 26.1.1 或兼容版本；最低部署目标 iOS / iPadOS 17。当前原生依赖的模拟器二进制仅支持 arm64，CI 使用 `macos-26` runner。
 
 ```sh
-# 创建或复用项目专用模拟器，依次构建、运行单元与 UI 测试
+# 首次构建：校验并准备离线模型，再打开 Xcode 工程
+python3 scripts/prepare_dependencies.py
+python3 scripts/generate_project.py
+
+# 两类专用模拟器，构建并运行单元 / UI 测试
 python3 scripts/verify.py
 
-# 可选：加入用户提供的本机回归视频；视频不会进入 Git
+# 可选本机回归片段；不进入 Git
 python3 scripts/verify.py --regression /absolute/path/IMG_9673.mov
+
+# 生成 Release 并安装到项目专用 iPhone / iPad 模拟器
+python3 scripts/build_simulator_release.py --install
 ```
 
-可通过 `--device iphone` / `--device ipad` 选择一端，`--unit-only` 仅运行核心测试。日志、xcresult、探针 JSON 存放在忽略的 `artifacts/`，验证构建位于 `build/DerivedData/Build/Products/Debug-iphonesimulator/CoachInsights.app`；本轮另有不含测试资源与 Debug 探针的 Release 构建 `build/ReleaseData/Build/Products/Release-iphonesimulator/CoachInsights.app`。未提供私有视频时，该用例标记跳过，合成媒体测试照常运行。
+`--device iphone` / `--device ipad` 选择一端，`--unit-only` 运行核心测试。结果保存在忽略的 `artifacts/`；Release 位于 `build/ReleaseV1/Build/Products/Release-iphonesimulator/CoachInsights.app`。可选私有视频、公开质量样本或系统相册测试素材缺失时，相应用例明确跳过，不能视为识别质量通过。
 
-[ABC 验收记录](docs/abc-validation.md) 说明当前能力、模拟器结果与后续门禁。自动工作流也运行同一入口；云端 CI 结果以 GitHub Actions 实际运行状态为准。
+公开人工标注质量集可使用含 numpy、opencv-python 的研究 Python 环境执行 `scripts/prepare_pose_quality.py --include-heavy`；依赖、帧和模型不进入原生 App。质量评估脚本与判定方式见姿态验证记录。SPM 原生依赖和许可见 [MediaPipe 包说明](Packages/MediaPipeTasks/README.md)。
 
 ## 仓库内容
 
@@ -48,7 +55,9 @@ python3 scripts/verify.py --regression /absolute/path/IMG_9673.mov
 | --- | --- |
 | `CoachInsights/` | SwiftUI 页面、UIKit 视频承载、原生媒体服务与本机数据层 |
 | `CoachInsightsTests/` / `CoachInsightsUITests/` | 媒体、几何、数据安全与双端界面自动化 |
-| `scripts/verify.py` | 仅使用模拟器的构建验证入口 |
+| `scripts/verify.py` / `build_simulator_release.py` | 双端验证、Release 构建和安装 |
+| `Packages/MediaPipeTasks/` | 固定原生 SDK 清单及许可，二进制不入 Git |
+| `docs/v1.0-validation.md` / `pose-engine-validation.md` | 功能验收与单独的人体质量门禁 |
 | `TODO.md` | 1.0 开发任务与完成状态 |
 | `docs/v1.0-development-plan.md` | 1.0 技术方案和验收依据 |
 | `research/project_decisions.json` | 已确认的产品范围与阶段性技术选择 |

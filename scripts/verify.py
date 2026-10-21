@@ -20,6 +20,7 @@ if args.regression:
     fixture = ROOT / "CoachInsightsTests/LocalFixtures/Regression.mov"
     fixture.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(args.regression.expanduser().resolve(), fixture)
+run("python3", "scripts/prepare_dependencies.py")
 run("python3", "scripts/generate_project.py")
 runtimes = [r for r in sim_json("list", "runtimes")["runtimes"]
             if r["isAvailable"] and r["name"].startswith("iOS ")]
@@ -41,7 +42,7 @@ for kind in (["iphone", "ipad"] if args.device == "both" else [args.device]):
                    runtime["identifier"], capture_output=True).stdout.strip()
     output = ROOT / "artifacts" / kind
     output.mkdir(parents=True, exist_ok=True)
-    result = output / ("Units.xcresult" if args.unit_only else "ABC.xcresult")
+    result = output / ("Units.xcresult" if args.unit_only else "V1.xcresult")
     if result.exists():
         shutil.rmtree(result)
     command = ["xcodebuild", "-project", "CoachInsights.xcodeproj", "-scheme", "CoachInsights",
@@ -55,6 +56,7 @@ for kind in (["iphone", "ipad"] if args.device == "both" else [args.device]):
     print(f"{kind}: PASS; {result}", flush=True)
     container = run("xcrun", "simctl", "get_app_container", udid, "com.coachinsights.CoachInsights",
                     "data", capture_output=True).stdout.strip()
-    for report in (Path(container) / "Documents").glob("probe-report*.json"):
-        shutil.copy2(report, output / report.name)
+    for pattern in ["probe-report*.json", "pose-*.json"]:
+        for report in (Path(container) / "Documents").glob(pattern):
+            shutil.copy2(report, output / report.name)
 print("Simulator verification complete. Private media and artifacts remain ignored.")

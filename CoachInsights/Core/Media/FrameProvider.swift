@@ -24,6 +24,7 @@ actor FrameProvider {
     }
 
     func frame(at index: Int) async throws -> ResolvedFrame {
+        try Task.checkCancellation()
         if pressureTask == nil {
             pressureTask = Task { [weak self] in
                 for await _ in NotificationCenter.default.notifications(named: UIApplication.didReceiveMemoryWarningNotification) {
@@ -38,6 +39,7 @@ actor FrameProvider {
         // A generator per outstanding request keeps cancellation local to that request.
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
+        if #available(iOS 18, *) { generator.dynamicRangePolicy = .forceSDR }
         generator.maximumSize = CGSize(width: maximumDimension, height: maximumDimension)
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero

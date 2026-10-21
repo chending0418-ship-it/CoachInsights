@@ -1,0 +1,122 @@
+{
+  "threshold": 0.9,
+  "normalisation": "human-labelled per-frame body box height",
+  "results": [
+    {
+      "report": "pose-quality-measurements.json",
+      "gatePassed": false,
+      "groups": {
+        "baseball_pitch": {
+          "frames": 30,
+          "clips": [
+            "0027",
+            "0028",
+            "0029",
+            "0030",
+            "0031",
+            "0033"
+          ],
+          "visible": 277,
+          "detected": 237,
+          "correct": 194,
+          "wristVisible": 34,
+          "wristDetected": 25,
+          "wristCorrect": 23,
+          "elbowVisible": 44,
+          "elbowDetected": 34,
+          "elbowCorrect": 29,
+          "leftRightSuspicions": 11,
+          "highConfidenceErrors": 31,
+          "coverage": 0.855595667870036,
+          "PCK005AllVisible": 0.7003610108303249,
+          "PCK005DetectedOnly": 0.8185654008438819,
+          "ambiguousFrames": 3
+        },
+        "baseball_swing": {
+          "frames": 30,
+          "clips": [
+            "0181",
+            "0182",
+            "0183",
+            "0184",
+            "0187",
+            "0189"
+          ],
+          "visible": 302,
+          "detected": 298,
+          "correct": 225,
+          "wristVisible": 37,
+          "wristDetected": 35,
+          "wristCorrect": 24,
+          "elbowVisible": 45,
+          "elbowDetected": 43,
+          "elbowCorrect": 29,
+          "leftRightSuspicions": 23,
+          "highConfidenceErrors": 61,
+          "coverage": 0.9867549668874173,
+          "PCK005AllVisible": 0.7450331125827815,
+          "PCK005DetectedOnly": 0.7550335570469798,
+          "ambiguousFrames": 0
+        }
+      }
+    },
+    {
+      "report": "pose-quality-heavy-measurements.json",
+      "gatePassed": false,
+      "groups": {
+        "baseball_pitch": {
+          "frames": 30,
+          "clips": [
+            "0027",
+            "0028",
+            "0029",
+            "0030",
+            "0031",
+            "0033"
+          ],
+          "visible": 277,
+          "detected": 226,
+          "correct": 190,
+          "wristVisible": 34,
+          "wristDetected": 26,
+          "wristCorrect": 23,
+          "elbowVisible": 44,
+          "elbowDetected": 29,
+          "elbowCorrect": 24,
+          "leftRightSuspicions": 6,
+          "highConfidenceErrors": 30,
+          "coverage": 0.8158844765342961,
+          "PCK005AllVisible": 0.6859205776173285,
+          "PCK005DetectedOnly": 0.8407079646017699,
+          "ambiguousFrames": 3
+        },
+        "baseball_swing": {
+          "frames": 30,
+          "clips": [
+            "0181",
+            "0182",
+            "0183",
+            "0184",
+            "0187",
+            "0189"
+          ],
+          "visible": 302,
+          "detected": 267,
+          "correct": 231,
+          "wristVisible": 37,
+          "wristDetected": 26,
+          "wristCorrect": 22,
+          "elbowVisible": 45,
+          "elbowDetected": 36,
+          "elbowCorrect": 32,
+          "leftRightSuspicions": 6,
+          "highConfidenceErrors": 27,
+          "coverage": 0.8841059602649006,
+          "PCK005AllVisible": 0.7649006622516556,
+          "PCK005DetectedOnly": 0.8651685393258427,
+          "ambiguousFrames": 0
+        }
+      }
+    }
+  ]
+}

@@ -36,6 +36,9 @@ import XCTest
         snapshot.comparison = ComparisonSetup(leftVideoID: asset.id, rightVideoID: asset.id,
             leftAnchor: clip.start, rightAnchor: clip.start, leftClip: clip, rightClip: clip)
         snapshot.poseSettings.minimumConfidence = 0.5
+        var configuration=PoseSettings();configuration.engine=MediaPipePoseEngine.identity;configuration.region=[0.1,0.1,0.7,0.8]
+        snapshot.poseConfigurations[asset.id.uuidString]=configuration
+        snapshot.playbackRates[asset.id.uuidString]=0.05
         snapshot.poseResults = [PoseResult(videoID: asset.id, contentHash: asset.contentHash,
             settings: snapshot.poseSettings, analyzedRange: clip, frames: [PoseFrame(time: clip.start, joints: [])])]
         try repository!.save(first, snapshot: snapshot)
@@ -102,4 +105,18 @@ import XCTest
         var settings = PoseSettings(); settings.minimumConfidence = 0.9
         XCTAssertFalse(result.isReusable(hash: "original", settings: settings, range: range))
     }
+    func testOldSnapshotMigrationAndInvalidGeometryCannotOverwriteSavedData() throws {
+        let original=SessionSnapshot(),encoded=try JSONEncoder().encode(original)
+        var dictionary=try XCTUnwrap(JSONSerialization.jsonObject(with:encoded) as? [String:Any])
+        dictionary.removeValue(forKey:"poseConfigurations");dictionary.removeValue(forKey:"playbackRates")
+        let restored=try JSONDecoder().decode(SessionSnapshot.self,from:JSONSerialization.data(withJSONObject:dictionary))
+        XCTAssertTrue(restored.poseConfigurations.isEmpty);XCTAssertTrue(restored.playbackRates.isEmpty)
+        let repository=try LibraryRepository(root:root.appendingPathComponent("Validation")),session=try repository.create(name:"安全",sport:.batting)
+        let previous=session.snapshotData
+        var invalid=restored;invalid.views["broken"]=ViewSettings(crop:[0,0,1])
+        XCTAssertThrowsError(try repository.save(session,snapshot:invalid));XCTAssertEqual(previous,session.snapshotData)
+        var settings=PoseSettings();settings.visible=false
+        XCTAssertTrue(settings.matchesAnalysis(PoseSettings()),"Visibility does not change the inference cache key")
+    }
+
 }

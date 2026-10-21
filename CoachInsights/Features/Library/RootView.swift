@@ -65,7 +65,7 @@ struct RootView: View {
                             .labelStyle(.titleOnly).lineLimit(1)
                             .buttonStyle(.borderedProminent).accessibilityIdentifier("createSession")
                         Button { showCapture = true } label: { Label("拍摄", systemImage: "video") }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.bordered).accessibilityIdentifier("rootCapture")
                     }
                 }.padding(.vertical, 8)
             }.listRowBackground(Theme.paper)
@@ -104,6 +104,7 @@ struct RootView: View {
         .scrollContentBackground(.hidden).background(Theme.paper)
         .navigationTitle("素材库")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { NavigationLink { HelpView() } label: { Label("使用说明与隐私", systemImage: "questionmark.circle") } }
             #if DEBUG
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink { ProbeView() } label: {

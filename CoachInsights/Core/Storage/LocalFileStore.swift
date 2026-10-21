@@ -28,7 +28,7 @@ actor LocalFileStore {
         guard FileManager.default.fileExists(atPath: url.path) else { throw StorageFailure.missingMedia }
         return url
     }
-    func importCopy(from source: URL) throws -> StoredMedia {
+    func importCopy(from source: URL, progress: @Sendable (Double) -> Void = { _ in }) throws -> StoredMedia {
         let access = source.startAccessingSecurityScopedResource()
         defer { if access { source.stopAccessingSecurityScopedResource() } }
         let size = try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -37,16 +37,21 @@ actor LocalFileStore {
         guard free > Int64(size) + 32 * 1024 * 1024 else { throw StorageFailure.insufficientSpace }
         let stage = root.appendingPathComponent("Staging/\(UUID().uuidString).partial")
         defer { try? FileManager.default.removeItem(at: stage) }
-        // Copy first, then hash the immutable local snapshot. Never modify the provider's original.
-        try FileManager.default.copyItem(at: source, to: stage)
-        try Task.checkCancellation()
-        let handle = try FileHandle(forReadingFrom: stage)
-        defer { try? handle.close() }
+        FileManager.default.createFile(atPath: stage.path, contents: nil)
+        let input = try FileHandle(forReadingFrom: source)
+        let output = try FileHandle(forWritingTo: stage)
+        defer { try? input.close(); try? output.close() }
         var digest = SHA256()
-        while let data = try handle.read(upToCount: 1024 * 1024), !data.isEmpty {
+        var copied = 0
+        while let data = try input.read(upToCount: 1024 * 1024), !data.isEmpty {
             try Task.checkCancellation()
+            try output.write(contentsOf: data)
             digest.update(data: data)
+            copied += data.count
+            progress(min(1, Double(copied) / Double(max(size, 1))))
         }
+        try output.synchronize()
+        try Task.checkCancellation()
         let hash = digest.finalize().map { String(format: "%02x", $0) }.joined()
         let suffix = source.pathExtension.lowercased().filter { $0.isLetter || $0.isNumber }
         let relative = "Media/\(hash).\(suffix.isEmpty ? "mov" : suffix)"
