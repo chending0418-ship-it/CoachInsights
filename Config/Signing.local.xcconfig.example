@@ -1,0 +1,6 @@
+// Copy to Signing.local.xcconfig and replace with your Apple Developer Team ID.
+// Find the Team ID in developer.apple.com/account under Membership details.
+// DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Only change this before the first upload, if the default ID is unavailable.
+// COACH_INSIGHTS_BUNDLE_IDENTIFIER = com.yourcompany.CoachInsights

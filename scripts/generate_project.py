@@ -15,6 +15,9 @@ def ref(name):
 def array(values):
     return "(" + ", ".join(values) + ",)"
 targets = ["CoachInsights", "CoachInsightsTests", "CoachInsightsUITests"]
+buildConfig = add("BuildConfig", '{isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Build.xcconfig; sourceTree = "<group>"; }')
+signingExample = add("SigningExample", '{isa = PBXFileReference; lastKnownFileType = text; path = Signing.local.xcconfig.example; sourceTree = "<group>"; }')
+add("ConfigGroup", f'{{isa = PBXGroup; children = {array([buildConfig, signingExample])}; path = Config; sourceTree = "<group>"; }}')
 package = add("PosePackage", '{isa = XCLocalSwiftPackageReference; relativePath = Packages/MediaPipeTasks; }')
 poseProduct = add("PoseProduct", f'{{isa = XCSwiftPackageProductDependency; package = {package}; productName = MediaPipeTasksVision; }}')
 poseBuild = add("PoseBuild", f'{{isa = PBXBuildFile; productRef = {poseProduct}; }}')
@@ -28,11 +31,10 @@ for name in targets:
         add(name+phase, f'{{isa = PBX{phase}BuildPhase; buildActionMask = 2147483647; files = {array([poseBuild]) if app and phase == "Frameworks" else "()"}; runOnlyForDeploymentPostprocessing = 0; }}')
     for config in ["Debug", "Release"]:
         settings = {
-            "PRODUCT_BUNDLE_IDENTIFIER": f"com.coachinsights.{name}",
+            "PRODUCT_BUNDLE_IDENTIFIER": '"$(COACH_INSIGHTS_BUNDLE_IDENTIFIER)"' if app else f"com.coachinsights.{name}",
             "PRODUCT_NAME": '"$(TARGET_NAME)"',
             "SWIFT_VERSION": "5.0", "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
             "TARGETED_DEVICE_FAMILY": '"1,2"', "CODE_SIGN_STYLE": "Automatic",
-            "MARKETING_VERSION": "1.0", "CURRENT_PROJECT_VERSION": "1",
             "GENERATE_INFOPLIST_FILE": "NO" if app else "YES",
             "SUPPORTED_PLATFORMS": '"iphoneos iphonesimulator"',
         }
@@ -40,6 +42,7 @@ for name in targets:
             settings["INFOPLIST_FILE"] = "Config/Info.plist"
             settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = "AppIcon"
             settings["SWIFT_EMIT_LOC_STRINGS"] = "YES"
+            settings["SKIP_INSTALL"] = "NO"
         elif name == "CoachInsightsTests":
             settings["TEST_HOST"] = '"$(BUILT_PRODUCTS_DIR)/CoachInsights.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoachInsights"'
             settings["BUNDLE_LOADER"] = '"$(TEST_HOST)"'
@@ -57,11 +60,11 @@ for name in targets:
     kind = "application" if app else "bundle.unit-test" if name == "CoachInsightsTests" else "bundle.ui-testing"
     add(name+"Target", f'{{isa = PBXNativeTarget; buildConfigurationList = {ref(name+"Configs")}; buildPhases = {array([ref(name+p) for p in ["Sources","Frameworks","Resources"]])}; buildRules = (); dependencies = {array(dependencies) if dependencies else "()"}; fileSystemSynchronizedGroups = ({ref(name+"Group")},); packageProductDependencies = {array([poseProduct]) if app else "()"}; name = {name}; productName = {name}; productReference = {product[name]}; productType = "com.apple.product-type.{kind}"; }}')
 add("Products", f'{{isa = PBXGroup; children = {array(list(product.values()))}; name = Products; sourceTree = "<group>"; }}')
-add("MainGroup", f'{{isa = PBXGroup; children = {array([ref(n+"Group") for n in targets]+[ref("Products")])}; sourceTree = "<group>"; }}')
+add("MainGroup", f'{{isa = PBXGroup; children = {array([ref(n+"Group") for n in targets]+[ref("ConfigGroup"), ref("Products")])}; sourceTree = "<group>"; }}')
 for config in ["Debug", "Release"]:
     settings = '"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; SDKROOT = iphoneos; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
     settings += ' DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)"); ONLY_ACTIVE_ARCH = YES;' if config == "Debug" else ' DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O";'
-    add("Project"+config, f'{{isa = XCBuildConfiguration; buildSettings = {{{settings}}}; name = {config}; }}')
+    add("Project"+config, f'{{isa = XCBuildConfiguration; baseConfigurationReference = {buildConfig}; buildSettings = {{{settings}}}; name = {config}; }}')
 add("ProjectConfigs", f'{{isa = XCConfigurationList; buildConfigurations = ({ref("ProjectDebug")}, {ref("ProjectRelease")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; }}')
 add("Project", f'{{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2610; }}; buildConfigurationList = {ref("ProjectConfigs")}; compatibilityVersion = "Xcode 16.0"; developmentRegion = zh-Hans; hasScannedForEncodings = 0; knownRegions = (en, "zh-Hans", Base); mainGroup = {ref("MainGroup")}; minimizedProjectReferenceProxies = 1; preferredProjectObjectVersion = 77; productRefGroup = {ref("Products")}; packageReferences = ({package},); projectDirPath = ""; projectRoot = ""; targets = {array([ref(n+"Target") for n in targets])}; }}')
 project = ROOT / "CoachInsights.xcodeproj"

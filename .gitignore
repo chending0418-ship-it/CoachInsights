@@ -25,6 +25,11 @@ artifacts/
 build/
 *.xcresult/
 .swiftpm/
+Config/Signing.local.xcconfig
+*.xcarchive/
+*.ipa
+*.mobileprovision
+*.p12
 
 # Reproducibly downloaded, bundled offline pose model
 *.task

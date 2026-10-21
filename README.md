@@ -51,6 +51,17 @@ python3 scripts/build_simulator_release.py --install
 
 公开人工标注质量集可使用含 numpy、opencv-python 的研究 Python 环境执行 `scripts/prepare_pose_quality.py --include-heavy`；依赖、帧和模型不进入原生 App。质量评估脚本与判定方式见姿态验证记录。SPM 原生依赖和许可见 [MediaPipe 包说明](Packages/MediaPipeTasks/README.md)。
 
+## TestFlight
+
+首次上传的签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0 (1)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+
+```sh
+# 本地未签名 iOS 归档与包检查，不签名、不上传、不连接设备
+python3 scripts/prepare_testflight.py
+```
+
+结果位于 `artifacts/testflight/`。该检查不等于 Apple 上传校验，未签名归档不可直接分发；请由你在 Xcode 选择付费开发者 Team 后重新 Archive 并上传。隐私政策发布正文见 [隐私政策](docs/privacy-policy.md)，发布前填写真实联系邮箱。
+
 ## 仓库内容
 
 | 路径 | 内容 |
