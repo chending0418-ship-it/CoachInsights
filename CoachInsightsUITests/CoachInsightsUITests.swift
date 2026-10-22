@@ -106,6 +106,19 @@ final class CoachInsightsUITests:XCTestCase {
         app.buttons["narrowViewport"].tap()
         XCTAssertTrue(app.buttons["playPause"].waitForExistence(timeout:10));waitLabel(app.staticTexts["frameReadout"],"第 2 /")
     }
+    @MainActor func testIPadCompactLibrarySelectionSurvivesWidening() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad library window transition") }
+        let app=launch(["--layout-probe"]);app.buttons["narrowViewport"].tap()
+        create(app,"First record");fixture(app);app.buttons["closeVideo"].tap()
+        create(app,"Second record");fixture(app);app.buttons["closeVideo"].tap()
+        let first=app.staticTexts["First record"].firstMatch
+        if !first.isHittable { app.swipeUp() };XCTAssertTrue(first.waitForExistence(timeout:5));first.tap()
+        XCTAssertTrue(app.buttons["nextFrame"].waitForExistence(timeout:10));app.buttons["nextFrame"].tap()
+        waitLabel(app.staticTexts["frameReadout"],"第 2 /")
+        app.buttons["wideViewport"].tap()
+        XCTAssertTrue(app.navigationBars["First record"].waitForExistence(timeout:10))
+        waitLabel(app.staticTexts["frameReadout"],"第 2 /")
+    }
     @MainActor func testSimulatorCaptureFlow() {
         let app=launch();app.buttons["rootCapture"].tap()
         XCTAssertTrue(app.buttons["simulateCapture"].waitForExistence(timeout:5));app.buttons["simulateCapture"].tap()

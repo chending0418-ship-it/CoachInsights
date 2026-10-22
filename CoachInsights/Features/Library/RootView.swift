@@ -137,7 +137,7 @@ struct RootView: View {
                             Group {
                                 if usesSplit {
                                     Button { selection=item.session.id;initialVideoID=item.asset.id } label: { videoCard(item,repository:repository) }
-                                } else { NavigationLink { SessionDetail(session:item.session,initialVideoID:item.asset.id) } label: { videoCard(item,repository:repository) } }
+                                } else { Button { openCompact(item.session,videoID:item.asset.id) } label: { videoCard(item,repository:repository) } }
                             }.buttonStyle(.plain)
                         }
                     }.padding(.vertical,6)
@@ -155,7 +155,7 @@ struct RootView: View {
                             .listRowBackground(selection == session.id ? Theme.rose.opacity(0.3) : Color.clear)
                             .contextMenu { Button("删除记录", role: .destructive) { pendingDelete = session } }
                     } else {
-                        NavigationLink { SessionDetail(session: session) } label: { SessionRow(session: session) }
+                        Button { openCompact(session) } label: { SessionRow(session: session) }.buttonStyle(.plain)
                             .swipeActions { Button("删除", role: .destructive) { pendingDelete = session } }
                     }
                 }
@@ -175,6 +175,9 @@ struct RootView: View {
         }
         .searchable(text: $query, prompt: "搜索分析名称")
         .overlay { if library.busy { ProgressView("正在清理本机副本…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+    }
+    private func openCompact(_ session:AnalysisSession,videoID:UUID?=nil) {
+        selection=session.id;initialVideoID=videoID;importedSession=session;openImported=true
     }
 }
 
