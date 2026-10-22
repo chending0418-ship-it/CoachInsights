@@ -157,28 +157,29 @@ actor ExportService {
 }
 
 @MainActor enum ExportBuilder {
-    static func source(asset:VideoAsset,repository:LibraryRepository,snapshot:SessionSnapshot,settings:ViewSettings?=nil,pose:Bool=true) async throws -> ExportSource {
+    static func source(asset:VideoAsset,repository:LibraryRepository,snapshot:SessionSnapshot,settings:ViewSettings?=nil,pose:Bool=true,annotations:Bool=true) async throws -> ExportSource {
         let metadata=try asset.metadata(),url=try await repository.files.existingURL(asset.relativePath)
         let local=try await LocalMedia.asset(url:url,metadata:metadata)
+        let overlaysVisible=snapshot.overlayVisibility[asset.id.uuidString] ?? true
         let configuration=snapshot.poseConfigurations[asset.id.uuidString] ?? snapshot.poseSettings
         let result=snapshot.poseResults.first { $0.videoID==asset.id && $0.contentHash==asset.contentHash && $0.settings.engine==configuration.engine
             && $0.settings.revision==configuration.revision && $0.settings.region==configuration.region && $0.settings.minimumConfidence==configuration.minimumConfidence }
         return ExportSource(id:asset.id,asset:local,metadata:metadata,settings:settings ?? snapshot.views[asset.id.uuidString] ?? ViewSettings(),
-                            annotations:snapshot.annotations.filter{$0.videoID==asset.id},pose:pose && configuration.visible ? result:nil,confidence:configuration.minimumConfidence)
+                            annotations:annotations && overlaysVisible ? snapshot.annotations.filter{$0.videoID==asset.id}:[],pose:pose && configuration.visible && overlaysVisible ? result:nil,confidence:configuration.minimumConfidence)
     }
-    static func recipe(session:AnalysisSession,repository:LibraryRepository,videoID:UUID?,compare:Bool,rate:Double,pose:Bool,audio:Bool) async throws -> ExportRecipe {
+    static func recipe(session:AnalysisSession,repository:LibraryRepository,videoID:UUID?,compare:Bool,rate:Double,pose:Bool,audio:Bool,annotations:Bool=true) async throws -> ExportRecipe {
         let snapshot=try session.snapshot(),assets=try repository.assets().filter{snapshot.videoIDs.contains($0.id)}
         if compare {
             guard let setup=snapshot.comparison,let a=assets.first(where:{$0.id==setup.leftVideoID}),let b=assets.first(where:{$0.id==setup.rightVideoID}) else { throw ExportFailure.unavailable }
             let clock=ComparisonClock(leftAnchor:setup.leftAnchor.seconds,rightAnchor:setup.rightAnchor.seconds,leftRange:setup.leftClip.start.seconds...setup.leftClip.end.seconds,rightRange:setup.rightClip.start.seconds...setup.rightClip.end.seconds)
             guard let range=clock.commonRange,range.upperBound>range.lowerBound else { throw ExportFailure.invalidRange }
-            var left=try await source(asset:a,repository:repository,snapshot:snapshot,settings:setup.leftView,pose:pose)
-            var right=try await source(asset:b,repository:repository,snapshot:snapshot,settings:setup.rightView,pose:pose)
+            var left=try await source(asset:a,repository:repository,snapshot:snapshot,settings:setup.leftView,pose:pose,annotations:annotations)
+            var right=try await source(asset:b,repository:repository,snapshot:snapshot,settings:setup.rightView,pose:pose,annotations:annotations)
             left.clip=setup.leftClip;right.clip=setup.rightClip
             return ExportRecipe(left:left,right:right,clock:clock,horizontal:setup.layout=="horizontal",start:range.lowerBound,end:range.upperBound,rate:setup.rate)
         }
         guard let asset=assets.first(where:{$0.id==videoID}) ?? assets.first else { throw ExportFailure.unavailable }
-        var source=try await source(asset:asset,repository:repository,snapshot:snapshot,pose:pose)
+        var source=try await source(asset:asset,repository:repository,snapshot:snapshot,pose:pose,annotations:annotations)
         let clip=snapshot.clips[asset.id.uuidString] ?? ClipRange(start:source.metadata.timeline.frames[0].presentationTime,end:source.metadata.timeline.duration)
         source.clip=clip
         return ExportRecipe(left:source,start:clip.start.seconds,end:clip.end.seconds,rate:rate,audio:audio)

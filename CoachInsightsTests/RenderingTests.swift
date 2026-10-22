@@ -3,6 +3,18 @@ import UIKit
 @testable import CoachInsights
 
 @MainActor final class RenderingTests:XCTestCase {
+    func testCrowdedPoseLabelsStaySeparateAndInsideVisibleImage() {
+        let geometry=VideoGeometry(imageSize:CGSize(width:1920,height:1080),viewportSize:CGSize(width:320,height:240))
+        let angles=["左肘","左膝","右肘","右膝","躯干"].map{PoseMetrics.Angle(name:$0,degrees:90,point:CGPoint(x:0.5,y:0.5))}
+        let labels=AnalysisRenderer.poseAngleLabels(angles,geometry:geometry)
+        XCTAssertEqual(labels.count,5)
+        for i in labels.indices {
+            XCTAssertTrue(CGRect(x:0,y:30,width:320,height:180).contains(labels[i].box))
+            for j in labels.indices where j>i { XCTAssertFalse(labels[i].box.intersects(labels[j].box)) }
+        }
+        XCTAssertEqual(Set(labels.map{$0.text}),Set(angles.map{"\($0.name) 90°"}))
+    }
+
     func testPoseEstimateNoticeSurvivesLetterboxAndIsAbsentWithoutVisibleJoints() throws {
         let size=CGSize(width:400,height:400)
         let image=UIGraphicsImageRenderer(size:CGSize(width:400,height:200)).image { c in

@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct SessionDetail: View {
     @EnvironmentObject private var library: LibraryStore
     let session: AnalysisSession
+    var initialVideoID: UUID? = nil
+    var onClose: (() -> Void)? = nil
     @State private var workspace: AnalysisWorkspace?
     @State private var name = ""
     @State private var renaming = false
@@ -12,27 +14,42 @@ struct SessionDetail: View {
     var body: some View {
         Group {
             if let workspace { AnalysisEditor(workspace: workspace) }
-            else { ProgressView("打开本机分析…") }
+            else { ProgressView("打开本机分析…").frame(maxWidth:.infinity,maxHeight:.infinity).background(.black) }
         }
         .navigationTitle(session.name).navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbarBackground(.black,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar)
+        .toolbarColorScheme(.dark,for:.navigationBar)
         .toolbar {
-            Button("重命名", systemImage: "pencil") { name = session.name; renaming = true }.accessibilityIdentifier("renameSession")
-            Button("删除记录", systemImage: "trash", role: .destructive) { deleting = true }.accessibilityIdentifier("deleteSession")
-        }
-        .alert("删除分析记录？", isPresented: $deleting) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) { Task { workspace?.pause(); await library.remove(session); dismiss() } }
-        } message: { Text("清理这份记录与未被其他记录使用的本机副本。") }
-        .alert("重命名", isPresented: $renaming) {
-            TextField("分析名称", text: $name)
-            Button("保存") { library.rename(session, name: name) }
-            Button("取消", role: .cancel) {}
-        }
-        .task(id: session.id) {
-            if let repository = library.repository {
-                let value = AnalysisWorkspace(session: session, repository: repository)
-                workspace = value; await value.reload()
+            ToolbarItem(placement:.topBarLeading) {
+                Button("关闭视频",systemImage:"xmark") { workspace?.stopAndSave();if let onClose { onClose() } else { dismiss() } }
+                    .labelStyle(.iconOnly).accessibilityIdentifier("closeVideo")
             }
+            ToolbarItem(placement:.topBarTrailing) {
+                Menu {
+                    Button("重命名",systemImage:"pencil") { name=session.name;renaming=true }.accessibilityIdentifier("renameSession")
+                    if let w=workspace {
+                        Button("镜像",systemImage:"arrow.left.and.right.righttriangle.left.righttriangle.right") { w.pause();var v=w.viewSettings;v.mirrored.toggle();w.updateView(v) }
+                        Button("旋转 90°",systemImage:"rotate.right") { w.pause();var v=w.viewSettings;v.quarterTurns+=1;w.updateView(v) }
+                        Button("复位画面",systemImage:"arrow.counterclockwise") { w.updateView(ViewSettings()) }
+                        NavigationLink { ExportView(session:session,initialVideoID:w.selectedVideoID,initialPose:w.overlaysVisible && w.poseSettings.visible,initialAnnotations:w.overlaysVisible) } label: { Label("导出分析",systemImage:"square.and.arrow.up") }
+                    }
+                    Button("删除记录",systemImage:"trash",role:.destructive) { deleting=true }.accessibilityIdentifier("deleteSession")
+                } label: { Image(systemName:"ellipsis.circle").frame(width:44,height:44) }.accessibilityLabel("更多操作").accessibilityIdentifier("moreActions")
+            }
+        }
+        .alert("删除分析记录？",isPresented:$deleting) {
+            Button("取消",role:.cancel) {}
+            Button("删除",role:.destructive) { Task { workspace?.stopAndSave();await library.remove(session);if let onClose { onClose() } else { dismiss() } } }
+        } message: { Text("清理这份记录与未被其他记录使用的本机副本。") }
+        .alert("重命名",isPresented:$renaming) {
+            TextField("分析名称",text:$name)
+            Button("保存") { library.rename(session,name:name) };Button("取消",role:.cancel) {}
+        }
+        .task(id:session.id) {
+            guard workspace == nil,let repository=library.repository else { return }
+            let value=AnalysisWorkspace(session:session,repository:repository)
+            value.selectedVideoID=initialVideoID;workspace=value;await value.reload()
         }
         .onDisappear { workspace?.stopAndSave() }
     }
@@ -40,184 +57,170 @@ struct SessionDetail: View {
 
 struct AnalysisEditor: View {
     @ObservedObject var workspace: AnalysisWorkspace
-    @State private var importing = false
-    @State private var photos = false
-    @State private var capture = false
-    @State private var keyframeName = ""
-    @State private var showKeyframe = false
-    @State private var showPose = false
+    @State private var importing=false
+    @State private var photos=false
+    @State private var capture=false
+    @State private var showKeyframe=false
+    @State private var showPose=false
+    @State private var showTools=false
+    @State private var showNodes=false
+    @State private var showAdd=false
+    @State private var showCompare=false
+    @State private var keyframeName=""
+    @State private var screenshotURL:URL?
+    @State private var screenshotBusy=false
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    private var w: AnalysisWorkspace { workspace }
-    var body: some View {
+    private var w:AnalysisWorkspace { workspace }
+    var body:some View {
         GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if !w.assets.isEmpty {
-                        Picker("当前素材", selection: Binding(get: { w.selectedVideoID ?? w.assets[0].id }, set: { id in Task { await w.select(id) } })) {
-                            ForEach(w.assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag($0.id) }
-                        }.accessibilityIdentifier("videoSelection")
-                    }
-                    if let metadata = w.metadata {
-                        AnalysisCanvas(workspace: w)
-                            .frame(height: max(190, min(geometry.size.height * 0.5, sizeClass == .regular ? 480 : 330)))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        Text("\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · 第 \(w.frameIndex + 1) / \(metadata.timeline.frames.count) 帧 · \(w.time, specifier: "%.3f") s")
-                            .font(.caption.monospacedDigit()).accessibilityIdentifier("frameReadout")
-                        playbackControls
-                        drawingControls
-                        Text("已保存 \(w.snapshot.annotations.count) 个标注 · \(w.snapshot.keyframes.count) 个关键帧").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("annotationCount")
-                        HStack {
-                            Button("关键帧", systemImage: "bookmark") { w.pause(); showKeyframe = true }.accessibilityIdentifier("addKeyframe")
-                            Spacer()
-                            Button("人体分析", systemImage: "figure.stand") { w.pause(); showPose = true }.accessibilityIdentifier("poseTools")
-                        }.buttonStyle(.bordered)
-                        if let pose=w.currentPose {
-                            Text("关节点覆盖 \(pose.joints.filter { $0.name != "nose" }.count) / 12 · 辅助估算，请逐帧复核点位")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        keyframes
-                    } else {
-                        EmptyPanel(icon: "video.badge.plus", title: "添加分析素材", detail: "拍摄或导入视频，逐帧看清动作。\n原片与分析仅保存在当前设备。")
-                    }
+            let landscape=geometry.size.width>geometry.size.height
+            VStack(spacing:0) {
+                if w.metadata != nil {
+                    quickActions
+                    HStack(spacing:0) {
+                        ZStack(alignment:.topLeading) {
+                            AnalysisCanvas(workspace:w)
+                            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
+                            if w.tool != "view" { Text(w.rangeMode == "单帧" ? "绘图 · 当前帧":"绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
+                        }.frame(maxWidth:.infinity,maxHeight:.infinity).clipped()
+                        if showTools && geometry.size.width>=700 { ScrollView { drawingControls }.frame(width:244).background(Color(white:0.12)) }
+                    }.frame(maxWidth:.infinity,maxHeight:.infinity)
+                    if showTools && geometry.size.width<700 { ScrollView { drawingControls }.frame(height:155).background(Color(white:0.12)) }
+                    playbackControls(compact:landscape)
+                } else {
+                    Spacer()
+                    EmptyPanel(icon:"video.badge.plus",title:"添加分析素材",detail:"拍摄或导入视频，逐帧看清动作。\n原片与分析仅保存在当前设备。")
                     importControls
-                    if w.busy {
-                        ProgressView("正在复制到本机…", value: w.progress)
-                        Button("取消导入", role: .cancel) { w.importTask?.cancel() }
-                    }
-                    if let notice = w.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                    if let saveIssue=w.saveIssue { Text("保存失败："+saveIssue).foregroundStyle(.red);Button("重试保存") { w.save() } }
-                    if let issue = w.issue {
-                        Text(issue).font(.callout).foregroundStyle(.red)
-                        HStack {
-                            Button("重试读取") { Task { await w.reload() } }
-                            Button("重新关联原片") { importing = true }
-                        }
-                    }
-                    NavigationLink { ComparisonView(session: w.session) } label: { FeatureCard(icon: "rectangle.split.2x1", title: "双视频对比", detail: "两路画面 · 动作同步 · 联动慢放") }
-                    NavigationLink { ExportView(session: w.session, initialVideoID:w.selectedVideoID) } label: { FeatureCard(icon: "square.and.arrow.up", title: "导出分析", detail: "截图、慢放视频与双路合成") }
-                }.padding().frame(maxWidth: 1100).frame(maxWidth: .infinity)
-            }.background(Theme.paper)
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--real-footage"),!FileManager.default.fileExists(atPath:URL.documentsDirectory.appendingPathComponent("V101-RegressionFixture.mov").path) { Text("本机测试原片缺失").accessibilityIdentifier("realFixtureUnavailable") }
+                    #endif
+                    Button("双视频对比",systemImage:"rectangle.split.2x1") { showCompare=true }.padding()
+                    Spacer()
+                }
+                if w.busy { HStack { ProgressView(value:w.progress);Button("取消导入") { w.importTask?.cancel() } }.padding(8) }
+                if let error=w.saveIssue { HStack { Text("保存失败："+error);Button("重试保存") { w.save() } }.font(.caption).padding(8) }
+                if let issue=w.issue { HStack { Text(issue);Button("重试读取") { Task { await w.reload() } };Button("重新关联原片") { importing=true } }.font(.caption).padding(8).foregroundStyle(.orange) }
+                if let notice=w.notice { Text(notice).font(.caption).foregroundStyle(.secondary).lineLimit(2).padding(4).accessibilityIdentifier("editorNotice") }
+            }.background(.black).foregroundStyle(.white).tint(Theme.rose)
+
         }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.movie]) { result in
+        .fileImporter(isPresented:$importing,allowedContentTypes:[.movie]) { result in
             switch result {
             case .success(let url):
-                if w.issue != nil, let asset = w.selectedAsset, w.metadata == nil {
-                    Task { do { try await w.repository.relink(url, asset: asset); await w.reload() } catch { w.issue = error.localizedDescription } }
-                } else { w.importFile(url) }
-            case .failure(let error): w.issue = error.localizedDescription
+                if w.issue != nil,let asset=w.selectedAsset,w.metadata == nil { Task { do { try await w.repository.relink(url,asset:asset);await w.reload() } catch { w.issue=error.localizedDescription } } }
+                else { w.importFile(url) }
+            case .failure(let error):w.issue=error.localizedDescription
             }
         }
-        .sheet(isPresented: $photos) {
-            PhotoImportView { result in
-                photos = false
-                switch result {
-                case .success(let selection): w.notice = selection.notice; w.importFile(selection.url, timing: selection.timing)
-                case .failure(let error): if !(error is CancellationError) { w.issue = error.localizedDescription }
-                }
-            }
-        }
-        .sheet(isPresented: $capture, onDismiss: { Task { await w.reload() } }) { NavigationStack { CaptureView(session: w.session) } }
-        .sheet(isPresented: $showPose) { NavigationStack { PoseToolsView(workspace: w) } }
-        .alert("命名关键帧", isPresented: $showKeyframe) {
-            TextField("动作节点或自定义名称", text: $keyframeName)
-            Button("保存") { w.addKeyframe(keyframeName); keyframeName = "" }
-            Button("取消", role: .cancel) {}
-        }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { w.stopAndSave() } else if w.frame?.index != w.frameIndex { w.seek(frame:w.frameIndex) } }
+        .sheet(isPresented:$photos) { PhotoImportView { result in photos=false;switch result { case .success(let selection):w.notice=selection.notice;w.importFile(selection.url,timing:selection.timing)
+        case .failure(let error):if !(error is CancellationError) { w.issue=error.localizedDescription } } } }
+        .sheet(isPresented:$capture,onDismiss:{Task { await w.reload() }}) { NavigationStack { CaptureView(session:w.session) } }
+        .sheet(isPresented:$showPose) { NavigationStack { PoseToolsView(workspace:w) } }
+        .sheet(isPresented:$showNodes) { NavigationStack { ScrollView { keyframes.padding() }.navigationTitle("关键帧").toolbar { Button("完成") { showNodes=false } } }.presentationDetents([.medium,.large]) }
+        .sheet(isPresented:Binding(get:{screenshotURL != nil},set:{if !$0 { screenshotURL=nil }})) { if let screenshotURL { ShareSheet(url:screenshotURL) } }
+        .navigationDestination(isPresented:$showCompare) { ComparisonView(session:w.session,initialVideoID:w.selectedVideoID) }
+        .confirmationDialog("添加素材",isPresented:$showAdd,titleVisibility:.visible) { importControls }
+        .alert("命名关键帧",isPresented:$showKeyframe) { TextField("动作节点或自定义名称",text:$keyframeName);Button("保存") { w.addKeyframe(keyframeName);keyframeName="" };Button("取消",role:.cancel) {} }
+        .onAppear { w.resumeDisplay() }
+        .onChange(of:scenePhase) { _,phase in if phase != .active { w.stopAndSave() } else { w.resumeDisplay() } }
+        .onChange(of:showTools) { _,value in if !value { w.tool="view" } }
     }
-    private var importControls: some View {
-        HStack {
-            Button("相册", systemImage: "photo.on.rectangle") { w.pause(); photos = true }.accessibilityIdentifier("importPhotos")
-            Button("文件", systemImage: "folder") { w.pause(); importing = true }.accessibilityIdentifier("importFile")
-            Button("拍摄", systemImage: "video") { w.pause(); capture = true }.accessibilityIdentifier("captureVideo")
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
-                Button("测试素材") { Task { await importFixture() } }.accessibilityIdentifier("importFixture")
-            }
-            #endif
-        }.buttonStyle(.bordered).disabled(w.busy)
+    private var quickActions:some View {
+        HStack(spacing:0) {
+            Button { Task { await screenshot() } } label: { Label("截图",systemImage:"camera").frame(maxWidth:.infinity,minHeight:44) }.disabled(screenshotBusy || w.metadata == nil || w.seeking || w.scrubbing || w.preparing).accessibilityIdentifier("quickScreenshot")
+            Button { w.pause();showTools.toggle() } label: { Label("绘图",systemImage:"pencil.tip.crop.circle").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("drawingTools")
+            Button { w.pause();showPose=true } label: { Label("人体分析",systemImage:"figure.stand").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("poseTools")
+            Button { w.pause();w.save();showCompare=true } label: { Label("对比",systemImage:"rectangle.split.2x1").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("openComparison")
+            Menu {
+                Picker("当前素材",selection:Binding(get:{w.selectedVideoID ?? UUID()},set:{id in Task { w.save();await w.select(id) }})) { ForEach(w.assets) { Text($0.originalName).tag($0.id) } }
+                Button("添加素材",systemImage:"plus") { w.pause();showAdd=true }
+                Button("关键帧列表",systemImage:"bookmark") { w.pause();showNodes=true }.accessibilityIdentifier("openKeyframes")
+                Button(w.overlaysVisible ? "隐藏标注与骨架":"显示标注与骨架",systemImage:w.overlaysVisible ? "eye.slash":"eye") { w.overlaysVisible.toggle() }.accessibilityIdentifier("toggleOverlays")
+            } label: { Image(systemName:"slider.horizontal.3").frame(width:44,height:44) }.accessibilityLabel("素材与显示").accessibilityIdentifier("videoOptions")
+        }.labelStyle(.iconOnly).font(.title3).background(Color(white:0.08))
     }
-    private var playbackControls: some View {
-        VStack(spacing: 8) {
-            if !w.thumbnails.isEmpty {
-                GeometryReader { geo in
-                    HStack(spacing: 1) { ForEach(w.thumbnails.indices, id: \.self) { index in
-                        Image(uiImage: w.thumbnails[index]).resizable().scaledToFill().frame(width: max(1,geo.size.width/CGFloat(w.thumbnails.count)),height: 40).clipped()
-                    } }
-                }.frame(height: 40).clipShape(RoundedRectangle(cornerRadius: 5))
+    private func playbackControls(compact:Bool)->some View {
+        VStack(spacing:compact ? 2:6) {
+            Text("第 \(w.frameIndex+1) / \(w.metadata?.timeline.frames.count ?? 0) 帧 · \(w.time,specifier:"%.3f") s")
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary).accessibilityIdentifier("frameReadout")
+            VideoTimeline(workspace:w,compact:compact)
+            HStack(spacing:12) {
+                Button { w.looping.toggle() } label: { Image(systemName:"repeat").foregroundStyle(w.looping ? Theme.rose:.white).frame(width:44,height:44) }.accessibilityLabel(w.looping ? "关闭循环":"开启循环")
+                FrameStepButton(direction:-1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
+                Spacer(minLength:0)
+                Button { if w.playing || w.preparing { w.pause();w.save() } else { w.play() } } label: { Image(systemName:w.playing || w.preparing ? "pause.fill":"play.fill").font(.title2).frame(width:48,height:44) }.accessibilityLabel(w.playing ? "暂停":"播放").accessibilityIdentifier("playPause")
+                Spacer(minLength:0)
+                FrameStepButton(direction:1) { w.step(1) }.accessibilityIdentifier("nextFrame")
+                Menu { Picker("速度",selection:Binding(get:{w.rate},set:{w.setRate($0)})) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } } } label: { Text("\(w.rate.formatted())×").font(.callout.monospacedDigit()).frame(minWidth:44,minHeight:44) }.accessibilityLabel("播放速度").accessibilityIdentifier("playbackRate")
             }
-            if let metadata = w.metadata {
-                Slider(value: Binding(get: { Double(w.frameIndex) }, set: { w.seek(frame: Int($0.rounded())) }), in: 0...Double(max(1,metadata.timeline.frames.count-1)), step: 1,
-                       onEditingChanged: { editing in if !editing { w.save() } }).accessibilityIdentifier("frameSlider")
-            }
-            HStack {
-                Button { w.step(-1) } label: { Image(systemName: "backward.end.fill") }.accessibilityLabel("前一帧").accessibilityIdentifier("previousFrame")
-                Spacer()
-                Button {
-                    if w.playing { w.pause(); w.seek(frame: w.frameIndex); w.save() } else { w.play() }
-                } label: { Image(systemName: w.playing ? "pause.fill" : "play.fill").frame(width: 38) }
-                    .accessibilityLabel(w.playing ? "暂停" : "播放").accessibilityIdentifier("playPause")
-                Spacer()
-                Button { w.step(1) } label: { Image(systemName: "forward.end.fill") }.accessibilityLabel("后一帧").accessibilityIdentifier("nextFrame")
-                Picker("速度", selection: $workspace.rate) { ForEach([1.0,0.5,0.25,0.1,0.05], id: \.self) { Text("\($0.formatted())×").tag($0) } }
-                    .onChange(of: w.rate) { _, value in w.snapshot.playbackRates[w.key] = value; w.save(); if w.playing { w.play() } }
-            }.buttonStyle(.bordered)
-            HStack {
-                Toggle("循环", isOn: $workspace.looping).fixedSize()
-                Spacer()
-                Button { w.muted.toggle(); w.playback?.player.isMuted = w.muted } label: { Image(systemName: w.muted ? "speaker.slash" : "speaker.wave.2") }.accessibilityLabel("切换静音")
-                Menu("片段") {
-                    Button("当前帧设为起点") { w.pause(); w.markStart() }
-                    Button("当前帧设为终点") { w.pause(); w.markEnd() }
-                    Button("恢复完整视频") { w.fullClip() }
-                }
-            }.font(.caption)
-            Text("片段 \(w.clip.start.seconds, specifier: "%.3f") – \(w.clip.end.seconds, specifier: "%.3f") s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-        }
-    }
-    private var drawingControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
+            if !compact {
                 HStack {
-                    ForEach([("view","hand.draw","画面"),("select","cursorarrow","选择"),("line","line.diagonal","直线"),("arrow","arrow.up.right","箭头"),("ellipse","circle","圆框"),("freehand","pencil.tip","手绘"),("text","textformat","文字"),("angle","angle","角度")], id: \.0) { tool in
-                        Button { w.tool = tool.0 } label: { Label(tool.2, systemImage: tool.1).font(.caption).padding(9)
-                            .background(w.tool == tool.0 ? Theme.burgundy : Color.white, in: RoundedRectangle(cornerRadius: 9))
-                            .foregroundStyle(w.tool == tool.0 ? .white : Theme.burgundy) }.accessibilityIdentifier("tool_"+tool.0)
+                    Button { w.muted.toggle();w.playback?.player.isMuted=w.muted } label: { Image(systemName:w.muted ? "speaker.slash":"speaker.wave.2").frame(width:44,height:44) }.accessibilityLabel("切换静音")
+                    Text("\(w.snapshot.annotations.count) 个标注 · \(w.snapshot.keyframes.count) 个关键帧").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("annotationCount")
+                    Spacer(minLength:0)
+                    Button("关键帧",systemImage:"bookmark") { w.pause();showKeyframe=true }.font(.caption).frame(minHeight:44).accessibilityIdentifier("addKeyframe")
+                }
+            }
+        }.padding(.horizontal,12).padding(.top,6).background(Color(white:0.08))
+    }
+    private var importControls:some View {
+        Group {
+            Button("相册",systemImage:"photo.on.rectangle") { w.pause();photos=true }.accessibilityIdentifier("importPhotos")
+            Button("文件",systemImage:"folder") { w.pause();importing=true }.accessibilityIdentifier("importFile")
+            Button("拍摄",systemImage:"video") { w.pause();capture=true }.accessibilityIdentifier("captureVideo")
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--ui-testing") { Button("测试素材") { Task { await importFixture() } }.accessibilityIdentifier("importFixture") }
+            #endif
+        }.disabled(w.busy)
+    }
+    private func screenshot() async {
+        w.pause();w.save();screenshotBusy=true;defer { screenshotBusy=false }
+        do {
+            let recipe=try await ExportBuilder.recipe(session:w.session,repository:w.repository,videoID:w.selectedVideoID,compare:false,rate:w.rate,pose:w.overlaysVisible && w.poseSettings.visible,audio:false)
+            let original=recipe.left
+            let source=ExportSource(id:original.id,asset:original.asset,metadata:original.metadata,settings:original.settings,annotations:w.overlaysVisible ? original.annotations:[],pose:original.pose,confidence:original.confidence,clip:original.clip)
+            screenshotURL=try await ExportService().screenshot(source:source,time:w.time,size:recipe.size,directory:w.repository.files.root.appendingPathComponent("Cache/Exports"))
+        } catch { w.issue=error.localizedDescription }
+    }
+    private var drawingControls:some View {
+        VStack(alignment:.leading,spacing:2) {
+            ScrollView(.horizontal,showsIndicators:false) {
+                HStack(spacing:4) {
+                    ForEach([("view","hand.draw","画面"),("select","cursorarrow","选择"),("line","line.diagonal","直线"),("arrow","arrow.up.right","箭头"),("ellipse","circle","圆框"),("freehand","pencil.tip","手绘"),("text","textformat","文字"),("angle","angle","角度")],id:\.0) { tool in
+                        Button { w.pause();w.tool=tool.0 } label: {
+                            Label(tool.2,systemImage:tool.1).font(.caption).padding(.horizontal,10).frame(minHeight:44)
+                                .background(w.tool==tool.0 ? Theme.burgundy:Color(white:0.2),in:RoundedRectangle(cornerRadius:8))
+                        }.accessibilityIdentifier("tool_"+tool.0)
                     }
                 }
             }
             if w.tool == "view" {
-                HStack {
-                    Text("双指缩放 · 单指移动").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Menu("画面") {
-                        Button("复位") { w.updateView(ViewSettings()) }
-                        Button("镜像") { var v=w.viewSettings; v.mirrored.toggle(); w.updateView(v) }
-                        Button("旋转 90°") { var v=w.viewSettings; v.quarterTurns += 1; w.updateView(v) }
-                        Button("放大") { var v=w.viewSettings; v.zoom=min(8,v.zoom+0.5); w.updateView(v) }
-                        Button("缩小") { var v=w.viewSettings; v.zoom=max(1,v.zoom-0.5); w.updateView(v) }
-                    }
+                HStack { Text("双指缩放 · 单指移动 · 双击复位").font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength:0);Button("复位") { w.updateView(ViewSettings()) }.font(.caption).frame(minHeight:44)
                 }
             } else {
-                HStack {
-                    ForEach(["#722F37","#FFFFFF","#F9C74F","#33C3EE"], id: \.self) { color in
-                        Button { w.color = color; w.styleSelection() } label: { Circle().fill(Color(uiColor: UIColor(hex: color))).frame(width: 24,height:24)
-                            .overlay(Circle().stroke(.gray, lineWidth: w.color == color ? 3 : 1)) }.accessibilityLabel("颜色 "+color)
+                HStack(spacing:0) {
+                    ForEach(["#722F37","#FFFFFF","#F9C74F","#33C3EE"],id:\.self) { color in
+                        Button { w.color=color;w.styleSelection() } label: {
+                            Circle().fill(Color(uiColor:UIColor(hex:color))).frame(width:22,height:22).overlay(Circle().stroke(w.color==color ? Color.white:Color.gray,lineWidth:w.color==color ? 3:1)).frame(width:44,height:44)
+                        }.accessibilityLabel("颜色 "+color)
                     }
-                    Picker("线宽", selection: $workspace.lineWidth) { ForEach([2.0,4.0,7.0],id: \.self) { Text("\(Int($0)) pt").tag($0) } }.onChange(of:w.lineWidth) { _,_ in w.styleSelection() }
-                    Picker("显示范围", selection: $workspace.rangeMode) { Text("单帧").tag("单帧"); Text("片段").tag("片段") }
-                }
-                if w.tool == "text" { TextField("标注文字", text: $workspace.textValue).textFieldStyle(.roundedBorder).onSubmit { w.styleSelection() } }
-                if w.tool == "angle" { Text("依次点选三个点，第二点为角度顶点。").font(.caption).foregroundStyle(.secondary) }
+                    Spacer(minLength:0)
+                    Menu {
+                        Picker("线宽",selection:$workspace.lineWidth) { ForEach([2.0,4.0,7.0],id:\.self) { Text("\(Int($0)) pt").tag($0) } }
+                        Picker("显示范围",selection:$workspace.rangeMode) { Text("当前帧").tag("单帧");Text("整个片段").tag("片段") }
+                    } label: { Text(w.rangeMode=="单帧" ? "当前帧":"整个片段").font(.caption).frame(minWidth:44,minHeight:44) }.accessibilityLabel("标注样式与显示范围")
+                }.onChange(of:w.lineWidth) { _,_ in w.styleSelection() }
                 HStack {
-                    Button("撤销", systemImage: "arrow.uturn.backward") { w.undo() }.disabled(w.undoStack.isEmpty).accessibilityIdentifier("undoAnnotation")
-                    Button("重做", systemImage: "arrow.uturn.forward") { w.redo() }.disabled(w.redoStack.isEmpty)
-                    Spacer()
-                    Button("删除", systemImage: "trash", role: .destructive) { w.deleteSelection() }.disabled(w.selectedAnnotation == nil).accessibilityIdentifier("deleteAnnotation")
-                }.font(.caption)
+                    Button("撤销",systemImage:"arrow.uturn.backward") { w.undo() }.disabled(w.undoStack.isEmpty).accessibilityIdentifier("undoAnnotation")
+                    Button("重做",systemImage:"arrow.uturn.forward") { w.redo() }.disabled(w.redoStack.isEmpty)
+                    Spacer(minLength:0)
+                    Button("删除",systemImage:"trash",role:.destructive) { w.deleteSelection() }.disabled(w.selectedAnnotation==nil).accessibilityIdentifier("deleteAnnotation")
+                }.font(.caption).frame(minHeight:44)
+                if w.tool=="text" { TextField("标注文字",text:$workspace.textValue).textFieldStyle(.roundedBorder).onSubmit { w.styleSelection() } }
+                if w.tool=="angle" { Text("依次选三个点，第二点为角度顶点。").font(.caption).foregroundStyle(.secondary) }
             }
-        }.padding(10).background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius:12))
+        }.padding(.horizontal,8).padding(.vertical,4).foregroundStyle(.white)
     }
     private var keyframes: some View {
         VStack(alignment: .leading) {
@@ -238,6 +241,9 @@ struct AnalysisEditor: View {
     #if DEBUG
     private func importFixture() async {
         do {
+            if ProcessInfo.processInfo.arguments.contains("--real-footage"),w.assets.isEmpty {
+                w.importFile(URL.documentsDirectory.appendingPathComponent("V101-RegressionFixture.mov"));return
+            }
             let url = URL.temporaryDirectory.appendingPathComponent("UI-\(UUID().uuidString).mov")
             let fps = w.assets.isEmpty ? 30 : 120
             try await FixtureFactory.video(at: url, times: (0..<(fps*2)).map { Double($0)/Double(fps) }, duration: 2)

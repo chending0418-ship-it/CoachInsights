@@ -6,6 +6,10 @@ struct ExportView:View {
     let session:AnalysisSession
     var initialVideoID:UUID? = nil
     var initialComparison=false
+    var initialPose=true
+    var initialAnnotations=true
+    @State private var includeAnnotations=true
+    @State private var lastScreenshot=false
     @EnvironmentObject private var library:LibraryStore
     @Environment(\.scenePhase) private var phase
     @State private var videoID:UUID?
@@ -13,7 +17,7 @@ struct ExportView:View {
     @State private var compare=false
     @State private var includePose=true
     @State private var audio=false
-    @State private var rate:Double=0.25
+    @State private var rate:Double=1
     @State private var progress:Double=0
     @State private var busy=false
     @State private var resultURL:URL?
@@ -28,6 +32,7 @@ struct ExportView:View {
                 if !assets.isEmpty {
                     Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
                     Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
+                    Toggle("包含可见绘图标注",isOn:$includeAnnotations).disabled(busy)
                     Toggle("包含可见骨架和角度（辅助估算）",isOn:$includePose).disabled(busy)
                     if includePose {
                         Text(PoseGuidance.exportNotice).font(.caption).foregroundStyle(.secondary)
@@ -41,6 +46,7 @@ struct ExportView:View {
                     Button(compare ? "导出同屏视频":"导出慢放视频",systemImage:"film") { run(screenshot:false) }.buttonStyle(.borderedProminent).disabled(busy).accessibilityIdentifier("exportVideo")
                     Text(compare ? "按已保存的布局、同步点和对比速度导出，无声。":"选定片段按展示时间导出。慢放结果无声；1× 可选保留原声。")
                         .font(.caption).foregroundStyle(.secondary)
+                    Text("导出摘要：\(compare ? "双视频同屏":"当前素材") · \(rate.formatted())× · \(includePose ? "包含可见分析图层":"不含人体图层")").font(.caption).foregroundStyle(.secondary)
                     Text("兼容格式：H.264 · SDR · 30 fps；横画面最长边 1920，竖画面最长边 1920。画面保留原比例，不覆盖原片。")
                         .font(.caption).foregroundStyle(.secondary)
                 } else { EmptyPanel(icon:"square.and.arrow.up",title:"添加视频后导出",detail:"回到分析记录，先导入或拍摄一段视频。") }
@@ -55,24 +61,26 @@ struct ExportView:View {
                     Text("导出完成").accessibilityIdentifier("exportComplete")
                 }
                 if let notice { Text(notice).font(.caption) }
-                if let issue { Text(issue).foregroundStyle(.red);Button("重试") { run(screenshot:false) } }
+                if let issue { Text(issue).foregroundStyle(.red);Button("重试") { run(screenshot:lastScreenshot) } }
             }.padding().frame(maxWidth:850).frame(maxWidth:.infinity)
         }.background(Theme.paper).navigationTitle("导出分析").navigationBarTitleDisplayMode(.inline)
         .task {
-            do { let ids=try session.snapshot().videoIDs;assets=try library.repository?.assets().filter{ids.contains($0.id)} ?? [];videoID=assets.first(where:{$0.id==initialVideoID})?.id ?? assets.first?.id; compare=initialComparison; if let id=videoID { rate=try session.snapshot().playbackRates[id.uuidString] ?? 0.25 } }
+            includePose=initialPose;includeAnnotations=initialAnnotations
+            do { let ids=try session.snapshot().videoIDs;assets=try library.repository?.assets().filter{ids.contains($0.id)} ?? [];videoID=assets.first(where:{$0.id==initialVideoID})?.id ?? assets.first?.id; compare=initialComparison; if let id=videoID { rate=try session.snapshot().playbackRates[id.uuidString] ?? 1 } }
             catch { issue=error.localizedDescription }
         }
-        .onChange(of:videoID) { _,id in if let id { rate=(try? session.snapshot().playbackRates[id.uuidString]) ?? 0.25 } }
+        .onChange(of:videoID) { _,id in if let id { rate=(try? session.snapshot().playbackRates[id.uuidString]) ?? 1 } }
         .sheet(isPresented:$sharing) { if let resultURL { ShareSheet(url:resultURL) } }
         .onDisappear { task?.cancel() }
         .onChange(of:phase) { _,value in if value == .background { task?.cancel();notice="应用进入后台，已取消导出；可以返回重试。" } }
     }
     private func run(screenshot:Bool) {
+        lastScreenshot=screenshot
         guard let repository=library.repository else { return };busy=true;progress=0;resultURL=nil;issue=nil
         task=Task {
             defer { busy=false }
             do {
-                let recipe=try await ExportBuilder.recipe(session:session,repository:repository,videoID:videoID,compare:compare,rate:rate,pose:includePose,audio:audio)
+                let recipe=try await ExportBuilder.recipe(session:session,repository:repository,videoID:videoID,compare:compare,rate:rate,pose:includePose,audio:audio,annotations:includeAnnotations)
                 let directory=repository.files.root.appendingPathComponent("Cache/Exports")
                 let service=ExportService()
                 if screenshot {

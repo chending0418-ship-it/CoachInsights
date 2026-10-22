@@ -16,11 +16,12 @@
 由 Codex 按任务依赖实现和验证，不设置人工开发排期。
 
 - [1.0 TODO](TODO.md)：任务状态、完成条件与执行规则。
+- [1.0.1 测试版修改 TODO](docs/v1.0.1-todo.md)：参考 CoachNow 的视频观看与操作体验，规划播放流畅度、工具布局、双视频对比和无需订阅的分析流程；功能已实现，双端主要回归通过，完整性能与长时资源验收待人工测试；见 [1.0.1 验证记录](docs/v1.0.1-validation.md)。
 - [1.0 开发计划](docs/v1.0-development-plan.md)：产品行为、技术方案、实现顺序、双端验收与风险处理。
 
 ## 当前进度
 
-按已确认的辅助估算范围，1.0 的 62 项 Todo 已完成，新版 Release 已安装并启动于 iPhone / iPad 项目专用模拟器。
+当前 1.0.1 (3) Release 已安装并启动于 iPhone / iPad 项目专用模拟器：优化视频观看与定位、绘图及对比交互，修复人体叠加拖动同步。双端主要回归已通过；用户取消后续长时自动测试，完整性能验收待人工测试。见 [1.0.1 验证记录](docs/v1.0.1-validation.md)。原 1.0 的 62 项 Todo 完成状态保留。
 
 已接入完整的本机视频流程：拍摄 / 相册 / 文件导入、逐帧与五档慢放、可编辑标注、关键帧、双视频同步、离线骨架和二维角度、截图 / 单视频 / 双路合成导出。iPhone、iPad 共用原生 Universal 工程，主题为勃艮第红 `#722F37`，使用已确认的棒球瞳孔图标。
 
@@ -53,7 +54,7 @@ python3 scripts/build_simulator_release.py --install
 
 ## TestFlight
 
-签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0 (2)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0.1 (3)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
 
 新版在最终签名前清理 Xcode 为静态 MediaPipe 框架生成的 6 个空外壳，以消除缺少 dSYM 的上传警告；SDK 实现仍静态链接，模型与分析逻辑保持不变。清理会检查代码、资源与运行时依赖，不满足条件则停止构建。详情见 [MediaPipe 打包说明](Packages/MediaPipeTasks/README.md)。旧的 `1.0 (1)` 归档与 TestFlight 构建不受修改。
 

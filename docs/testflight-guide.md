@@ -8,7 +8,7 @@
 | --- | --- |
 | App 名称 | Coach Insights |
 | Bundle Identifier | `com.coachinsights.CoachInsights` |
-| Version / Build | `1.0` / `2` |
+| Version / Build | `1.0.1` / `3` |
 | 支持设备 | iPhone、iPad，同一个 Universal App |
 | 最低系统 | iOS / iPadOS 17.0 |
 | 归档配置 | Release，arm64 iOS |
@@ -145,7 +145,7 @@ Review Information 中取消需要登录的选项，填写**你自己的**联系
 
 ## 后续构建与常见提示
 
-- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如本次 `2` → 下次 `3`；同一测试阶段 Version 可保持 `1.0`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
+- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如本次 `3` → 下次 `4`；同一测试阶段 Version 可保持 `1.0.1`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
 - 只看到 Personal Team：先确认 Apple Developer Program 资格，或切换到有权限的付费团队。
 - Bundle ID unavailable / profile mismatch：核对 Bundle ID 注册归属、Team 与后台 App，保持三者一致。
 - 旧包的 6 条 MediaPipe dSYM 警告：原始 SDK 是静态库，Xcode 生成了没有必要保留的空动态框架。`1.0 (2)` 的构建阶段会验证并清理它们，应用自己的 dSYM 正常保留。请重新 Archive 并选择新归档上传，旧的 `1.0 (1)` 归档不会自动修正。若 SDK 将来加入代码、资源或动态依赖，保护检查会停止构建，不能关闭检查或创建空 dSYM 绕过。
