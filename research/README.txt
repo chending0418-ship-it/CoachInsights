@@ -1,9 +1,17 @@
-Coach Inside: first local engine study, 2026-10-20
+Coach Insights: first local engine study, 2026-10-20
 
 Scope from the user
 - Version 1.0 supports both iPhone and iPad, with device-local storage and no iCloud sync.
-- Start bat-path analysis with semi-automatic tracking, including initialization and user corrections.
+- Bat trajectory and its semi-automatic tracking/correction tools were removed from version 1.0 on 2026-10-20.
+- Video tools, drawing annotations, dual-video comparison and human pose analysis remain in scope.
 - Current work is engine evaluation; a production iOS app is not implemented by this study.
+
+Archived tracking study
+The first study originally evaluated semi-automatic bat tracking. Its code, measurements and
+reproduction steps below are retained as historical research. They are not active 1.0 work.
+BootsTAPIR and the tracking-specific research dependencies are not application dependencies.
+Current product scope is recorded in project_decisions.json; it supersedes the scope text
+embedded in the original benchmarks/2026-10-20/summary.json snapshot.
 
 Results
 - results/report.html: readable report, with local videos.
@@ -23,12 +31,12 @@ The fastest blurred swing frames are not assigned precise reference points.
 Reproduction on macOS Apple Silicon (from the project root)
 1. Create a Python 3.12 virtual environment and install research/requirements.lock.txt.
    Set the local input path, for example:
-   export COACH_INSIDE_VIDEO="$HOME/Downloads/IMG_9673.mov"
+   export COACH_INSIGHTS_VIDEO="$HOME/Downloads/IMG_9673.mov"
    .venv/bin/python research/prepare_study.py
 2. swiftc -parse-as-library research/inspect_video.swift -o .venv/inspect_video
-   .venv/inspect_video "$COACH_INSIDE_VIDEO" research/results
+   .venv/inspect_video "$COACH_INSIGHTS_VIDEO" research/results
 3. swiftc -parse-as-library research/extract_frames.swift -o .venv/extract_frames
-   .venv/extract_frames "$COACH_INSIDE_VIDEO" research/results/frames
+   .venv/extract_frames "$COACH_INSIGHTS_VIDEO" research/results/frames
 4. swiftc -parse-as-library research/vision_benchmark.swift -o .venv/vision_benchmark
    .venv/vision_benchmark research/results
 5. swiftc -parse-as-library research/optical_flow.swift -o .venv/optical_flow

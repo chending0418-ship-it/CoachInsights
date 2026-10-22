@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-20",
-  "product": "Coach Inside",
+  "date": "2026-10-22",
+  "product": "Coach Insights",
   "version1": {
     "platforms": [
       "iPhone",
@@ -13,7 +13,13 @@
       "baseball batting",
       "baseball pitching"
     ],
-    "batTrajectory": "semi-automatic from the first implementation; user initializes and can correct tip and knob",
+    "batTrajectory": false,
+    "poseAnalysis": true,
+    "excludedFeatures": [
+      "bat tip and knob tracking",
+      "bat trajectory visualization",
+      "dedicated trajectory correction tools"
+    ],
     "coreVideoTools": [
       "capture/import",
       "slow playback",
@@ -23,7 +29,16 @@
       "local persistence",
       "export/share"
     ],
-    "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services."
+    "privacy": "Inference and video processing on device; research sample is not uploaded to third-party inference services.",
+    "poseAnalysisMode": "Auxiliary estimates of 2D skeleton and image-plane elbow/knee/trunk angles, with manual frame review and explicit limitations; no trajectory view",
+    "poseEngine": {
+      "default": "Apple Vision revision 1",
+      "fallback": "MediaPipe Full v1 / native Tasks 1.1.1",
+      "offline": true,
+      "qualityGate": "Auxiliary-estimate delivery explicitly accepted by user on 2026-10-22. The historical 90% PCK@0.05 reference is informational and does not block version 1.0.",
+      "simulator": "Use bundled MediaPipe Full directly: missing Vision weights and intermittent setup stall are known runtime limitations.",
+      "limitations": "Joint offsets, left/right confusion and missing results can occur under occlusion, motion blur, side views or multiple people. High confidence is not proof of accuracy. Visible pose in preview/export carries an estimate notice."
+    }
   },
   "research": {
     "sample": "IMG_9673.mov (provided locally; not included in the repository)",
@@ -39,17 +54,50 @@
       "OpenCV CSRT",
       "BootsTAPIR"
     ],
+    "trackingStatus": "Archived research only. Bat trajectory was removed from version 1.0 on 2026-10-20; tracking engines are not active application dependencies.",
     "qualification": "Desktop feasibility comparison; results do not establish iPhone/iPad latency, battery use or overall accuracy.",
     "provisionalSelection": {
       "pose": "Apple Vision by native integration cost; no accuracy superiority established",
-      "batTracking": "BootsTAPIR 256x256, pending iOS model conversion and device qualification",
       "alternativePose": "MediaPipe Full",
       "limitations": [
-        "One batting sample only",
-        "Fast-swing blur remains unreliable",
-        "Pitching not tested",
-        "No iPhone or iPad device latency/memory validation yet"
+        "Original desktop experiment used one batting clip and did not qualify iOS accuracy.",
+        "iOS 26.1 simulator Vision lacks human-pose weights; native Full fallback now runs.",
+        "Independent 60-frame human-labelled acceptance set fails the original 90% PCK@0.05 gate for Full and Heavy.",
+        "Simulator acceptance does not establish physical camera, energy or thermal behaviour; physical-device validation is explicitly out of scope."
       ]
     }
+  },
+  "decisionHistory": [
+    {
+      "date": "2026-10-20",
+      "change": "User removed bat trajectory from the current version. Retain video tools, manual annotations, dual-video comparison and human pose analysis. Archive existing bat-tracking experiments."
+    },
+    {
+      "date": "2026-10-20",
+      "change": "User requires simulator-only development and acceptance for iPhone/iPad; no physical-device verification gate."
+    },
+    {
+      "date": "2026-10-20",
+      "change": "Correct product name to Coach Insights throughout app, native project, identifiers, tests, docs and research presentation; use burgundy #722F37 theme."
+    },
+    {
+      "date": "2026-10-22",
+      "change": "Reproducible Vision runtime gap justifies native MediaPipe Full fallback. Full and optional Heavy compared against a separate 60-frame human-labelled baseball acceptance set; neither passes the original quality gate. No automatic reduction of the quality commitment."
+    },
+    {
+      "date": "2026-10-22",
+      "change": "User explicitly accepts human-pose recognition as an auxiliary estimate with clear limitations. Remove the 90% release blocker, retain original accuracy measurements, add manual-review guidance and a shared estimate notice for preview/export, and complete remaining TODO on the development branch without merging main."
+    }
+  ],
+  "developmentPlan": {
+    "executor": "Codex",
+    "scheduling": "No staffing or calendar schedule; implementation follows dependencies and acceptance gates",
+    "todo": "TODO.md",
+    "plan": "docs/v1.0-development-plan.md",
+    "initialDeploymentTarget": "iOS / iPadOS 17+",
+    "executionStatus": "All 62 version 1.0 TODO items completed under the user-approved auxiliary-estimate scope. iPhone/iPad simulator regression: 81 passed, zero failures, one device-specific skip. Updated Release compiled for arm64 simulator and iOS, installed and launched on both QA simulators. Historical accuracy measurements retained without a 90% release blocker; development branch only, no main merge.",
+    "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction",
+    "validationRecord": "docs/v1.0-validation.md",
+    "poseQualityRecord": "docs/pose-engine-validation.md"
   }
 }
