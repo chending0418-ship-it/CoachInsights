@@ -4,12 +4,21 @@ import UIKit
 @testable import CoachInsights
 
 @MainActor final class WorkflowTests:XCTestCase {
+    private var workspaces:[AnalysisWorkspace]=[]
+    private var comparisons:[ComparisonWorkspace]=[]
+    func track(_ w:AnalysisWorkspace)->AnalysisWorkspace { workspaces.append(w);return w }
+    func track(_ w:ComparisonWorkspace)->ComparisonWorkspace { comparisons.append(w);return w }
     var root:URL!
     override func setUpWithError() throws {
         root=URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
     }
-    override func tearDownWithError() throws { try FileManager.default.removeItem(at:root) }
+    override func tearDown() async throws {
+        for w in workspaces { await w.shutdown() };for w in comparisons { await w.shutdown() }
+        workspaces=[];comparisons=[]
+        await Task.yield()
+        if FileManager.default.fileExists(atPath:root.path) { try FileManager.default.removeItem(at:root) }
+    }
     func fixture(_ name:String="source",fps:Int=30,duration:Double=1) async throws -> URL {
         let url=root.appendingPathComponent(name+".mov")
         try await FixtureFactory.video(at:url,times:(0..<Int(duration*Double(fps))).map{Double($0)/Double(fps)},duration:duration)
@@ -23,7 +32,7 @@ import UIKit
         let record=try repository.create(name:"完整打击分析",sport:.batting)
         let source=try await fixture(fps:60)
         let asset=try await repository.importVideo(source,into:record)
-        let w=AnalysisWorkspace(session:record,repository:repository);await w.reload()
+        let w=track(AnalysisWorkspace(session:record,repository:repository));await w.reload()
         try await wait{w.frame != nil}
         w.seek(frame:20);w.seek(frame:40);w.seek(frame:15)
         try await wait{w.frame?.index==15}
@@ -33,8 +42,8 @@ import UIKit
         w.tool="arrow";w.add(points:[UnitPointValue(x:0.2,y:0.3),UnitPointValue(x:0.8,y:0.7)])
         XCTAssertEqual(w.visibleAnnotations.count,1)
         let annotation=try XCTUnwrap(w.snapshot.annotations.first)
-        w.step(1);XCTAssertEqual(w.visibleAnnotations.count,0)
-        w.step(-1);XCTAssertEqual(w.visibleAnnotations.count,1)
+        w.step(1);try await wait{w.frameReady};XCTAssertEqual(w.visibleAnnotations.count,0)
+        w.step(-1);try await wait{w.frameReady};XCTAssertEqual(w.visibleAnnotations.count,1)
         var edited=annotation;edited.points[0].x=0.3;w.replace(edited)
         XCTAssertEqual(w.snapshot.annotations[0].points[0].x,0.3)
         w.undo();XCTAssertEqual(w.snapshot.annotations[0],annotation)
@@ -49,13 +58,13 @@ import UIKit
         XCTAssertEqual(snapshot.views[asset.id.uuidString],view)
         XCTAssertEqual(snapshot.clips[asset.id.uuidString]?.start.seconds,0.25)
         XCTAssertEqual(snapshot.clips[asset.id.uuidString]!.end.seconds,46.0/60,accuracy:0.00001)
-        let next=AnalysisWorkspace(session:restored,repository:reopened);await next.reload();try await wait{next.frame?.index==45};next.stopAndSave()
+        let next=track(AnalysisWorkspace(session:restored,repository:reopened));await next.reload();try await wait{next.frame?.index==45};next.stopAndSave()
     }
     func testComparisonDifferentRatesAnchorsPlaybackAndRestore() async throws {
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),record=try repository.create(name:"投球对比",sport:.pitching)
         let a=try await fixture("a",fps:30,duration:1.5),b=try await fixture("b",fps:120,duration:1)
         _=try await repository.importVideo(a,into:record);_=try await repository.importVideo(b,into:record)
-        let w=ComparisonWorkspace(session:record,repository:repository);await w.load()
+        let w=track(ComparisonWorkspace(session:record,repository:repository));await w.load()
         w.left.seek(frame:6);w.right.seek(frame:36)
         try await wait{w.left.frame?.index==6 && w.right.frame?.index==36}
         w.anchor(isLeft:true)
@@ -69,7 +78,7 @@ import UIKit
         XCTAssertGreaterThan(w.time,0.1);XCTAssertLessThan(w.drift,1.0/120)
         w.pause();w.seek(100);XCTAssertEqual(w.time,0.7,accuracy:0.00001)
         var view=ViewSettings();view.mirrored=true;view.crop=[0.1,0.1,0.8,0.8];w.right.updateView(view);w.save()
-        let next=ComparisonWorkspace(session:record,repository:repository);await next.load()
+        let next=track(ComparisonWorkspace(session:record,repository:repository));await next.load()
         XCTAssertEqual(next.setup?.layout,"vertical");XCTAssertEqual(next.setup?.rightView,view)
         w.pause();next.pause()
     }
@@ -119,7 +128,7 @@ import UIKit
         do { _=try await task.value;XCTFail("cancelled export completed") } catch { XCTAssertTrue(error is CancellationError,"\(error)") }
         XCTAssertTrue((try? FileManager.default.contentsOfDirectory(atPath:directory.path).isEmpty) ?? true)
         let second=try repository.create(name:"取消导入",sport:.pitching)
-        let importing=Task { try await repository.importVideo(source,into:second) };importing.cancel()
+        let importing=Task { @MainActor in _=try await repository.importVideo(source,into:second) };importing.cancel()
         do { _=try await importing.value;XCTFail("cancelled import completed") } catch { XCTAssertTrue(error is CancellationError,"\(error)") }
         XCTAssertTrue(try second.snapshot().videoIDs.isEmpty)
         let staging=root.appendingPathComponent("Library/Files/Staging")
@@ -184,7 +193,7 @@ import UIKit
     func testPoseCancellationRetryReuseAndParameterInvalidation() async throws {
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),session=try repository.create(name:"姿态任务",sport:.pitching)
         let url=try await fixture(),asset=try await repository.importVideo(url,into:session)
-        let w=AnalysisWorkspace(session:session,repository:repository);await w.reload();try await wait{w.frame != nil}
+        let w=track(AnalysisWorkspace(session:session,repository:repository));await w.reload();try await wait{w.frame != nil}
         var settings=PoseSettings();settings.engine=MediaPipePoseEngine.identity;w.poseSettings=settings
         w.analyzePose(force:true);XCTAssertTrue(w.poseBusy)
         try await Task.sleep(for:.milliseconds(15));w.poseTask?.cancel();try await wait{!w.poseBusy}
@@ -220,7 +229,7 @@ import UIKit
     func testLivePauseFreezesCurrentFrameAndSelectionPreservesOtherStyleFields() async throws {
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),session=try repository.create(name:"暂停帧",sport:.batting)
         let source=try await fixture(duration:1.5);_=try await repository.importVideo(source,into:session)
-        let w=AnalysisWorkspace(session:session,repository:repository);await w.reload();try await wait{w.frame != nil}
+        let w=track(AnalysisWorkspace(session:session,repository:repository));await w.reload();try await wait{w.frame != nil}
         w.rate=1;w.looping=false;w.play();try await wait{w.playing}
         try await Task.sleep(for:.milliseconds(350));w.tool="line"
         XCTAssertFalse(w.playing);XCTAssertGreaterThan(w.frameIndex,1)
@@ -238,7 +247,7 @@ import UIKit
     func testSingleLoopStopsOnLastFrameAndCanReplay() async throws {
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),session=try repository.create(name:"循环边界",sport:.batting)
         let source=try await fixture(fps:30,duration:0.3);_=try await repository.importVideo(source,into:session)
-        let w=AnalysisWorkspace(session:session,repository:repository);await w.reload();try await wait{w.frame != nil}
+        let w=track(AnalysisWorkspace(session:session,repository:repository));await w.reload();try await wait{w.frame != nil}
         w.rate=1;w.looping=true;w.play();try await wait{w.playing}
         var maximum=0.0,sawWrap=false
         for _ in 0..<45 {
@@ -257,11 +266,12 @@ import UIKit
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),session=try repository.create(name:"对比边界",sport:.pitching)
         let a=try await fixture("short",fps:30,duration:0.2),b=try await fixture("long",fps:60,duration:0.5)
         _=try await repository.importVideo(a,into:session);_=try await repository.importVideo(b,into:session)
-        let w=ComparisonWorkspace(session:session,repository:repository);await w.load();w.loop=false;w.play();try await wait{w.playing}
+        let w=track(ComparisonWorkspace(session:session,repository:repository));await w.load();w.loop=false;w.play();try await wait{w.playing}
         try await wait{!w.playing && w.time>=0.199}
         try await wait{w.left.frame?.index==5 && w.right.frame?.index==11}
         XCTAssertEqual(w.left.frameIndex,5);XCTAssertEqual(w.right.frameIndex,11)
-        XCTAssertLessThan(w.right.playback!.player.currentTime().seconds,0.2)
+        XCTAssertLessThan(w.right.frame!.requestedTime.seconds,0.2)
+        XCTAssertEqual(w.right.playback!.player.rate,0) // Paused rendering no longer seeks a hidden AVPlayer.
         w.pause()
         XCTAssertNil(ComparisonClock(leftAnchor:0,rightAnchor:0,leftRange:0...1,rightRange:1...2).commonRange)
     }

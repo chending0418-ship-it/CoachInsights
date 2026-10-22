@@ -3,6 +3,7 @@ import SwiftUI
 struct PoseToolsView: View {
     @ObservedObject var workspace: AnalysisWorkspace
     @Environment(\.dismiss) private var dismiss
+    @State private var advanced=false
     @State private var region = [0.0,0.0,1.0,1.0]
     private var statusMessage:String { workspace.poseBusy ? "正在本机逐帧分析…" : workspace.issue ?? workspace.notice ?? "选定片段与主体区域后开始分析。" }
     var body: some View {
@@ -10,15 +11,21 @@ struct PoseToolsView: View {
             Section("人体识别 · 辅助估算") {
                 Text(PoseGuidance.limitations)
                     .font(.callout).accessibilityIdentifier("poseLimitations")
+                Toggle("显示骨架与角度",isOn:Binding(get:{workspace.poseSettings.visible && workspace.overlaysVisible},set:{ value in
+                    workspace.poseSettings.visible=value
+                    if value { workspace.overlaysVisible=true }
+                    workspace.save()
+                }))
+                DisclosureGroup("高级设置",isExpanded:$advanced) {
                 Picker("识别引擎",selection:$workspace.poseSettings.engine) {
                     Text("Apple Vision（不可用时自动切换）").tag("Apple Vision")
                     Text("MediaPipe Full · 本机模型").tag(MediaPipePoseEngine.identity)
                 }.disabled(workspace.poseBusy)
-                Toggle("显示骨架与角度",isOn:$workspace.poseSettings.visible)
                 VStack(alignment:.leading) {
                     Text("关节最低置信度 \(workspace.poseSettings.minimumConfidence, specifier:"%.2f")")
                     Slider(value:$workspace.poseSettings.minimumConfidence,in:0.3...0.9)
                 }.disabled(workspace.poseBusy)
+                }
             }
             Section("指定分析区域") {
                 if let frame=workspace.frame {
@@ -28,12 +35,14 @@ struct PoseToolsView: View {
                 }
                 Text("用画面百分比框住一个完整人体。区域内出现多人或主体明显跳变时，该帧留空。")
                     .font(.caption).foregroundStyle(.secondary)
+                if advanced {
                 ForEach(0..<4,id:\.self) { i in
                     VStack(alignment:.leading) {
                         Text("\(["左边距","上边距","宽度","高度"][i]) \(Int(region[i]*100))%")
                         Slider(value:$region[i],in:i<2 ? 0...0.9 : 0.1...1,step:0.01)
                     }
                 }.disabled(workspace.poseBusy)
+                }
                 Button("应用区域") {
                     region[2]=min(region[2],1-region[0]); region[3]=min(region[3],1-region[1])
                     workspace.poseSettings.region=region; workspace.save()
@@ -47,7 +56,7 @@ struct PoseToolsView: View {
                     Button("取消分析") { workspace.poseTask?.cancel() }.accessibilityIdentifier("cancelPose")
                 } else {
                     HStack {
-                        Button("分析选定片段") { workspace.analyzePose() }.buttonStyle(.borderedProminent).accessibilityIdentifier("runPose")
+                        Button("分析选定片段 · 无需订阅") { workspace.analyzePose() }.buttonStyle(.borderedProminent).accessibilityIdentifier("runPose")
                         Button("重新分析") { workspace.analyzePose(force:true) }.buttonStyle(.bordered)
                     }
                 }

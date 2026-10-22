@@ -68,9 +68,10 @@ struct ComparisonClock {
         try await waitUntilReady()
         // Preparation can complete separately; playback starts together on the shared host clock.
         guard let indices=frameIndices(at:analysisTime) else { throw MediaFailure.invalidTiming }
-        let first = await left.seek(frame: indices.0)
-        let second = await right.seek(frame: indices.1)
-        guard first && second else { throw MediaFailure.readFailed }
+        async let first=left.seek(frame:indices.0)
+        async let second=right.seek(frame:indices.1)
+        let completed=await (first,second)
+        guard completed.0 && completed.1 else { throw MediaFailure.readFailed }
     }
     func start(at analysisTime: Double, rate: Float) throws {
         guard let (a, b) = clock.times(at: analysisTime), rate.isFinite, rate > 0 else {

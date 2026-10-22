@@ -15,6 +15,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--device", choices=["iphone", "ipad", "both"], default="both")
 parser.add_argument("--regression", type=Path, help="Optional private IMG_9673.mov; copied only to ignored test fixtures")
 parser.add_argument("--unit-only", action="store_true")
+parser.add_argument("--output-dir",type=Path,default=Path("artifacts"))
+parser.add_argument("--derived-data",type=Path,default=Path("build/DerivedData"))
+parser.add_argument("--only",action="append",default=[],help="Focused test class or method; may repeat")
 args = parser.parse_args()
 if args.regression:
     fixture = ROOT / "CoachInsightsTests/LocalFixtures/Regression.mov"
@@ -40,17 +43,19 @@ for kind in (["iphone", "ipad"] if args.device == "both" else [args.device]):
             device_type = [d for d in types if d["name"].startswith(prefix)][-1]
         udid = run("xcrun", "simctl", "create", label, device_type["identifier"],
                    runtime["identifier"], capture_output=True).stdout.strip()
-    output = ROOT / "artifacts" / kind
+    output = ROOT / args.output_dir / kind
     output.mkdir(parents=True, exist_ok=True)
     result = output / ("Units.xcresult" if args.unit_only else "V1.xcresult")
     if result.exists():
         shutil.rmtree(result)
     command = ["xcodebuild", "-project", "CoachInsights.xcodeproj", "-scheme", "CoachInsights",
                "-destination", f"platform=iOS Simulator,id={udid}",
-               "-derivedDataPath", "build/DerivedData", "-resultBundlePath", str(result),
+               "-derivedDataPath", str(args.derived_data), "-resultBundlePath", str(result),
                "-parallel-testing-enabled", "NO", "CODE_SIGNING_ALLOWED=NO", "test"]
     if args.unit_only:
         command.insert(-1, "-only-testing:CoachInsightsTests")
+    for target in args.only:
+        command.insert(-1,"-only-testing:"+target)
     with (output / ("units.log" if args.unit_only else "test.log")).open("w") as log:
         run(*command, stdout=log, stderr=subprocess.STDOUT)
     print(f"{kind}: PASS; {result}", flush=True)

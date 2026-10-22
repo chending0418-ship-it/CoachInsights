@@ -11,6 +11,7 @@ actor ThumbnailStore {
         guard contentHash.count == 64, contentHash.allSatisfy({ $0.isHexDigit }), frame >= 0 else {
             throw StorageFailure.unsafePath
         }
+        try Task.checkCancellation()
         // Version + content hash + frame prevents stale cache reuse after source/schema changes.
         let url = directory.appendingPathComponent("v1-\(contentHash)-\(frame).jpg")
         if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
@@ -18,6 +19,7 @@ actor ThumbnailStore {
             return image
         }
         let resolved = try await provider.frame(at: frame)
+        try Task.checkCancellation()
         let image = UIImage(cgImage: resolved.image)
         let ratio = min(1, 240 / max(image.size.width, image.size.height))
         let format = UIGraphicsImageRendererFormat(); format.scale = 1
@@ -27,6 +29,9 @@ actor ThumbnailStore {
                                                                   height: image.size.height * ratio)))
         }
         if let data = thumbnail.jpegData(compressionQuality: 0.7), data.count <= byteLimit {
+            try Task.checkCancellation()
+            // Cache eviction may remove the directory while this actor remains alive.
+            try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
             try data.write(to: url, options: .atomic)
             try trim()
         }

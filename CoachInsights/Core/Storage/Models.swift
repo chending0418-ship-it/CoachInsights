@@ -78,6 +78,7 @@ struct SessionSnapshot: Codable, Equatable {
     var views: [String: ViewSettings] = [:]
     var playheads: [String: MediaTime] = [:]
     var playbackRates: [String: Double] = [:]
+    var overlayVisibility:[String:Bool]=[:]
     var annotations: [Annotation] = []
     var keyframes: [Keyframe] = []
     var comparison: ComparisonSetup?
@@ -195,7 +196,7 @@ enum StorageFailure: LocalizedError, Equatable {
 // Version 1 records created before playback preferences remain readable.
 extension SessionSnapshot {
     private enum CodingKeys:String,CodingKey {
-        case version,videoIDs,clips,views,playheads,playbackRates,annotations,keyframes,comparison,poseSettings,poseConfigurations,poseResults
+        case version,videoIDs,clips,views,playheads,playbackRates,overlayVisibility,annotations,keyframes,comparison,poseSettings,poseConfigurations,poseResults
     }
     init(from decoder:Decoder) throws {
         let c=try decoder.container(keyedBy:CodingKeys.self)
@@ -205,6 +206,7 @@ extension SessionSnapshot {
         views=try c.decode([String:ViewSettings].self,forKey:.views)
         playheads=try c.decode([String:MediaTime].self,forKey:.playheads)
         playbackRates=try c.decodeIfPresent([String:Double].self,forKey:.playbackRates) ?? [:]
+        overlayVisibility=try c.decodeIfPresent([String:Bool].self,forKey:.overlayVisibility) ?? [:]
         annotations=try c.decode([Annotation].self,forKey:.annotations)
         keyframes=try c.decode([Keyframe].self,forKey:.keyframes)
         comparison=try c.decodeIfPresent(ComparisonSetup.self,forKey:.comparison)

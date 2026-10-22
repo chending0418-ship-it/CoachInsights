@@ -66,6 +66,24 @@ actor FrameProvider {
             _ = try? await frame(at: frameIndex)
         }
     }
+    /// Coalesced drag previews may use nearby decode times. Keep the actual displayed
+    /// source PTS so overlays are never drawn using the requested playhead instead.
+    func preview(at index:Int) async throws -> ResolvedFrame {
+        let target=metadata.timeline.steppedIndex(from:index,by:0)
+        if let cached=cache.value(for:target) { return cached }
+        let generator=AVAssetImageGenerator(asset:asset)
+        generator.appliesPreferredTrackTransform=true
+        generator.maximumSize=CGSize(width:640,height:640)
+        if #available(iOS 18,*) { generator.dynamicRangePolicy = .forceSDR }
+        generator.requestedTimeToleranceBefore=CMTime(seconds:0.05,preferredTimescale:600_000)
+        generator.requestedTimeToleranceAfter=CMTime(seconds:0.05,preferredTimescale:600_000)
+        let (image,actual)=try await withTaskCancellationHandler {
+            try await generator.image(at:metadata.timeline.frames[target].presentationTime.cmTime)
+        } onCancel: { generator.cancelAllCGImageGeneration() }
+        try Task.checkCancellation()
+        let displayed=metadata.timeline.nearestFrame(to:MediaTime(actual))
+        return ResolvedFrame(image:image,index:displayed,requestedTime:metadata.timeline.frames[displayed].presentationTime,actualTime:MediaTime(actual))
+    }
     func clear() { cacheEpoch &+= 1; cache.removeAll() }
     var cachedByteCount: Int { cache.totalCost }
     deinit { pressureTask?.cancel() }

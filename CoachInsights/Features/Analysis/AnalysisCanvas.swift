@@ -5,11 +5,12 @@ struct AnalysisCanvas: UIViewRepresentable {
     @ObservedObject var workspace: AnalysisWorkspace
     func makeUIView(context: Context) -> AnalysisCanvasView { AnalysisCanvasView() }
     func updateUIView(_ view: AnalysisCanvasView, context: Context) {
+        let redraw = view.image !== workspace.frame?.image || view.settings != workspace.viewSettings || view.live != workspace.playing
         view.frameKey = (workspace.selectedVideoID?.uuidString ?? "") + ":" + String(workspace.frameIndex)
         view.image = workspace.frame?.image
         view.playerLayer.player = workspace.playback?.player
-        view.live = workspace.playing || workspace.frame?.index != workspace.frameIndex
-        view.isUserInteractionEnabled = workspace.tool == "view" || (!workspace.playing && workspace.frame?.index == workspace.frameIndex)
+        view.live = workspace.playing
+        view.isUserInteractionEnabled = workspace.tool == "view" || (!workspace.playing && workspace.frameReady)
         view.settings = workspace.viewSettings
         view.annotations = workspace.visibleAnnotations
         view.pose = workspace.currentPose
@@ -19,12 +20,16 @@ struct AnalysisCanvas: UIViewRepresentable {
         view.strokeColor = workspace.color
         view.strokeWidth = workspace.lineWidth
         view.textValue = workspace.textValue
+        if let pose=workspace.currentPose {
+            view.accessibilityValue=String(format:"视频 %.3f 秒，人体分析 %.3f 秒",workspace.displayTime,pose.time.seconds)
+        } else { view.accessibilityValue=String(format:"视频 %.3f 秒，当前帧无可见人体结果",workspace.displayTime) }
         view.imageSize = workspace.metadata?.displaySize ?? CGSize(width: 16, height: 9)
         view.onAdd = { workspace.add(points: $0) }
         view.onEdit = { workspace.replace($0) }
         view.onSelect = { workspace.selectedAnnotation = $0 }
         view.onView = { workspace.updateView($0) }
-        view.setNeedsLayout(); view.setNeedsDisplay()
+        view.setNeedsLayout();view.updateOverlay()
+        if redraw { view.setNeedsDisplay() }
     }
     static func dismantleUIView(_ uiView: AnalysisCanvasView, coordinator: ()) { uiView.playerLayer.player = nil }
 }
@@ -55,24 +60,36 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     private var handleIndex: Int?
     private var edit: Annotation?
     private var pinchStart: Double = 1
+    private var lastLayoutSize:CGSize = .zero
+    private var lastImageSize:CGSize = .zero
+    private var lastSettings:ViewSettings?
+    private var readyObserver:NSKeyValueObservation?
     private var geometry: VideoGeometry { settings.geometry(image: imageSize, viewport: bounds.size) }
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isOpaque = true; backgroundColor = .black; clipsToBounds = true; isMultipleTouchEnabled = true
+        isOpaque = true; contentMode = .redraw; backgroundColor = .black; clipsToBounds = true; isMultipleTouchEnabled = true
         layer.addSublayer(playerLayer)
+        readyObserver=playerLayer.observe(\.isReadyForDisplay,options:[.new]) { [weak self] _,_ in
+            DispatchQueue.main.async { self?.setNeedsLayout();self?.setNeedsDisplay() }
+        }
         let touch = CanvasTouchRecognizer(target: nil, action: nil)
         touch.cancelsTouchesInView = false; touch.delaysTouchesBegan = false; touch.delaysTouchesEnded = false; touch.delegate = self
         addGestureRecognizer(touch)
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:)))
         pinch.delegate = self; addGestureRecognizer(pinch)
+        let doubleTap=UITapGestureRecognizer(target:self,action:#selector(resetView))
+        doubleTap.numberOfTapsRequired=2;doubleTap.delegate=self;addGestureRecognizer(doubleTap)
+        isAccessibilityElement = true
         accessibilityIdentifier = "analysisCanvas"
         accessibilityLabel = "视频分析画布"
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layoutSubviews() {
         super.layoutSubviews()
-        playerLayer.isHidden = !live
+        playerLayer.isHidden = !live || !playerLayer.isReadyForDisplay
         guard geometry.isValid else { return }
+        guard lastLayoutSize != bounds.size || lastImageSize != imageSize || lastSettings != settings else { return }
+        lastLayoutSize=bounds.size;lastImageSize=imageSize;lastSettings=settings
         CATransaction.begin(); CATransaction.setDisableActions(true)
         playerLayer.bounds = CGRect(origin: .zero, size: imageSize)
         let a = geometry.viewPoint(from: .zero), b = geometry.viewPoint(from: CGPoint(x: 1, y: 0)), c = geometry.viewPoint(from: CGPoint(x: 0, y: 1))
@@ -88,11 +105,16 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     }
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext(), geometry.isValid else { return }
-        if !live, let image {
+        if let image {
             AnalysisRenderer.draw(image: image, in: context, size: bounds.size, settings: settings,
                                   annotations: [], pose: nil, confidence: confidence)
         } else { context.setFillColor(UIColor.black.cgColor); context.fill(bounds) }
-        // Live player sits above this view's backing store; a transparent overlay layer draws its marks.
+        updateOverlay()
+    }
+    func updateOverlay() {
+        guard geometry.isValid else { return }
+        // Only the transparent overlay redraws on playback ticks; retain the static
+        // backing image underneath the player during preparation and loop seeks.
         overlay.image = image; overlay.geometry = geometry; overlay.annotations = annotations.filter { $0.id != edit?.id } + (edit.map { [$0] } ?? [])
         overlay.pose = pose; overlay.confidence = confidence; overlay.selectedID = selectedID
         overlay.draft = draft; overlay.tool = tool; overlay.strokeColor = strokeColor; overlay.strokeWidth = strokeWidth
@@ -100,6 +122,11 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         overlay.frame = bounds; overlay.setNeedsDisplay()
     }
     private let overlay = CanvasOverlay()
+    @objc private func resetView() { guard tool == "view" else { return };settings=ViewSettings();onView?(settings);setNeedsLayout();setNeedsDisplay() }
+    override func gestureRecognizerShouldBegin(_ recognizer:UIGestureRecognizer)->Bool {
+        if recognizer is UITapGestureRecognizer { return tool == "view" }
+        return true
+    }
     @objc private func pinch(_ gesture: UIPinchGestureRecognizer) {
         guard tool == "view" else { return }
         if gesture.state == .began { pinchStart = settings.zoom }
@@ -135,6 +162,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let location = touches.first?.location(in: self), let start else { return }
         if tool == "view", let originalSettings {
+            guard (event?.allTouches?.count ?? 1)<2 else { return }
             settings.pan.x = originalSettings.pan.x + (location.x-start.x)/bounds.width
             settings.pan.y = originalSettings.pan.y + (location.y-start.y)/bounds.height
             setNeedsLayout()
@@ -163,7 +191,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         start = nil; original = nil; edit = nil; draft.removeAll(); setNeedsDisplay()
     }
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        gestureRecognizer is UIPinchGestureRecognizer || otherGestureRecognizer is UIPinchGestureRecognizer
+        gestureRecognizer is UIPinchGestureRecognizer || otherGestureRecognizer is UIPinchGestureRecognizer || (tool == "view" && (gestureRecognizer is UITapGestureRecognizer || otherGestureRecognizer is UITapGestureRecognizer))
     }
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x-b.x, a.y-b.y) }
     private func clamp(_ p: CGPoint) -> CGPoint { CGPoint(x: min(1,max(0,p.x)), y: min(1,max(0,p.y))) }

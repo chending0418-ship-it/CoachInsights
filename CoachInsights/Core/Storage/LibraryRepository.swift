@@ -5,10 +5,12 @@ import SwiftData
     let container: ModelContainer
     let context: ModelContext
     let files: LocalFileStore
+    let thumbnails:ThumbnailStore
     private let inspector = MediaInspector()
     private var importingSessions: Set<UUID> = []
     init(root: URL, inMemory: Bool = false, availableBytes: (@Sendable () throws -> Int64)? = nil) throws {
         files = try LocalFileStore(root: root.appendingPathComponent("Files"), availableBytes: availableBytes)
+        thumbnails=try ThumbnailStore(directory:root.appendingPathComponent("Files/Cache/Thumbnails"))
         var localRoot = root
         var resourceValues = URLResourceValues()
         resourceValues.isExcludedFromBackup = true
@@ -83,6 +85,26 @@ import SwiftData
         for asset in candidates { context.delete(asset) }
         do { try context.save() } catch { context.rollback(); throw error }
         try await recover()
+    }
+    /// Reuse immutable local media; editing the target never mutates its source record.
+    func attach(_ id:UUID,into target:AnalysisSession) throws {
+        guard try assets().contains(where:{$0.id==id}) else { throw StorageFailure.missingMedia }
+        var snapshot=try target.snapshot()
+        guard !snapshot.videoIDs.contains(id) else { return }
+        let source=try sessions().first { record in
+            guard record.id != target.id else { return false };return try record.snapshot().videoIDs.contains(id)
+        }
+        let original=try source?.snapshot()
+        snapshot.videoIDs.append(id)
+        let key=id.uuidString
+        snapshot.clips[key]=original?.clips[key];snapshot.views[key]=original?.views[key]
+        snapshot.overlayVisibility[key]=original?.overlayVisibility[key]
+        snapshot.playheads[key]=original?.playheads[key];snapshot.playbackRates[key]=original?.playbackRates[key]
+        snapshot.poseConfigurations[key]=original?.poseConfigurations[key] ?? original?.poseSettings
+        snapshot.annotations += original?.annotations.filter{$0.videoID==id}.map{value in var copy=value;copy.id=UUID();return copy} ?? []
+        snapshot.keyframes += original?.keyframes.filter{$0.videoID==id}.map{value in var copy=value;copy.id=UUID();return copy} ?? []
+        snapshot.poseResults += original?.poseResults.filter{$0.videoID==id} ?? []
+        try save(target,snapshot:snapshot)
     }
     func recover() async throws {
         guard importingSessions.isEmpty else { return }

@@ -12,6 +12,9 @@ import AVFoundation
     @Published var issue:String?
     @Published var loop=true
     @Published var drift:Double=0
+    @Published var independent=false
+    private var newLayout=false
+    private var layoutAdapted=false
     private var dual:DualPlaybackCoordinator?
     private var task:Task<Void,Never>?
     private var ticker:Task<Void,Never>?
@@ -21,17 +24,33 @@ import AVFoundation
         left.externallyClocked=true;right.externallyClocked=true
     }
     var range:ClosedRange<Double>? { dual?.clock.commonRange }
-    func load() async {
-        await left.reload(); await right.reload()
+    func refreshAssets() async {
+        for w in [left,right] {
+            let view=w.viewSettings,clip=w.clip
+            w.snapshot=(try? session.snapshot()) ?? w.snapshot
+            if w.metadata != nil { w.snapshot.views[w.key]=view;w.snapshot.clips[w.key]=clip }
+            w.assets=(try? repository.assets().filter{w.snapshot.videoIDs.contains($0.id)}.sorted{$0.createdAt<$1.createdAt}) ?? w.assets
+        }
+    }
+    func load(initialVideoID:UUID?=nil,secondVideoID:UUID?=nil) async {
+        pause()
         do {
+            await left.reload(openVideo:false);await right.reload(openVideo:false)
             let snapshot=try session.snapshot()
-            guard let first=left.assets.first else { return }
-            let second=left.assets.dropFirst().first ?? first
-            let a=try first.metadata(),b=try second.metadata()
-            setup=snapshot.comparison ?? ComparisonSetup(leftVideoID:first.id,rightVideoID:second.id,
-                leftAnchor:a.timeline.frames[0].presentationTime,rightAnchor:b.timeline.frames[0].presentationTime,
-                leftClip:snapshot.clips[first.id.uuidString] ?? ClipRange(start:MediaTime(seconds:0),end:a.timeline.duration),
-                rightClip:snapshot.clips[second.id.uuidString] ?? ClipRange(start:MediaTime(seconds:0),end:b.timeline.duration))
+            guard let first=left.assets.first(where:{$0.id==initialVideoID}) ?? left.assets.first else { return }
+            let saved=snapshot.comparison
+            if secondVideoID == nil,let saved,(initialVideoID == nil || saved.leftVideoID == initialVideoID) { setup=saved;newLayout=false }
+            else {
+                guard let second=left.assets.first(where:{$0.id==secondVideoID && $0.id != first.id}) ?? left.assets.first(where:{$0.id != first.id}) else { await left.select(first.id);setup=nil;return }
+                let a=try first.metadata(),b=try second.metadata()
+                let rightClip=snapshot.clips[second.id.uuidString] ?? ClipRange(start:b.timeline.frames[0].presentationTime,end:b.timeline.duration)
+                setup=ComparisonSetup(leftVideoID:first.id,rightVideoID:second.id,
+                    leftAnchor:snapshot.playheads[first.id.uuidString] ?? a.timeline.frames[0].presentationTime,rightAnchor:rightClip.start,
+                    leftClip:snapshot.clips[first.id.uuidString] ?? ClipRange(start:a.timeline.frames[0].presentationTime,end:a.timeline.duration),
+                    rightClip:rightClip,rate:snapshot.playbackRates[first.id.uuidString] ?? 1,
+                    leftView:snapshot.views[first.id.uuidString] ?? ViewSettings(),rightView:snapshot.views[second.id.uuidString] ?? ViewSettings())
+                newLayout=true;layoutAdapted=false
+            }
             guard let setup else { return }
             await left.select(setup.leftVideoID);await right.select(setup.rightVideoID)
             left.snapshot.views[left.key]=setup.leftView;right.snapshot.views[right.key]=setup.rightView
@@ -41,6 +60,35 @@ import AVFoundation
             rebuild();seek(0)
         } catch { issue=error.localizedDescription }
     }
+    func adaptLayout(width:CGFloat,height:CGFloat) {
+        guard newLayout,!layoutAdapted,setup != nil else { return }
+        setup?.layout=width<600 && height>width ? "vertical":"horizontal";layoutAdapted=true;save()
+    }
+    func independentSeek(_ seconds:Double,isLeft:Bool) {
+        pause();independent=true
+        (isLeft ? left:right).scrub(to:seconds)
+        if let setup,let range {
+            let anchor=isLeft ? setup.leftAnchor:setup.rightAnchor
+            time=min(range.upperBound,max(range.lowerBound,seconds-anchor.seconds))
+        }
+    }
+    func frameOffset(_ delta:Int,isLeft:Bool) {
+        let w=isLeft ? left:right
+        guard let map=w.metadata?.timeline else { return }
+        let current=isLeft ? setup?.leftAnchor:setup?.rightAnchor
+        let start=map.nearestFrame(to:current ?? MediaTime(seconds:w.time))
+        let next=map.steppedIndex(from:start,by:delta)
+        offset(map.frames[next].presentationTime.seconds-map.frames[start].presentationTime.seconds,isLeft:isLeft)
+    }
+    func setRate(_ value:Double) {
+        guard [1.0,0.5,0.25,0.1,0.05].contains(value) else { return }
+        setup?.rate=value
+        if playing,let dual { dual.left.player.rate=Float(value);dual.right.player.rate=Float(value) }
+        save()
+    }
+    func resumeFrames() { left.resumeFrame();right.resumeFrame() }
+    func shutdown() async { let pending=[task,ticker].compactMap{$0};pause();for worker in pending { await worker.value };await left.shutdown();await right.shutdown();save();task=nil;ticker=nil }
+    func stopAndSave() { pause();left.stopAndSave();right.stopAndSave();save() }
     func replace(_ id:UUID,isLeft:Bool) async {
         pause();if isLeft { await left.select(id) } else { await right.select(id) }
         guard var setup,let metadata=(isLeft ? left.metadata:right.metadata) else { return }
@@ -67,7 +115,7 @@ import AVFoundation
         self.setup=setup;rebuild();seek(time);save()
     }
     func seek(_ value:Double) {
-        pause();guard let dual,let range=range,let indices=dual.frameIndices(at:value) else { return }
+        pause();independent=false;guard let dual,let range=range,let indices=dual.frameIndices(at:value) else { return }
         time=min(range.upperBound,max(range.lowerBound,value));left.seek(frame:indices.0);right.seek(frame:indices.1)
     }
     func step(_ delta:Int) {
@@ -77,7 +125,8 @@ import AVFoundation
     }
     func play() {
         guard let dual,let setup,let range else { return }
-        pause();if time>=range.upperBound-0.001 { time=range.lowerBound }
+        pause();independent=false;if left.scrubbing { left.endScrubbing() };if right.scrubbing { right.endScrubbing() }
+        if time>=range.upperBound-0.001 { time=range.lowerBound }
         task=Task { [weak self] in
             guard let self else { return }
             do {
@@ -88,8 +137,9 @@ import AVFoundation
                 try dual.start(at:time,rate:Float(setup.rate));playing=true;left.playing=true;right.playing=true
                 ticker=Task { [weak self] in
                     guard let self else { return }
+                    var refresh=0
                     while !Task.isCancelled && playing {
-                        do { try await Task.sleep(for:.milliseconds(200)) } catch { return }
+                        do { try await Task.sleep(for:.milliseconds(33)) } catch { return }
                         guard !Task.isCancelled else { return }
                         let observed=dual.left.player.currentTime().seconds-setup.leftAnchor.seconds
                         time=min(range.upperBound,max(range.lowerBound,observed));drift=dual.drift
@@ -101,7 +151,8 @@ import AVFoundation
                         let a=left.metadata?.timeline.frames[safe:left.frameIndex]?.duration.seconds ?? 1/30
                         let b=right.metadata?.timeline.frames[safe:right.frameIndex]?.duration.seconds ?? 1/30
                         let tolerance=max(0.001,min(0.035,min(a,b)*0.9))
-                        do { try await dual.correctIfNeeded(tolerance:tolerance) } catch { issue=error.localizedDescription;pause() }
+                        refresh+=1
+                        if refresh%6 == 0 { do { try await dual.correctIfNeeded(tolerance:tolerance) } catch { issue=error.localizedDescription;pause() } }
                     }
                 }
             } catch is CancellationError {} catch { issue=error.localizedDescription }

@@ -102,6 +102,9 @@ final class MediaTests: XCTestCase {
         XCTAssertNotNil(UIImage(contentsOfFile: corrupt.path))
         try await store.clear()
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: cache.path).isEmpty)
+        try FileManager.default.removeItem(at:cache)
+        _=try await store.image(contentHash:hash,frame:0,provider:provider)
+        XCTAssertNotNil(UIImage(contentsOfFile:corrupt.path),"A purged cache directory must be recreated without reopening the editor")
     }
     @MainActor func testLatestRequestCannotBeOverwrittenAndExactSeek() async throws {
         let runner = LatestTaskRunner<Int>()
