@@ -9,6 +9,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Verify static SDK packaging guards
+        run: python3 -m unittest discover -s scripts -p 'test_mediapipe_static_packaging.py' -v
       - name: Verify iPhone and iPad
         run: python3 scripts/verify.py
       - name: Preserve simulator results

@@ -2,6 +2,8 @@
 """Generate the Universal Xcode project with pinned local MediaPipe package."""
 from pathlib import Path
 import hashlib
+import json
+from mediapipe_static_packaging import NAMES
 
 ROOT = Path(__file__).resolve().parents[1]
 def ident(name):
@@ -21,6 +23,13 @@ add("ConfigGroup", f'{{isa = PBXGroup; children = {array([buildConfig, signingEx
 package = add("PosePackage", '{isa = XCLocalSwiftPackageReference; relativePath = Packages/MediaPipeTasks; }')
 poseProduct = add("PoseProduct", f'{{isa = XCSwiftPackageProductDependency; package = {package}; productName = MediaPipeTasksVision; }}')
 poseBuild = add("PoseBuild", f'{{isa = PBXBuildFile; productRef = {poseProduct}; }}')
+packaging_script = '''set -eu
+/usr/bin/python3 "${SRCROOT}/scripts/mediapipe_static_packaging.py" --app "${TARGET_BUILD_DIR}/${WRAPPER_NAME}" --built-products "${BUILT_PRODUCTS_DIR}" --report "${DERIVED_FILE_DIR}/mediapipe-static-packaging.json"
+'''
+packaging_inputs = ["$(SRCROOT)/scripts/mediapipe_static_packaging.py", "$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)"]
+packaging_inputs += [f"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/{name}.framework/{name}" for name in NAMES]
+packaging_inputs += [f"$(BUILT_PRODUCTS_DIR)/{name}.framework/{name}" for name in NAMES]
+staticPackaging = add("StaticMediaPipePackaging", '{isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; files = (); inputPaths = ' + array([json.dumps(path) for path in packaging_inputs]) + '; outputPaths = ("$(DERIVED_FILE_DIR)/mediapipe-static-packaging.json",); name = "Remove empty statically linked MediaPipe wrappers"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = ' + json.dumps(packaging_script) + '; }')
 product = {}
 for name in targets:
     (ROOT / name).mkdir(exist_ok=True)
@@ -43,6 +52,10 @@ for name in targets:
             settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = "AppIcon"
             settings["SWIFT_EMIT_LOC_STRINGS"] = "YES"
             settings["SKIP_INSTALL"] = "NO"
+            # This post-embed phase verifies and removes only empty wrappers in
+            # the built app before CodeSign. Xcode's script sandbox cannot model
+            # modifying copy-phase outputs without a duplicate-producer cycle.
+            settings["ENABLE_USER_SCRIPT_SANDBOXING"] = "NO"
         elif name == "CoachInsightsTests":
             settings["TEST_HOST"] = '"$(BUILT_PRODUCTS_DIR)/CoachInsights.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoachInsights"'
             settings["BUNDLE_LOADER"] = '"$(TEST_HOST)"'
@@ -58,7 +71,8 @@ for name in targets:
         proxy = add(name+"Proxy", f'{{isa = PBXContainerItemProxy; containerPortal = {ref("Project")}; proxyType = 1; remoteGlobalIDString = {ref("CoachInsightsTarget")}; remoteInfo = CoachInsights; }}')
         dependencies.append(add(name+"Dependency", f'{{isa = PBXTargetDependency; target = {ref("CoachInsightsTarget")}; targetProxy = {proxy}; }}'))
     kind = "application" if app else "bundle.unit-test" if name == "CoachInsightsTests" else "bundle.ui-testing"
-    add(name+"Target", f'{{isa = PBXNativeTarget; buildConfigurationList = {ref(name+"Configs")}; buildPhases = {array([ref(name+p) for p in ["Sources","Frameworks","Resources"]])}; buildRules = (); dependencies = {array(dependencies) if dependencies else "()"}; fileSystemSynchronizedGroups = ({ref(name+"Group")},); packageProductDependencies = {array([poseProduct]) if app else "()"}; name = {name}; productName = {name}; productReference = {product[name]}; productType = "com.apple.product-type.{kind}"; }}')
+    phases = [ref(name+p) for p in ["Sources", "Frameworks", "Resources"]] + ([staticPackaging] if app else [])
+    add(name+"Target", f'{{isa = PBXNativeTarget; buildConfigurationList = {ref(name+"Configs")}; buildPhases = {array(phases)}; buildRules = (); dependencies = {array(dependencies) if dependencies else "()"}; fileSystemSynchronizedGroups = ({ref(name+"Group")},); packageProductDependencies = {array([poseProduct]) if app else "()"}; name = {name}; productName = {name}; productReference = {product[name]}; productType = "com.apple.product-type.{kind}"; }}')
 add("Products", f'{{isa = PBXGroup; children = {array(list(product.values()))}; name = Products; sourceTree = "<group>"; }}')
 add("MainGroup", f'{{isa = PBXGroup; children = {array([ref(n+"Group") for n in targets]+[ref("ConfigGroup"), ref("Products")])}; sourceTree = "<group>"; }}')
 for config in ["Debug", "Release"]:

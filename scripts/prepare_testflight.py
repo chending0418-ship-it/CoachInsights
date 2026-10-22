@@ -8,6 +8,7 @@ import plistlib
 import re
 import subprocess
 import sys
+from mediapipe_static_packaging import NAMES, images
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "artifacts/testflight"
@@ -63,13 +64,18 @@ def inspect(archive):
     check("no_test_media_or_debug_libraries", not forbidden)
     check("app_symbols_match", bool(uuids(app / "CoachInsights")) and uuids(app / "CoachInsights") == uuids(archive / "dSYMs/CoachInsights.app.dSYM"))
     framework_symbols = []
+    check("no_empty_mediapipe_wrappers", not any((app / f"Frameworks/{name}.framework").exists() for name in NAMES))
+    main_images = images((app / "CoachInsights").read_bytes())
+    check("no_mediapipe_runtime_dependency", not any(f"/{name}.framework/" in dependency
+          for image in main_images for dependency in image["dependencies"] for name in NAMES))
     for framework in sorted((app / "Frameworks").glob("*.framework")):
         binary = framework / framework.stem
         archs = run("xcrun", "lipo", "-archs", str(binary), capture_output=True).stdout.split()
         check(f"{framework.stem}_arm64", archs == ["arm64"])
         dsym = archive / f"dSYMs/{framework.name}.dSYM"
-        if not dsym.exists():
+        if not dsym.exists() or uuids(binary) != uuids(dsym):
             framework_symbols.append(framework.name)
+    check("all_embedded_framework_symbols_match", not framework_symbols)
     app_archs = run("xcrun", "lipo", "-archs", str(app / "CoachInsights"), capture_output=True).stdout.split()
     check("app_arm64", app_archs == ["arm64"])
     return {
@@ -88,7 +94,7 @@ def inspect(archive):
         "vendorFrameworksWithoutDSYM": framework_symbols,
         "limitations": [
             "Apple account membership, bundle ID ownership, signing and server-side validation require your Apple account.",
-            "The pinned vendor frameworks do not supply dSYMs; Xcode may report missing vendor symbols during upload. The app dSYM is checked separately.",
+            "MediaPipe is statically linked. Only verified empty, unreferenced wrappers are removed before app signing; SDK source-line debug information cannot be reconstructed from vendor archives.",
             "Local manifest checks do not replace Organizer validation or Apple's SDK privacy/signature checks."
         ]
     }

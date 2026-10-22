@@ -30,6 +30,9 @@ Config/Signing.local.xcconfig
 *.ipa
 *.mobileprovision
 *.p12
+# Organizer exports contain account/profile information and are local artifacts.
+/CoachInsights 20*/
+*.xcdistributionlogs/
 
 # Reproducibly downloaded, bundled offline pose model
 *.task

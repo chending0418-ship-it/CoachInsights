@@ -1,4 +1,4 @@
-# Coach Insights：首次 TestFlight 上传
+# Coach Insights：TestFlight 上传
 
 本地准备日期：2026-10-22。由你操作 Apple 账号、签名、上传与邀请；项目继续在 `codex/1.0-development`，不合并 `main`。
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | App 名称 | Coach Insights |
 | Bundle Identifier | `com.coachinsights.CoachInsights` |
-| Version / Build | `1.0` / `1` |
+| Version / Build | `1.0` / `2` |
 | 支持设备 | iPhone、iPad，同一个 Universal App |
 | 最低系统 | iOS / iPadOS 17.0 |
 | 归档配置 | Release，arm64 iOS |
@@ -61,7 +61,7 @@ python3 scripts/generate_project.py
 1. Signing & Capabilities → 勾选 **Automatically manage signing**。
 2. Team → 选择有效的付费开发者 Team。
 3. 确认 Bundle Identifier 与 App Store Connect 的记录一致。
-4. General 中确认 Version `1.0`、Build `1`。这是假定该版本尚未上传构建的初始值；若已经上传过，先把 `Config/Build.xcconfig` 的 `CURRENT_PROJECT_VERSION` 改为比已上传构建更大的数。
+4. General 中确认 Version `1.0`、Build `2`。`1.0 (1)` 已上传，本次修正使用新的构建号；若 `2` 也已使用，先把 `Config/Build.xcconfig` 的 `CURRENT_PROJECT_VERSION` 改为比已上传构建更大的数。
 
 为了以后运行生成脚本也保留 Team，建议复制 `Config/Signing.local.xcconfig.example` 为 `Config/Signing.local.xcconfig`，将 `DEVELOPMENT_TEAM` 的注释去掉，填写开发者账号 Membership details 中的真实 Team ID。该本机文件不会推送。仅在 Xcode 界面选择的 Team 在下次重新生成工程时会被清除；本次选择后可以直接归档，无需再次生成。
 
@@ -88,9 +88,13 @@ python3 scripts/generate_project.py
 
 ## 本地验证记录
 
-2026-10-22 使用 Xcode 26.1.1 完成 Release iOS 未签名归档，24 项包检查全部通过。归档中的 App 约 40.11 MiB（不是 IPA 或 TestFlight 下载体积），离线模型 SHA-256 与固定值一致，应用 dSYM UUID 与可执行文件匹配，没有测试视频或 Debug 动态库。1024 × 1024 App 图标没有 alpha 通道。补充的两份第三方隐私资源实际进入归档。
+2026-10-22 使用 Xcode 26.1.1 完成 `1.0 (2)` Release iOS 未签名归档，21 项包检查全部通过。归档中的 App 约 39.91 MiB（不是 IPA 或 TestFlight 下载体积），离线模型 SHA-256 与固定值一致，应用 dSYM UUID 与可执行文件匹配，没有测试视频或 Debug 动态库。1024 × 1024 App 图标没有 alpha 通道。补充的两份第三方隐私资源实际进入归档。6 个空 MediaPipe 外壳已在最终签名前移除，缺少 dSYM 的嵌入框架为 0，应用也没有对它们的运行时动态依赖。
 
-同一配置的模拟器 Release 已重新构建，并在项目专用 iPhone 16e 与 iPad mini A17 Pro 模拟器安装、启动。本轮变更涉及构建配置、包资源和文档；既有功能回归结果见 `docs/v1.0-validation.md`，没有将本轮包检查冒充为新一轮全功能回归。未执行 Apple 账号签名、上传或服务端校验，也不要求真机验收。
+本次修正重新执行双端全量回归：81 项通过、0 失败、1 项 iPad 专用场景在 iPhone 上跳过；两端均实际执行打击 / 投球识别、标注、对比与导出。另有 9 项打包保护测试通过，以及 iPhone / iPad 各 1 项独立 Release 人体识别测试通过。Release 专项从新的构建目录开始，测试宿主开启 testability 以调用内部 API，没有给 App 开启 DEBUG 或加入素材生成工具。
+
+同一配置的正式模拟器 Release 已重新构建，并在项目专用 iPhone 16e 与 iPad mini A17 Pro 模拟器安装、启动。详细验证见 `docs/v1.0-validation.md`。未执行 Apple 账号签名、上传或服务端校验，也不要求真机验收。
+
+另用模拟器 ad-hoc 签名验证构建顺序为“嵌入框架签名 → 清理空外壳 → App 最终签名”，严格签名完整性检查通过；该检查不使用 Apple 账号证书。
 
 ## 6. 可复制的测试信息
 
@@ -141,10 +145,10 @@ Review Information 中取消需要登录的选项，填写**你自己的**联系
 
 ## 后续构建与常见提示
 
-- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如 `1` → `2`；同一测试阶段 Version 可保持 `1.0`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
+- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如本次 `2` → 下次 `3`；同一测试阶段 Version 可保持 `1.0`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
 - 只看到 Personal Team：先确认 Apple Developer Program 资格，或切换到有权限的付费团队。
 - Bundle ID unavailable / profile mismatch：核对 Bundle ID 注册归属、Team 与后台 App，保持三者一致。
-- 缺少 SDK dSYM：固定版本的 6 个 MediaPipe 动态框架没有提供 dSYM；应用自己的 dSYM 已校验匹配。Xcode 可能提示第三方符号缺失，这会影响 SDK 内部崩溃符号化。不要创建空 dSYM 冒充。若只是 warning 且上传成功，可继续；若是校验错误，保留完整错误以便处理。
+- 旧包的 6 条 MediaPipe dSYM 警告：原始 SDK 是静态库，Xcode 生成了没有必要保留的空动态框架。`1.0 (2)` 的构建阶段会验证并清理它们，应用自己的 dSYM 正常保留。请重新 Archive 并选择新归档上传，旧的 `1.0 (1)` 归档不会自动修正。若 SDK 将来加入代码、资源或动态依赖，保护检查会停止构建，不能关闭检查或创建空 dSYM 绕过。
 - 隐私清单或 SDK 签名错误：本地文件存在检查不能代替 Apple 的服务端检查。保留具体 SDK 名称与 ITMS 错误码，不要通过删除声明或关闭安全校验绕过。
 - 家长无法接受内部邀请：应使用外部组，完成 TestFlight App Review 后邀请。
 - 不需要在这一步提交正式 App Store 版本；本次只启用 TestFlight 测试。

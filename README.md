@@ -53,11 +53,16 @@ python3 scripts/build_simulator_release.py --install
 
 ## TestFlight
 
-首次上传的签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0 (1)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0 (2)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+
+新版在最终签名前清理 Xcode 为静态 MediaPipe 框架生成的 6 个空外壳，以消除缺少 dSYM 的上传警告；SDK 实现仍静态链接，模型与分析逻辑保持不变。清理会检查代码、资源与运行时依赖，不满足条件则停止构建。详情见 [MediaPipe 打包说明](Packages/MediaPipeTasks/README.md)。旧的 `1.0 (1)` 归档与 TestFlight 构建不受修改。
 
 ```sh
 # 本地未签名 iOS 归档与包检查，不签名、不上传、不连接设备
 python3 scripts/prepare_testflight.py
+
+# 可选：使用已准备的本机 Regression.mov 验证优化 Release 宿主中的真实人体识别
+python3 scripts/verify_release_pose.py
 ```
 
 结果位于 `artifacts/testflight/`。该检查不等于 Apple 上传校验，未签名归档不可直接分发；请由你在 Xcode 选择付费开发者 Team 后重新 Archive 并上传。隐私政策发布正文见 [隐私政策](docs/privacy-policy.md)，发布前填写真实联系邮箱。
