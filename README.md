@@ -31,7 +31,7 @@
 
 ## 构建与验证
 
-使用 Apple Silicon Mac 与 Xcode 26.1.1 或兼容版本；最低部署目标 iOS / iPadOS 17。当前原生依赖的模拟器二进制仅支持 arm64，CI 使用 `macos-26` runner。
+使用 Apple Silicon Mac 与 Xcode 26.1.1 或兼容版本；最低部署目标 iOS / iPadOS 17。当前原生依赖的模拟器二进制仅支持 arm64，手动 GitHub Actions 验证使用 `macos-26` runner；按用户要求，push 和 PR 不再自动触发模拟器测试，仅在明确安排时手动运行。
 
 ```sh
 # 首次构建：校验并准备离线模型，再打开 Xcode 工程
