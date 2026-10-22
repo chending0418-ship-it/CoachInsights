@@ -1,6 +1,6 @@
 // Keep release identity here: project generation must not reset version numbers.
 MARKETING_VERSION = 1.0.1
-CURRENT_PROJECT_VERSION = 3
+CURRENT_PROJECT_VERSION = 4
 COACH_INSIGHTS_BUNDLE_IDENTIFIER = com.coachinsights.CoachInsights
 
 // Optional account-specific settings. This file is ignored by Git.

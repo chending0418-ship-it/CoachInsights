@@ -1,6 +1,8 @@
 # Coach Insights：TestFlight 上传
 
-本地准备日期：2026-10-22。由你操作 Apple 账号、签名、上传与邀请；项目继续在 `codex/1.0-development`，不合并 `main`。
+本地准备日期：2026-10-22。每次打包先创建 PR、完成代码审查与必要验证，合并到 `main` 后从 `main` 生成归档。Apple 账号授权、上传与邀请由你操作；GitHub 模拟器工作流仅手动触发。
+
+2026-10-22 用户确认 1.0.1 (3) 已上传，当前配置递增为 **1.0.1 (4)**。此前本地未签名 iOS 归档的 21 项包检查通过。本次按新流程，先通过面向 main 的 PR 审查与合并，再从 main 重新生成 Build 4 归档；未签名预检包不能直接上传。报告：`artifacts/testflight/preflight.json`。
 
 ## 已准备的内容
 
@@ -8,7 +10,7 @@
 | --- | --- |
 | App 名称 | Coach Insights |
 | Bundle Identifier | `com.coachinsights.CoachInsights` |
-| Version / Build | `1.0.1` / `3` |
+| Version / Build | `1.0.1` / `4` |
 | 支持设备 | iPhone、iPad，同一个 Universal App |
 | 最低系统 | iOS / iPadOS 17.0 |
 | 归档配置 | Release，arm64 iOS |
@@ -61,7 +63,7 @@ python3 scripts/generate_project.py
 1. Signing & Capabilities → 勾选 **Automatically manage signing**。
 2. Team → 选择有效的付费开发者 Team。
 3. 确认 Bundle Identifier 与 App Store Connect 的记录一致。
-4. General 中确认 Version `1.0`、Build `2`。`1.0 (1)` 已上传，本次修正使用新的构建号；若 `2` 也已使用，先把 `Config/Build.xcconfig` 的 `CURRENT_PROJECT_VERSION` 改为比已上传构建更大的数。
+4. General 中确认 Version `1.0.1`、Build `4`。用户确认 `1.0.1 (3)` 已上传，本次修正使用新的构建号；若 `4` 也已使用，先把 `Config/Build.xcconfig` 的 `CURRENT_PROJECT_VERSION` 改为比已上传构建更大的数。
 
 为了以后运行生成脚本也保留 Team，建议复制 `Config/Signing.local.xcconfig.example` 为 `Config/Signing.local.xcconfig`，将 `DEVELOPMENT_TEAM` 的注释去掉，填写开发者账号 Membership details 中的真实 Team ID。该本机文件不会推送。仅在 Xcode 界面选择的 Team 在下次重新生成工程时会被清除；本次选择后可以直接归档，无需再次生成。
 
@@ -145,7 +147,7 @@ Review Information 中取消需要登录的选项，填写**你自己的**联系
 
 ## 后续构建与常见提示
 
-- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如本次 `3` → 下次 `4`；同一测试阶段 Version 可保持 `1.0.1`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
+- 每次上传前在 `Config/Build.xcconfig` 增加 `CURRENT_PROJECT_VERSION`，例如本次 `4` → 下次 `5`；同一测试阶段 Version 可保持 `1.0.1`。即使 Xcode 分发向导替你调整构建号，也以 App Store Connect 已使用的最大值为准更新配置。
 - 只看到 Personal Team：先确认 Apple Developer Program 资格，或切换到有权限的付费团队。
 - Bundle ID unavailable / profile mismatch：核对 Bundle ID 注册归属、Team 与后台 App，保持三者一致。
 - 旧包的 6 条 MediaPipe dSYM 警告：原始 SDK 是静态库，Xcode 生成了没有必要保留的空动态框架。`1.0 (2)` 的构建阶段会验证并清理它们，应用自己的 dSYM 正常保留。请重新 Archive 并选择新归档上传，旧的 `1.0 (1)` 归档不会自动修正。若 SDK 将来加入代码、资源或动态依赖，保护检查会停止构建，不能关闭检查或创建空 dSYM 绕过。

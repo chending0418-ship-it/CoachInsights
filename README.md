@@ -54,7 +54,7 @@ python3 scripts/build_simulator_release.py --install
 
 ## TestFlight
 
-签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0.1 (3)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0.1 (4)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
 
 新版在最终签名前清理 Xcode 为静态 MediaPipe 框架生成的 6 个空外壳，以消除缺少 dSYM 的上传警告；SDK 实现仍静态链接，模型与分析逻辑保持不变。清理会检查代码、资源与运行时依赖，不满足条件则停止构建。详情见 [MediaPipe 打包说明](Packages/MediaPipeTasks/README.md)。旧的 `1.0 (1)` 归档与 TestFlight 构建不受修改。
 
