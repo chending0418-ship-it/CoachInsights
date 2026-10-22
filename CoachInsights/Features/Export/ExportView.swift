@@ -25,6 +25,7 @@ struct ExportView:View {
     @State private var issue:String?
     @State private var notice:String?
     @State private var task:Task<Void,Never>?
+    private var summaryRate:Double { compare ? ((try? session.snapshot().comparison?.rate) ?? 1) : rate }
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
@@ -46,7 +47,7 @@ struct ExportView:View {
                     Button(compare ? "导出同屏视频":"导出慢放视频",systemImage:"film") { run(screenshot:false) }.buttonStyle(.borderedProminent).disabled(busy).accessibilityIdentifier("exportVideo")
                     Text(compare ? "按已保存的布局、同步点和对比速度导出，无声。":"选定片段按展示时间导出。慢放结果无声；1× 可选保留原声。")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text("导出摘要：\(compare ? "双视频同屏":"当前素材") · \(rate.formatted())× · \(includePose ? "包含可见分析图层":"不含人体图层")").font(.caption).foregroundStyle(.secondary)
+                    Text("导出摘要：\(compare ? "双视频同屏":"当前素材") · \(summaryRate.formatted())× · \(includePose ? "包含可见分析图层":"不含人体图层")").font(.caption).foregroundStyle(.secondary)
                     Text("兼容格式：H.264 · SDR · 30 fps；横画面最长边 1920，竖画面最长边 1920。画面保留原比例，不覆盖原片。")
                         .font(.caption).foregroundStyle(.secondary)
                 } else { EmptyPanel(icon:"square.and.arrow.up",title:"添加视频后导出",detail:"回到分析记录，先导入或拍摄一段视频。") }

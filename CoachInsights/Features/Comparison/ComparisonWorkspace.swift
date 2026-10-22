@@ -43,10 +43,12 @@ import AVFoundation
             else {
                 guard let second=left.assets.first(where:{$0.id==secondVideoID && $0.id != first.id}) ?? left.assets.first(where:{$0.id != first.id}) else { await left.select(first.id);setup=nil;return }
                 let a=try first.metadata(),b=try second.metadata()
+                let rightClip=snapshot.clips[second.id.uuidString] ?? ClipRange(start:b.timeline.frames[0].presentationTime,end:b.timeline.duration)
                 setup=ComparisonSetup(leftVideoID:first.id,rightVideoID:second.id,
-                    leftAnchor:snapshot.playheads[first.id.uuidString] ?? a.timeline.frames[0].presentationTime,rightAnchor:b.timeline.frames[0].presentationTime,
+                    leftAnchor:snapshot.playheads[first.id.uuidString] ?? a.timeline.frames[0].presentationTime,rightAnchor:rightClip.start,
                     leftClip:snapshot.clips[first.id.uuidString] ?? ClipRange(start:a.timeline.frames[0].presentationTime,end:a.timeline.duration),
-                    rightClip:snapshot.clips[second.id.uuidString] ?? ClipRange(start:b.timeline.frames[0].presentationTime,end:b.timeline.duration))
+                    rightClip:rightClip,rate:snapshot.playbackRates[first.id.uuidString] ?? 1,
+                    leftView:snapshot.views[first.id.uuidString] ?? ViewSettings(),rightView:snapshot.views[second.id.uuidString] ?? ViewSettings())
                 newLayout=true;layoutAdapted=false
             }
             guard let setup else { return }

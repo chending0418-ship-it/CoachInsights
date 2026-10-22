@@ -129,6 +129,30 @@ import AVFoundation
         XCTAssertEqual(pair.right.viewSettings.zoom,2);XCTAssertEqual(pair.left.currentPose?.time,pair.left.frame?.requestedTime)
         pair.stopAndSave()
     }
+    func testNewComparisonPreservesSourceViewsRateAndTrimmedSecondClip() async throws {
+        let (repo,session,first)=try await setupVideo()
+        let url=root.appendingPathComponent("trimmed-second.mov")
+        try await FixtureFactory.video(at:url,times:[0,0.2,0.4,0.6,0.8],duration:1)
+        let second=try await repo.importVideo(url,into:session)
+        var snapshot=try session.snapshot()
+        var firstView=ViewSettings();firstView.mirrored=true;firstView.zoom=2
+        var secondView=ViewSettings();secondView.quarterTurns=1
+        let secondClip=ClipRange(start:MediaTime(seconds:0.4),end:MediaTime(seconds:0.8))
+        snapshot.views[first.id.uuidString]=firstView;snapshot.views[second.id.uuidString]=secondView
+        snapshot.clips[second.id.uuidString]=secondClip;snapshot.playbackRates[first.id.uuidString]=0.25
+        snapshot.playheads[first.id.uuidString]=MediaTime(seconds:0.1)
+        try repo.save(session,snapshot:snapshot)
+        let pair=track(ComparisonWorkspace(session:session,repository:repo))
+        await pair.load(initialVideoID:first.id,secondVideoID:second.id)
+        try await wait{pair.left.frameReady && pair.right.frameReady}
+        XCTAssertEqual(pair.left.viewSettings,firstView);XCTAssertEqual(pair.right.viewSettings,secondView)
+        XCTAssertEqual(pair.setup?.rate,0.25);XCTAssertEqual(pair.right.clip,secondClip)
+        XCTAssertEqual(pair.right.frame?.requestedTime,secondClip.start)
+        pair.stopAndSave()
+        let reopened=track(ComparisonWorkspace(session:session,repository:repo));await reopened.load(initialVideoID:first.id)
+        XCTAssertEqual(reopened.setup,pair.setup)
+        XCTAssertEqual(try session.snapshot().views[first.id.uuidString],firstView)
+    }
     func testTwentySingleAndMixedRateComparisonLoops() async throws {
         let repo=try LibraryRepository(root:root.appendingPathComponent("LoopLibrary")),session=try repo.create(name:"20 loops",sport:.batting)
         for fps in [30,60] {

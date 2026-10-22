@@ -41,7 +41,7 @@ struct RootView: View {
                 } detail: {
                     NavigationStack {
                         if let session = library.sessions.first(where: { $0.id == selection }) {
-                            SessionDetail(session: session,initialVideoID:initialVideoID,onClose:{selection=nil;initialVideoID=nil}).id(initialVideoID ?? session.id)
+                            SessionDetail(session: session,initialVideoID:initialVideoID,onClose:{selection=nil;initialVideoID=nil}).id(session.id.uuidString + (initialVideoID?.uuidString ?? ""))
                         } else {
                             EmptyPanel(icon: "viewfinder", title: "让每一帧都有发现",
                                        detail: "从左侧打开记录，或新建一份分析。\n所有素材与分析仅保存在这台设备。")
