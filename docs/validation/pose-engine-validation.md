@@ -39,7 +39,7 @@
 python3 scripts/verify.py
 
 # 原生 XCTest 的报告由 verify.py 自动复制到本机 artifacts
-python3 scripts/check_pose_quality.py artifacts/iphone/pose-quality-measurements.json artifacts/iphone/pose-quality-heavy-measurements.json --output docs/pose-quality-metrics.json
+python3 scripts/check_pose_quality.py artifacts/iphone/pose-quality-measurements.json artifacts/iphone/pose-quality-heavy-measurements.json --output docs/validation/pose-quality-metrics.json
 ```
 
 质量脚本默认输出实测数据及是否达到历史参考目标，不因低于 90% 返回失败；数据不完整仍报错。仅研究时可追加 `--strict` 检查历史目标，低于目标返回非零。它不是 1.0 发布步骤。CI 无私有视频与可选公共测试帧时会显式跳过相应用例，不能当作定位精度证据。图像、视频、模型、参考坐标均保留在忽略目录。

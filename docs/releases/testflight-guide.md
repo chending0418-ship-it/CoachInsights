@@ -51,7 +51,7 @@
 
 ## 3. 在 Xcode 选择签名
 
-打开 `/Users/JasonChan/Documents/CoachInsights/CoachInsights.xcodeproj`，等待 Package Dependencies 解析完成。本机已经准备好模型；换电脑或重新拉仓库时，先在仓库目录执行：
+打开 `/Users/JasonChan/Documents/BaseballMaster.CC/apps/coach-insights/CoachInsights.xcodeproj`，等待 Package Dependencies 解析完成。本机已经准备好模型；换电脑或重新拉仓库时，先在仓库目录执行：
 
 ```sh
 python3 scripts/prepare_dependencies.py
@@ -94,7 +94,7 @@ python3 scripts/generate_project.py
 
 本次修正重新执行双端全量回归：81 项通过、0 失败、1 项 iPad 专用场景在 iPhone 上跳过；两端均实际执行打击 / 投球识别、标注、对比与导出。另有 9 项打包保护测试通过，以及 iPhone / iPad 各 1 项独立 Release 人体识别测试通过。Release 专项从新的构建目录开始，测试宿主开启 testability 以调用内部 API，没有给 App 开启 DEBUG 或加入素材生成工具。
 
-同一配置的正式模拟器 Release 已重新构建，并在项目专用 iPhone 16e 与 iPad mini A17 Pro 模拟器安装、启动。详细验证见 `docs/v1.0-validation.md`。未执行 Apple 账号签名、上传或服务端校验，也不要求真机验收。
+同一配置的正式模拟器 Release 已重新构建，并在项目专用 iPhone 16e 与 iPad mini A17 Pro 模拟器安装、启动。详细验证见 `docs/validation/v1.0-validation.md`。未执行 Apple 账号签名、上传或服务端校验，也不要求真机验收。
 
 另用模拟器 ad-hoc 签名验证构建顺序为“嵌入框架签名 → 清理空外壳 → App 最终签名”，严格签名完整性检查通过；该检查不使用 Apple 账号证书。
 
@@ -141,7 +141,7 @@ Pose landmarks and 2D angles are auxiliary estimates, with limitations displayed
 iPhone and iPad keep separate local libraries. There is no app account, cloud sync or in-app purchase.
 ```
 
-Review Information 中取消需要登录的选项，填写**你自己的**联系人姓名、电话、邮箱；Feedback Email 也使用你能收信的地址。隐私政策正文已在 `docs/privacy-policy.md` 准备好，先替换联系邮箱，再由你发布到一个无需登录即可访问的 HTTPS 页面；若后台要求 Privacy Policy URL，填写真实可访问链接。该 Markdown 文件的本机路径不能用作 URL。
+Review Information 中取消需要登录的选项，填写**你自己的**联系人姓名、电话、邮箱；Feedback Email 也使用你能收信的地址。隐私政策正文已在 `docs/legal/privacy-policy.md` 准备好，先替换联系邮箱，再由你发布到一个无需登录即可访问的 HTTPS 页面；若后台要求 Privacy Policy URL，填写真实可访问链接。该 Markdown 文件的本机路径不能用作 URL。
 
 若填写 App Privacy，根据当前本机处理、不追踪、不上传视频或分析记录的实现核对“Data Not Collected”。用户主动导出到第三方，以及 TestFlight 自身依据 Apple 政策收集的诊断/反馈，需与 App 自有数据服务区分。依赖升级或加入统计服务后需重新核对，不能沿用旧申报。
 

@@ -1,5 +1,7 @@
 # Coach Insights
 
+**统一入口：** [当前状态](docs/CURRENT.md) · [BaseballMaster 工作区](../../README.md) · [公共品牌规范](../../brand/README.md)。旧版本的日期记录继续保留。
+
 面向棒球教练和家长的本地视频分析工具，覆盖打击与投球。
 
 ## 1.0 范围
@@ -15,19 +17,13 @@
 
 由 Codex 按任务依赖实现和验证，不设置人工开发排期。
 
-- [1.0 TODO](TODO.md)：任务状态、完成条件与执行规则。
-- [1.0.1 测试版修改 TODO](docs/v1.0.1-todo.md)：参考 CoachNow 的视频观看与操作体验，规划播放流畅度、工具布局、双视频对比和无需订阅的分析流程；功能已实现，双端主要回归通过，完整性能与长时资源验收待人工测试；见 [1.0.1 验证记录](docs/v1.0.1-validation.md)。
-- [1.0 开发计划](docs/v1.0-development-plan.md)：产品行为、技术方案、实现顺序、双端验收与风险处理。
+- [1.0 TODO 原文](docs/archive/workspace-2026-11-04/TODO-before.md)：历史任务状态、完成条件与执行规则。
+- [1.0.1 测试版修改 TODO](docs/plans/v1.0.1-todo.md)：参考 CoachNow 的视频观看与操作体验，规划播放流畅度、工具布局、双视频对比和无需订阅的分析流程；功能已实现，双端主要回归通过，完整性能与长时资源验收待人工测试；见 [1.0.1 验证记录](docs/validation/v1.0.1-validation.md)。
+- [1.0 开发计划](docs/plans/v1.0-development-plan.md)：产品行为、技术方案、实现顺序、双端验收与风险处理。
 
 ## 当前进度
 
-当前 1.0.1 (3) Release 已安装并启动于 iPhone / iPad 项目专用模拟器：优化视频观看与定位、绘图及对比交互，修复人体叠加拖动同步。双端主要回归已通过；用户取消后续长时自动测试，完整性能验收待人工测试。见 [1.0.1 验证记录](docs/v1.0.1-validation.md)。原 1.0 的 62 项 Todo 完成状态保留。
-
-已接入完整的本机视频流程：拍摄 / 相册 / 文件导入、逐帧与五档慢放、可编辑标注、关键帧、双视频同步、离线骨架和二维角度、截图 / 单视频 / 双路合成导出。iPhone、iPad 共用原生 Universal 工程，主题为勃艮第红 `#722F37`，使用已确认的棒球瞳孔图标。
-
-[1.0 验收记录](docs/v1.0-validation.md) 说明代码、测试和构建。2026-10-22 用户确认人体识别以**辅助估算**交付，原 90% 定位目标保留为研究参考，不作为 1.0 发布门槛。遮挡、模糊、侧身和多人场景可能出现点位偏移、左右肢混淆或缺失，高置信度也可能出错；请逐帧人工复核。分析、对比、导出和使用说明均提示限制，带骨架的导出保留估算标识。具体样本与 Full / Heavy 实测数据见 [姿态引擎验证](docs/pose-engine-validation.md)，不将原始结果表述为已达到 90%。
-
-开发与验收统一使用模拟器，不要求真机。模拟器直接使用原生 MediaPipe Full，避开当前运行时缺少 Vision 模型及准备阶段停滞的问题；实际 iOS 代码保留 Vision 优先及错误回退。模型随 App 离线提供，视频不上传。历史球棒追踪研究保留查阅，没有进入 1.0 App。
+当前版本、开发分支、已实现范围、验证限制与上传状态只维护在 [CURRENT](docs/CURRENT.md)。原产品说明与日期记录见 [整理前原文](docs/archive/workspace-2026-11-04/README-before.md)。
 
 ## 构建与验证
 
@@ -54,7 +50,7 @@ python3 scripts/build_simulator_release.py --install
 
 ## TestFlight
 
-签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0.1 (4)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
+签名、App Store Connect 建档、归档、内部 / 外部测试步骤和可复制文案见 [TestFlight 操作说明](docs/releases/testflight-guide.md)。版本号配置位于 `Config/Build.xcconfig`，当前为 `1.0.1 (4)`；本机 Team 可写入被 Git 忽略的 `Config/Signing.local.xcconfig`。
 
 新版在最终签名前清理 Xcode 为静态 MediaPipe 框架生成的 6 个空外壳，以消除缺少 dSYM 的上传警告；SDK 实现仍静态链接，模型与分析逻辑保持不变。清理会检查代码、资源与运行时依赖，不满足条件则停止构建。详情见 [MediaPipe 打包说明](Packages/MediaPipeTasks/README.md)。旧的 `1.0 (1)` 归档与 TestFlight 构建不受修改。
 
@@ -66,7 +62,7 @@ python3 scripts/prepare_testflight.py
 python3 scripts/verify_release_pose.py
 ```
 
-结果位于 `artifacts/testflight/`。该检查不等于 Apple 上传校验，未签名归档不可直接分发；请由你在 Xcode 选择付费开发者 Team 后重新 Archive 并上传。隐私政策发布正文见 [隐私政策](docs/privacy-policy.md)，发布前填写真实联系邮箱。
+结果位于 `artifacts/testflight/`。该检查不等于 Apple 上传校验，未签名归档不可直接分发；请由你在 Xcode 选择付费开发者 Team 后重新 Archive 并上传。隐私政策发布正文见 [隐私政策](docs/legal/privacy-policy.md)，发布前填写真实联系邮箱。
 
 ## 仓库内容
 
@@ -76,9 +72,9 @@ python3 scripts/verify_release_pose.py
 | `CoachInsightsTests/` / `CoachInsightsUITests/` | 媒体、几何、数据安全与双端界面自动化 |
 | `scripts/verify.py` / `build_simulator_release.py` | 双端验证、Release 构建和安装 |
 | `Packages/MediaPipeTasks/` | 固定原生 SDK 清单及许可，二进制不入 Git |
-| `docs/v1.0-validation.md` / `pose-engine-validation.md` | 功能验收与人体估算的实测限制 |
-| `TODO.md` | 1.0 开发任务与完成状态 |
-| `docs/v1.0-development-plan.md` | 1.0 技术方案和验收依据 |
+| `docs/validation/v1.0-validation.md` / `pose-engine-validation.md` | 功能验收与人体估算的实测限制 |
+| `TODO.md` | 当前与历史任务导航 |
+| `docs/plans/v1.0-development-plan.md` | 1.0 技术方案和验收依据 |
 | `research/project_decisions.json` | 已确认的产品范围与阶段性技术选择 |
 | `research/README.txt` | 研究说明和复现步骤 |
 | `research/*.swift` | AVFoundation 解码、Vision 姿态与追踪实验 |
