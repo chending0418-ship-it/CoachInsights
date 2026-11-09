@@ -1,0 +1,16 @@
+{
+  "generatedOn": "2026-11-05",
+  "method": "built-in image_gen",
+  "kind": "fictional adult baseball training still",
+  "purpose": "UI design review only; not real footage or analysis evidence",
+  "originalImage": "batting-demo-original.png",
+  "displayImage": "batting-demo.jpg",
+  "originalSHA256": "8ac2b674718086da981cc893ad96580a4b386721ef831f214413edb3cb4b8b2d",
+  "iconSource": "brand/references/coach-pocket-2026-10-22/app-icon.png",
+  "prompt": "Use case: photorealistic-natural. Asset type: illustrative video still for an iPad baseball training app UI concept, not a real user or measured performance. Create one polished realistic editorial sports photograph, landscape 16:9. An anonymous adult East Asian right-handed baseball batter, full body visible with generous safe margins including entire bat and feet, seen clearly from a side-on camera at about chest height during a controlled practice swing just before contact. Burgundy plain practice jersey, ivory baseball pants, dark batting helmet, realistic gloved hands holding one regulation wooden baseball bat correctly. Small empty baseball practice field, unobtrusive muted green chain-link fence and soft outfield background, natural morning light, clear subject, restrained professional sports editorial color grading, no stadium crowd. Correct adult anatomy, credible baseball stance and equipment; no exaggerated body mechanics. No logos, no text, no labels, no interface, no watermarks. Frame the batter centrally so the same frame can fit a video player and library thumbnail. High quality photo, quiet and useful for coaching observation rather than an advertising action poster.",
+  "iconSourceRoot": "BaseballMaster.CC",
+  "iconArtworkUnchanged": true,
+  "iconResizedForPrototype": true,
+  "iconOriginalSHA256": "daca678d2771322c7506f12ab3c97cc30673af2cef89c18e580c1e496979729a",
+  "iconDerivativeSHA256": "2c143589818ece9573d36e5bffc1b9600c865600482485168f3407088543a284"
+}

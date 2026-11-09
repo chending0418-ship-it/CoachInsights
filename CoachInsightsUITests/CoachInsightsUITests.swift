@@ -2,10 +2,17 @@ import XCTest
 import UIKit
 
 final class CoachInsightsUITests:XCTestCase {
-    @MainActor func launch(_ extra:[String]=[])->XCUIApplication {
+    @MainActor func launch(_ extra:[String]=[], enterVideo:Bool=true)->XCUIApplication {
         XCUIDevice.shared.orientation = .portrait
         let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-library"]+extra;app.launch()
-        XCTAssertTrue(app.buttons["createSession"].waitForExistence(timeout:10));return app
+        XCTAssertTrue(app.buttons["scene_personal"].waitForExistence(timeout:10))
+        if enterVideo { openVideoLibrary(app) }
+        return app
+    }
+    @MainActor func openVideoLibrary(_ app:XCUIApplication) {
+        if app.buttons["scene_personal"].exists { app.buttons["scene_personal"].tap() }
+        if app.buttons["tool_videoAnalysis"].exists { app.buttons["tool_videoAnalysis"].tap() }
+        XCTAssertTrue(app.buttons["createSession"].waitForExistence(timeout:10))
     }
     @MainActor func create(_ app:XCUIApplication,_ name:String) {
         app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
@@ -24,11 +31,87 @@ final class CoachInsightsUITests:XCTestCase {
         let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)
     }
     @MainActor func openRecord(_ app:XCUIApplication,_ name:String) {
+        if app.buttons["scene_personal"].exists { openVideoLibrary(app) }
         let mode=app.segmentedControls["libraryBrowseMode"]
         if mode.exists { mode.buttons["分析记录"].tap() }
         let record=app.staticTexts[name].firstMatch
         if !record.isHittable { app.swipeUp() }
         XCTAssertTrue(record.waitForExistence(timeout:10));record.tap()
+    }
+    @MainActor func testToolboxEntryLayoutAndSceneNavigation() {
+        let app=launch(enterVideo:false)
+        let personal=app.buttons["scene_personal"],team=app.buttons["scene_team"],quick=app.buttons["scene_quick"]
+        XCTAssertEqual(personal.frame.minY,team.frame.minY,accuracy:1)
+        XCTAssertEqual(personal.frame.height,team.frame.height,accuracy:1)
+        XCTAssertEqual(personal.frame.width,team.frame.width,accuracy:1)
+        XCTAssertEqual(personal.frame.minX,quick.frame.minX,accuracy:1)
+        XCTAssertEqual(team.frame.maxX,quick.frame.maxX,accuracy:1)
+        XCTAssertGreaterThan(quick.frame.minY,personal.frame.maxY)
+        XCTAssertTrue(personal.isHittable && team.isHittable && quick.isHittable)
+        shot(app,"v11-toolbox-home")
+        team.tap();XCTAssertTrue(app.buttons["tool_teamPlan"].waitForExistence(timeout:5))
+        app.buttons["tool_teamPlan"].tap();XCTAssertTrue(app.staticTexts["内容待完善"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(app.buttons["tool_teamPlan"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(quick.waitForExistence(timeout:5));quick.tap()
+        XCTAssertTrue(app.buttons["tool_stopwatch"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(personal.waitForExistence(timeout:5));personal.tap()
+        app.buttons["tool_motionComparison"].tap()
+        XCTAssertTrue(app.navigationBars["动作对比"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["rootPhotos"].exists)
+        XCTAssertFalse(app.buttons["createSession"].exists)
+    }
+    @MainActor func testRecordsFiltersAndReturnToSavedAnalysis() {
+        let app=launch();create(app,"Entry filter record")
+        app.buttons["closeVideo"].tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.buttons["recordsTab"].tap()
+        let scene=app.segmentedControls["recordSceneFilter"]
+        XCTAssertTrue(scene.waitForExistence(timeout:5));scene.buttons["团训"].tap()
+        XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout:5))
+        scene.buttons["私教"].tap()
+        app.buttons["recordToolFilter"].tap();app.buttons["动作对比"].tap()
+        XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout:5))
+        app.buttons["recordToolFilter"].tap();app.buttons["视频分析"].tap()
+        let record=app.staticTexts["Entry filter record"].firstMatch
+        XCTAssertTrue(record.waitForExistence(timeout:5));shot(app,"v11-record-filters");record.tap()
+        XCTAssertTrue(app.buttons["closeVideo"].waitForExistence(timeout:5));app.buttons["closeVideo"].tap()
+        XCTAssertTrue(scene.buttons["私教"].isSelected)
+        XCTAssertTrue(app.buttons["recordToolFilter"].label.contains("视频分析"))
+        XCTAssertTrue(record.waitForExistence(timeout:5))
+        app.buttons["toolboxTab"].tap();XCTAssertTrue(app.buttons["scene_personal"].waitForExistence(timeout:5))
+        app.buttons["recordsTab"].tap()
+        XCTAssertTrue(scene.buttons["私教"].isSelected)
+        XCTAssertTrue(app.buttons["recordToolFilter"].label.contains("视频分析"))
+        record.tap();app.buttons["moreActions"].tap();app.buttons["deleteSession"].tap()
+        app.alerts.buttons["删除"].tap()
+        XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout:10))
+        XCTAssertTrue(scene.buttons["私教"].isSelected)
+    }
+    @MainActor func testStandaloneComparisonEntryUsesExistingVideos() {
+        let app=launch();create(app,"Standalone comparison");fixture(app);fixture(app)
+        app.buttons["closeVideo"].tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.buttons["scene_personal"].tap();app.buttons["tool_motionComparison"].tap()
+        let first=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","videoCard_")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout:10));first.tap()
+        XCTAssertTrue(app.buttons["cancelVideoPicker"].waitForExistence(timeout:10));app.buttons["cancelVideoPicker"].tap()
+        XCTAssertTrue(first.waitForExistence(timeout:5));first.tap()
+        let second=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","chooseVideo_")).firstMatch
+        XCTAssertTrue(second.waitForExistence(timeout:10));second.tap()
+        XCTAssertTrue(app.buttons["comparisonPlay"].waitForExistence(timeout:15));shot(app,"v11-standalone-comparison")
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        app.buttons["recordsTab"].tap()
+        app.buttons["recordToolFilter"].tap();app.buttons["动作对比"].tap()
+        let record=app.staticTexts["Standalone comparison"].firstMatch
+        XCTAssertTrue(record.waitForExistence(timeout:5));record.tap()
+        XCTAssertTrue(app.buttons["comparisonPlay"].waitForExistence(timeout:15))
     }
     @MainActor func testLibraryLifecycleNavigationAndRotation() {
         let app=launch();create(app,"Simulator batting")
@@ -59,7 +142,7 @@ final class CoachInsightsUITests:XCTestCase {
         let count=app.staticTexts["annotationCount"];waitLabel(count,"1 个标注")
         app.buttons["undoAnnotation"].tap();waitLabel(count,"0 个标注");app.buttons["重做"].tap();waitLabel(count,"1 个标注")
         shot(app,"v101-drawing")
-        app.buttons["drawingTools"].tap();app.buttons["addKeyframe"].tap()
+        app.buttons["drawingTools"].tap();app.buttons["videoOptions"].tap();app.buttons["保存关键帧"].tap()
         app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("Contact");app.alerts.buttons["保存"].tap();waitLabel(count,"1 个关键帧")
         app.buttons["poseTools"].tap();let limitations=app.staticTexts["poseLimitations"]
         XCTAssertTrue(limitations.waitForExistence(timeout:5));XCTAssertTrue(limitations.label.contains("辅助估算") && limitations.label.contains("高置信度也可能出错"))
@@ -71,7 +154,8 @@ final class CoachInsightsUITests:XCTestCase {
         shot(app,"v101-scrub-after-analysis")
         app.buttons["quickScreenshot"].tap();let share=app.otherElements["ActivityListView"]
         XCTAssertTrue(share.waitForExistence(timeout:20));let close=app.buttons["header.closeButton"]
-        if close.exists { close.tap() } else { app.swipeDown() }
+        if close.waitForExistence(timeout:5) { close.tap() } else { app.swipeDown() }
+        XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:share)],timeout:10),.completed)
         app.buttons["closeVideo"].tap();openRecord(app,"Full workflow");waitLabel(app.staticTexts["annotationCount"],"1 个标注")
         app.buttons["moreActions"].tap();app.buttons["导出分析"].tap()
         XCTAssertTrue(app.staticTexts["exportPoseLimitations"].waitForExistence(timeout:5));app.buttons["exportScreenshot"].tap();XCTAssertTrue(app.staticTexts["exportComplete"].waitForExistence(timeout:20))
@@ -111,8 +195,7 @@ final class CoachInsightsUITests:XCTestCase {
         let app=launch(["--layout-probe"]);app.buttons["narrowViewport"].tap()
         create(app,"First record");fixture(app);app.buttons["closeVideo"].tap()
         create(app,"Second record");fixture(app);app.buttons["closeVideo"].tap()
-        let first=app.staticTexts["First record"].firstMatch
-        if !first.isHittable { app.swipeUp() };XCTAssertTrue(first.waitForExistence(timeout:5));first.tap()
+        openRecord(app,"First record")
         XCTAssertTrue(app.buttons["nextFrame"].waitForExistence(timeout:10));app.buttons["nextFrame"].tap()
         waitLabel(app.staticTexts["frameReadout"],"第 2 /")
         app.buttons["wideViewport"].tap()

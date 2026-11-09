@@ -13,8 +13,10 @@ import AVFoundation
     @Published var loop=true
     @Published var drift:Double=0
     @Published var independent=false
-    private var newLayout=false
-    private var layoutAdapted=false
+    /// New comparisons follow their window until a user chooses a fixed layout.
+    /// Existing snapshots keep their saved layout; no migration or new persisted
+    /// preference is inferred from a legacy horizontal/vertical value.
+    @Published private(set) var followsWindow = true
     private var dual:DualPlaybackCoordinator?
     private var task:Task<Void,Never>?
     private var ticker:Task<Void,Never>?
@@ -39,7 +41,7 @@ import AVFoundation
             let snapshot=try session.snapshot()
             guard let first=left.assets.first(where:{$0.id==initialVideoID}) ?? left.assets.first else { return }
             let saved=snapshot.comparison
-            if secondVideoID == nil,let saved,(initialVideoID == nil || saved.leftVideoID == initialVideoID) { setup=saved;newLayout=false }
+            if secondVideoID == nil,let saved,(initialVideoID == nil || saved.leftVideoID == initialVideoID) { setup=saved;followsWindow=false }
             else {
                 guard let second=left.assets.first(where:{$0.id==secondVideoID && $0.id != first.id}) ?? left.assets.first(where:{$0.id != first.id}) else { await left.select(first.id);setup=nil;return }
                 let a=try first.metadata(),b=try second.metadata()
@@ -49,7 +51,7 @@ import AVFoundation
                     leftClip:snapshot.clips[first.id.uuidString] ?? ClipRange(start:a.timeline.frames[0].presentationTime,end:a.timeline.duration),
                     rightClip:rightClip,rate:snapshot.playbackRates[first.id.uuidString] ?? 1,
                     leftView:snapshot.views[first.id.uuidString] ?? ViewSettings(),rightView:snapshot.views[second.id.uuidString] ?? ViewSettings())
-                newLayout=true;layoutAdapted=false
+                followsWindow=true
             }
             guard let setup else { return }
             await left.select(setup.leftVideoID);await right.select(setup.rightVideoID)
@@ -60,9 +62,22 @@ import AVFoundation
             rebuild();seek(0)
         } catch { issue=error.localizedDescription }
     }
+    var layoutChoice: String { followsWindow ? "automatic" : (setup?.layout ?? "horizontal") }
+    static func automaticLayout(width: CGFloat, height: CGFloat) -> String {
+        height > width ? "vertical" : "horizontal"
+    }
     func adaptLayout(width:CGFloat,height:CGFloat) {
-        guard newLayout,!layoutAdapted,setup != nil else { return }
-        setup?.layout=width<600 && height>width ? "vertical":"horizontal";layoutAdapted=true;save()
+        guard followsWindow, width > 0, height > 0, setup != nil else { return }
+        let layout = Self.automaticLayout(width: width, height: height)
+        guard setup?.layout != layout else { return }
+        // Layout changes never rebuild the playback clock or seek either side.
+        setup?.layout = layout; save()
+    }
+    func selectLayout(_ choice: String, width: CGFloat, height: CGFloat) {
+        guard ["automatic", "horizontal", "vertical"].contains(choice), setup != nil else { return }
+        followsWindow = choice == "automatic"
+        if followsWindow { adaptLayout(width: width, height: height) }
+        else if setup?.layout != choice { setup?.layout = choice; save() }
     }
     func independentSeek(_ seconds:Double,isLeft:Bool) {
         pause();independent=true
@@ -169,7 +184,7 @@ import AVFoundation
         do { var snapshot=try session.snapshot();snapshot.comparison=setup;try repository.save(session,snapshot:snapshot) }
         catch { issue=error.localizedDescription }
     }
-    func changedSetup() { pause();rebuild();save() }
+    func changedSetup() { followsWindow=false;pause();rebuild();save() }
     private func viewChanged(_ snapshot:SessionSnapshot,isLeft:Bool) {
         guard var setup else { return }
         if isLeft { setup.leftView=snapshot.views[left.key] ?? ViewSettings() }
