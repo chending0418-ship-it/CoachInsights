@@ -126,6 +126,10 @@ import AVFoundation
         }
     }
 
+    func moveSlider(to seconds: Double) {
+        if scrubbing { scrub(to: seconds) }
+        else { seek(time: seconds) }
+    }
     func endScrubbing() {
         scrubTask?.cancel();scrubTask=nil;scrubbing=false;seek(frame:frameIndex);save()
     }
@@ -327,9 +331,11 @@ import AVFoundation
         snapshot.clips[key] = ClipRange(start: metadata.timeline.frames[0].presentationTime, end: metadata.timeline.duration); save()
     }
     func activateDrawingTool(_ value: String) {
+        if scrubbing { endScrubbing() }
         if value != "select" { selectedAnnotation = nil }
         if value != "view" && !overlaysVisible { overlaysVisible = true }
         tool = value
+        if value != "view" { resumeFrame() }
     }
     func add(points: [UnitPointValue]) {
         guard !playing, frameReady, let selectedVideoID, let metadata,

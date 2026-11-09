@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+ <defs>
+  <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+   <stop stop-color="#f4e5d5"/><stop offset="1" stop-color="#fff5ea"/>
+  </linearGradient>
+  <linearGradient id="ball" x1="0" y1="0" x2="1" y2="1">
+   <stop stop-color="#fff8eb"/><stop offset=".68" stop-color="#f5dcc5"/><stop offset="1" stop-color="#dbac96"/>
+  </linearGradient>
+  <clipPath id="ball-edge"><circle cx="510" cy="394" r="102"/></clipPath>
+ </defs>
+ <path fill="url(#paper)" d="M0 0h1000v1000H0z"/>
+ <path fill="#d89077" d="M0 465 1000 113v98L0 562z"/>
+ <path fill="#722f37" d="M0 564 1000 212v113L0 677z"/>
+ <path fill="#f3c7aa" d="M0 679 1000 327v17L0 697z"/>
+ <path fill="#963e47" d="m0 610 1000-351v8L0 618z" opacity=".65"/>
+ <path d="M373 428 602 348M362 451 620 360M350 471 624 375" fill="none" stroke="#fff1dd" stroke-opacity=".65" stroke-width="2" stroke-linecap="round"/>
+ <circle cx="522" cy="408" r="102" fill="#421723" opacity=".34"/>
+ <circle cx="510" cy="394" r="102" fill="url(#ball)"/>
+ <g clip-path="url(#ball-edge)" transform="rotate(-25 510 394)" fill="none" stroke="#9f4148" stroke-linecap="round">
+  <path d="M421 288Q494 385 422 495M599 288Q526 385 598 495" stroke-width="2.7"/>
+  <path d="m433 302 12-7m-4 20 13-6m-6 19 13-5m-8 20 14-4m-10 20 14-3m-11 19 14-2m-13 17h14m-15 16 14 2m-17 14 14 3m-19 13 13 4m-19 12 13 5m-20 10 12 6m-21 9 12 8M587 302l-12-7m4 20-13-6m6 19-13-5m8 20-14-4m10 20-14-3m11 19-14-2m13 17h-14m15 16-14 2m17 14-14 3m19 13-13 4m19 12-13 5m20 10-12 6m21 9-12 8" stroke-width="3.6"/>
+ </g>
+ <path d="M371 826h102m54 0h102" stroke="#ad6f66" stroke-width="1.5" opacity=".5"/>
+ <path d="M493 819h14v9l-7 5-7-5z" fill="#722f37" opacity=".72"/>
+</svg>

@@ -8,41 +8,46 @@ struct FieldLogView: View {
     @State private var ending = false
     @State private var notice: String?
     @State private var correction: PitchSelection?
+    @State private var editingGameCount = false
     @State private var visibleEventLimit = 30
-    @State private var showHistory = false
+    @State private var showsProcess = false
     @State private var name = ""
     private struct PitchSelection: Identifiable { let id: Int; let mark: PitchMark; let number: Int }
     private var log: FieldLog? { store.log(kind: kind, id: recordID) }
 
     var body: some View {
         GeometryReader { geometry in
-            if let log, kind == .bullpen, geometry.size.width >= 720, geometry.size.height >= 500 {
-                bullpenStudio(log, size: geometry.size)
-            } else {
-                ScrollView {
-                    if let log {
-                        VStack(alignment: .leading, spacing: 8) {
-                            header(log)
-                            controls(log, availableHeight: geometry.size.height)
-                            if kind == .bullpen {
-                                recent(log)
-                            } else {
-                                DisclosureGroup(isExpanded: $showHistory) {
-                                    recent(log, showTitle: false)
-                                } label: {
-                                    Text("本轮过程 · \(log.events.count)").font(.subheadline.weight(.semibold))
-                                }.padding(.horizontal, 12).frame(minHeight: 44)
-                            }
-                        }.padding(16).frame(maxWidth: 560).frame(maxWidth: .infinity)
-                    } else {
-                        ContentUnavailableView("记录已不存在", systemImage: "folder.badge.questionmark")
+            ScrollView {
+                if let log, kind == .batting {
+                    battingLayout(log)
+                } else if let log {
+                    VStack(alignment: .leading, spacing: 10) {
+                        header(log)
+                        controls(log, availableHeight: geometry.size.height)
+                        if let notice {
+                            Text(notice).font(.caption).foregroundStyle(Theme.burgundy)
+                                .accessibilityIdentifier("fieldNotice")
+                        }
+                        if log.events.count >= FieldLog.eventLimit {
+                            Text("本轮已达 10,000 次，请结束后新建一轮。").font(.caption).foregroundStyle(.red)
+                        }
+                        recent(log)
                     }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .frame(maxWidth: 580)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    ContentUnavailableView("记录已不存在", systemImage: "folder.badge.questionmark")
                 }
-                .scrollDismissesKeyboard(.interactively)
             }
+            .scrollDismissesKeyboard(kind == .batting ? .interactively : .automatic)
         }
         .background(Theme.paper).navigationTitle(kind.tool.title).navigationBarTitleDisplayMode(.inline)
-        .task(id: log?.id) { name = log?.name ?? "" }
+        .task(id: log?.id) {
+            name = log?.name ?? ""
+            showsProcess = false
+            visibleEventLimit = 30
+        }
         .onChange(of: name) { _, value in
             let limited = String(value.prefix(100))
             if limited != value { name = limited; return }
@@ -50,7 +55,7 @@ struct FieldLogView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
-                if let log { roundActions(log) }
+                if let log { compactActions(log) }
                 if let issue = store.issue {
                 VStack(spacing: 8) {
                     Text(issue).font(.callout).foregroundStyle(.red).accessibilityIdentifier("fieldIssue")
@@ -67,6 +72,13 @@ struct FieldLogView: View {
                 if let log, save(log, ending: true) { notice = "本轮已保存到记录" }
             }
         }
+        .sheet(isPresented: $editingGameCount) {
+            if let log {
+                GameCountEditor(count: log.gameCount.correction) { correction in
+                    change { $0.append(.gameCorrection(correction)) }
+                }
+            }
+        }
         .sheet(item: $correction) { selection in
             PitchCorrectionView(mark: selection.mark, number: selection.number) { mark in
                 change { $0.correctPitch(at: selection.id, zone: mark.zone, isStrike: mark.isStrike, location: mark.location) }
@@ -74,48 +86,51 @@ struct FieldLogView: View {
         }
     }
 
+    private func battingLayout(_ log: FieldLog) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
+                TextField("姓名或本轮名称（选填）", text: $name)
+                    .font(.subheadline).padding(.horizontal, 12).frame(minHeight: 44)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                    .disabled(log.ended).accessibilityIdentifier("fieldName")
+                HStack {
+                    Text(log.createdAt, style: .date).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Text(log.ended ? "已结束" : "本机自动保存").foregroundStyle(Theme.burgundy)
+                }.font(.caption)
+            }
+            battingControls(log)
+            DisclosureGroup(isExpanded: $showsProcess) {
+                VStack(alignment: .leading, spacing: 12) {
+                    recentEvents(log)
+                }
+                .padding(18).background(.white, in: RoundedRectangle(cornerRadius: 18))
+            } label: {
+                Text("本轮过程 · \(log.events.count)").font(.subheadline.weight(.semibold))
+            }.padding(.horizontal, 12).frame(minHeight: 44)
+        }.padding(16).frame(maxWidth: 560).frame(maxWidth: .infinity)
+    }
+
     private func header(_ log: FieldLog) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField(kind == .game ? "比赛名称（选填）" : "姓名或本轮名称（选填）", text: $name)
-                .font(.subheadline).padding(.horizontal, 12).frame(minHeight: 44)
-                .background(.white, in: RoundedRectangle(cornerRadius: 10))
-                .disabled(log.ended).accessibilityIdentifier("fieldName")
             HStack {
                 Text(log.createdAt, style: .date).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Text(log.ended ? "已结束" : "本机自动保存").foregroundStyle(Theme.burgundy)
+                Spacer()
+                Text(log.ended ? "已结束 · 可继续编辑" : "修改自动保存").foregroundStyle(Theme.burgundy)
             }.font(.caption)
+            TextField(kind == .game ? "比赛名称（可选）" : "姓名或本轮名称（可选）", text: $name)
+                .font(.headline).textFieldStyle(.roundedBorder).disabled(log.ended)
+                .accessibilityIdentifier("fieldName")
         }
     }
 
     @ViewBuilder private func controls(_ log: FieldLog, availableHeight: CGFloat) -> some View {
         switch kind {
-        case .batting:
-            VStack(alignment: .leading, spacing: 10) {
-                Label("总次数 · \(log.events.count)", systemImage: "figure.baseball")
-                    .font(.headline.monospacedDigit()).accessibilityIdentifier("battingTotal")
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(BattingContact.allCases, id: \.self) { contact in
-                        Button { change { $0.append(.batting(contact)) } } label: {
-                            HStack(spacing: 6) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(contact.title).font(.subheadline.weight(.semibold))
-                                    Text("\(log.count(contact))").font(.title2.weight(.semibold).monospacedDigit())
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "plus.circle").font(.body)
-                            }.padding(12).frame(maxWidth: .infinity, minHeight: 66)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                        }.buttonStyle(.plain).foregroundStyle(Theme.burgundy)
-                            .accessibilityLabel(contact.title).accessibilityValue("\(log.count(contact))")
-                            .accessibilityIdentifier("batting_" + contact.rawValue)
-                    }
-                }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
-            }
+        case .batting: battingControls(log)
         case .bullpen:
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("投球落点").font(.title3.bold())
+                    Text("投球落点").font(.headline)
                     Spacer()
                     Text("\(log.pitches.count) 球").font(.title2.weight(.semibold).monospacedDigit()).accessibilityIdentifier("bullpenTotal")
                 }
@@ -124,9 +139,9 @@ struct FieldLogView: View {
                     pitchMetric("坏球", value: "\(log.pitches.count - log.strikeCount)", color: PitchLocationMap.ballColor)
                     pitchMetric("好球率", value: log.pitches.isEmpty ? "—" : "\(Int((Double(log.strikeCount) / Double(log.pitches.count) * 100).rounded()))%", color: .primary)
                     pitchMetric("出局", value: "\(log.outCount)", color: .primary)
-                }.padding(.vertical, 8).background(.white, in: RoundedRectangle(cornerRadius: 12))
+                }.padding(.vertical, 8).background(.white, in: RoundedRectangle(cornerRadius: 14))
                 PitchLocationMap(pitches: log.pitches) { point in change { $0.append(.pitch(PitchMark(point: point))) } }
-                    .frame(maxWidth: min(400, max(220, (availableHeight - 210) * 1.04)))
+                    .frame(maxWidth: min(410, max(180, availableHeight - 260) * 1.04))
                     .frame(maxWidth: .infinity)
                     .disabled(log.ended || log.events.count >= FieldLog.eventLimit)
                 HStack(spacing: 12) {
@@ -138,43 +153,83 @@ struct FieldLogView: View {
             }
         case .game:
             let count = log.gameCount
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    gameTile("好球", action: .strike, value: count.strikes)
-                    gameTile("坏球", action: .ball, value: count.balls)
-                    gameTile("出局", action: .out, value: count.outs)
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    gameButton("客队", value: count.awayRuns, action: .awayRun, score: true)
+                    gameButton("主队", value: count.homeRuns, action: .homeRun, score: true)
                 }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
+                HStack(spacing: 8) {
+                    gameButton("好球 S", value: count.strikes, action: .strike)
+                    gameButton("坏球 B", value: count.balls, action: .ball)
+                    gameButton("出局 O", value: count.outs, action: .out)
+                }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("好球 \(count.strikes)，坏球 \(count.balls)，出局 \(count.outs)")
+                    .accessibilityIdentifier("gameCount")
                 HStack {
-                    Text("换边 \(count.sides) 次").font(.caption).foregroundStyle(.secondary)
+                    Text("已换边 \(count.sides) 次").font(.caption).foregroundStyle(.secondary)
                         .accessibilityIdentifier("gameSides")
-                    Spacer(minLength: 0)
-                    Button("下一位打者", systemImage: "arrow.right") { change { $0.append(.game(.clearBatter)) } }
-                        .font(.subheadline).buttonStyle(.bordered)
+                    Spacer(minLength: 4)
+                    Button("修改计数") { editingGameCount = true }
+                        .font(.subheadline).padding(.horizontal, 8).frame(minHeight: 44)
                         .disabled(log.ended || log.events.count >= FieldLog.eventLimit)
-                        .accessibilityHint("清空当前好球与坏球")
+                        .accessibilityIdentifier("gameEditCount")
+                    Button("下一位打者") { change { $0.append(.game(.clearBatter)) } }
+                        .font(.subheadline).padding(.horizontal, 8).frame(minHeight: 44)
+                        .disabled(log.ended || log.events.count >= FieldLog.eventLimit)
                         .accessibilityIdentifier("gameNextBatter")
                 }
-                Text(count.notice ?? "点计数按钮加一")
-                    .font(.footnote).foregroundStyle(count.notice == nil ? Color.secondary : Theme.burgundy)
-                    .accessibilityIdentifier("gameBoundary")
+                if let notice = count.notice {
+                    Text(notice).font(.caption.weight(.semibold)).foregroundStyle(Theme.burgundy)
+                        .accessibilityIdentifier("gameBoundary")
+                }
             }
         }
     }
 
-    private func gameTile(_ title: String, action: GameAction, value: Int) -> some View {
-        Button { change { $0.append(.game(action)) } } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(title).font(.subheadline.weight(.semibold))
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(value)").font(.title.weight(.semibold).monospacedDigit())
-                    Spacer(minLength: 0)
-                    Image(systemName: "plus.circle").font(.body)
+    private func battingControls(_ log: FieldLog) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("总次数 · \(log.events.count)", systemImage: "figure.baseball")
+                .font(.headline.monospacedDigit()).accessibilityIdentifier("battingTotal")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(BattingContact.allCases, id: \.self) { contact in
+                    Button { change { $0.append(.batting(contact)) } } label: {
+                        HStack(spacing: 6) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(contact.title).font(.subheadline.weight(.semibold))
+                                Text("\(log.count(contact))").font(.title2.weight(.semibold).monospacedDigit())
+                            }
+                            Spacer(minLength: 0)
+                            BattingContactIcon(contact: contact)
+                            Image(systemName: "plus.circle").font(.body)
+                        }.padding(12).frame(maxWidth: .infinity, minHeight: 66)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain).foregroundStyle(Theme.burgundy)
+                        .accessibilityLabel(contact.title).accessibilityValue("\(log.count(contact))")
+                        .accessibilityIdentifier("batting_" + contact.rawValue)
                 }
-            }.padding(12).frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                .background(.white, in: RoundedRectangle(cornerRadius: 12))
-        }.buttonStyle(.plain).foregroundStyle(Theme.burgundy)
-            .accessibilityLabel(title + "加一").accessibilityValue("\(value)")
-            .accessibilityIdentifier("game_" + action.rawValue)
+            }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
+        }
+    }
+
+    private func gameButton(_ title: String, value: Int, action: GameAction, score: Bool = false) -> some View {
+        Button { change { $0.append(.game(action)) } } label: {
+            VStack(spacing: 4) {
+                Text(title).font(.caption.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(value.formatted()).font(score ? .largeTitle.bold() : .title2.bold()).monospacedDigit()
+                    Image(systemName: "plus.circle").font(.caption)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(score ? Theme.burgundy : .white, in: RoundedRectangle(cornerRadius: 12))
+            .foregroundStyle(score ? .white : Theme.burgundy)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(action.title)
+        .accessibilityValue(value.formatted())
+        .accessibilityIdentifier("game_" + action.rawValue)
     }
 
     private func pitchMetric(_ title: String, value: String, color: Color) -> some View {
@@ -184,63 +239,27 @@ struct FieldLogView: View {
         }.frame(maxWidth: .infinity)
     }
 
-    private func bullpenStudio(_ log: FieldLog, size: CGSize) -> some View {
-        let listWidth = min(300, size.width * 0.32)
-        let mapWidth = min(size.width - listWidth - 52, max(180, size.height - 210) * 1.04)
-        return VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                TextField("姓名或本轮名称（可选）", text: $name)
-                    .font(.headline).textFieldStyle(.roundedBorder).frame(maxWidth: 320).disabled(log.ended)
-                    .accessibilityIdentifier("fieldName")
-                Text(log.createdAt, style: .date).font(.caption).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Text("\(log.pitches.count) 球").font(.title2.bold().monospacedDigit()).accessibilityIdentifier("bullpenTotal")
-                Text(log.ended ? "已结束" : "自动保存").font(.caption).foregroundStyle(Theme.burgundy)
-            }.frame(height: 44)
-            HStack(alignment: .top, spacing: 20) {
-                VStack(spacing: 12) {
-                    HStack(spacing: 0) {
-                        pitchMetric("好球", value: "\(log.strikeCount)", color: PitchLocationMap.strikeColor)
-                        pitchMetric("坏球", value: "\(log.pitches.count - log.strikeCount)", color: PitchLocationMap.ballColor)
-                        pitchMetric("好球率", value: log.pitches.isEmpty ? "—" : "\(Int((Double(log.strikeCount) / Double(log.pitches.count) * 100).rounded()))%", color: .primary)
-                        pitchMetric("出局", value: "\(log.outCount)", color: .primary)
-                    }.padding(.vertical, 10).background(.white, in: RoundedRectangle(cornerRadius: 14))
-                    PitchLocationMap(pitches: log.pitches) { point in change { $0.append(.pitch(PitchMark(point: point))) } }
-                        .frame(width: mapWidth).disabled(log.ended || log.events.count >= FieldLog.eventLimit)
-                    HStack(spacing: 12) {
-                        Label("好球", systemImage: "circle.fill").foregroundStyle(PitchLocationMap.strikeColor)
-                        Label("坏球", systemImage: "circle.fill").foregroundStyle(PitchLocationMap.ballColor)
-                        Spacer(minLength: 0)
-                        Text("捕手视角 · 手动落点").foregroundStyle(.secondary)
-                    }.font(.caption)
-                    Spacer(minLength: 0)
-                }.frame(maxWidth: .infinity)
-                ScrollView {
-                    recent(log)
-                }.frame(width: listWidth)
-            }.frame(maxHeight: .infinity)
-        }.padding(16)
-    }
-
-    private func roundActions(_ log: FieldLog) -> some View {
+    private func compactActions(_ log: FieldLog) -> some View {
         VStack(spacing: 4) {
-            if let notice {
-                Text(notice).font(.caption).foregroundStyle(Theme.burgundy).accessibilityIdentifier("fieldNotice")
+            if kind == .batting {
+                if let notice {
+                    Text(notice).font(.caption).foregroundStyle(Theme.burgundy).accessibilityIdentifier("fieldNotice")
+                }
+                if log.events.count >= FieldLog.eventLimit {
+                    Text("本轮已达 10,000 次，可结束后开始新一轮。").font(.caption).foregroundStyle(.red)
+                }
             }
-            if log.events.count >= FieldLog.eventLimit {
-                Text("本轮已达 10,000 次，可结束后开始新一轮。").font(.caption).foregroundStyle(.red)
-            }
-            HStack(spacing: 8) {
+            HStack(spacing: kind == .batting ? 8 : 12) {
                 if log.ended {
                     Button("继续编辑") {
                         var next = log
                         next.ended = false
-                        if store.update(next) { notice = nil }
-                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("fieldResume")
+                        if store.update(next), kind == .batting { notice = nil }
+                    }
+                        .buttonStyle(.borderedProminent).accessibilityIdentifier("fieldResume")
                 } else {
-                    Button { undo(log) } label: {
-                        Image(systemName: "arrow.uturn.backward").frame(width: 44, height: 44)
-                    }.disabled(log.undoHistory.isEmpty).accessibilityLabel("撤销").accessibilityIdentifier("fieldUndo")
+                    Button { undo(log) } label: { Image(systemName: "arrow.uturn.backward").frame(width: 44, height: 44) }
+                        .disabled(log.undoHistory.isEmpty).accessibilityLabel("撤销").accessibilityIdentifier("fieldUndo")
                     if kind == .bullpen {
                         Button("出局 +1") { change { $0.append(.bullpenOut) } }
                             .buttonStyle(.bordered).disabled(log.events.count >= FieldLog.eventLimit).accessibilityIdentifier("bullpenOut")
@@ -251,57 +270,72 @@ struct FieldLogView: View {
                     Menu {
                         Button("结束本轮") { ending = true }.disabled(log.events.isEmpty).accessibilityIdentifier("fieldEnd")
                         Button("清零本轮", role: .destructive) { reset = true }.disabled(log.events.isEmpty).accessibilityIdentifier("fieldReset")
-                    } label: {
-                        Image(systemName: "ellipsis").frame(width: 44, height: 44)
-                    }.accessibilityLabel("本轮选项").accessibilityIdentifier("fieldOptions")
+                    } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .accessibilityLabel("本轮选项").accessibilityIdentifier("fieldOptions")
                 }
-            }.frame(maxWidth: 560)
-        }.font(.subheadline).padding(.horizontal, 16).padding(.vertical, 6)
-            .frame(maxWidth: .infinity).background(Theme.paper)
-            .overlay(alignment: .top) { Divider() }
+            }
+            .frame(maxWidth: kind == .batting ? 560 : .infinity)
+        }
+        .font(kind == .batting ? .subheadline : nil)
+        .controlSize(.regular)
+        .padding(.horizontal, 16).padding(.vertical, kind == .batting ? 6 : 8)
+        .frame(maxWidth: .infinity).background(Theme.paper)
+        .overlay(alignment: .top) { Divider() }
     }
 
-    private func recent(_ log: FieldLog, showTitle: Bool = true) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if showTitle { Text("本轮过程 · \(log.events.count)").font(.headline) }
-            if log.events.isEmpty { Text("从上方按钮开始记录").foregroundStyle(.secondary).padding(.vertical, 20) }
-            ForEach(Array(log.events.indices.suffix(visibleEventLimit).reversed()), id: \.self) { index in
-                let event = log.events[index]
-                HStack {
-                    if case .pitch(let mark) = event {
-                        let number = log.events.prefix(index + 1).filter { if case .pitch = $0 { return true }; return false }.count
-                        Text("\(number)").font(.caption.bold().monospacedDigit()).foregroundStyle(.white)
-                            .frame(width: 28, height: 28).background(mark.isStrike ? PitchLocationMap.strikeColor : PitchLocationMap.ballColor, in: Circle())
-                        Button {
-                            correction = PitchSelection(id: index, mark: mark, number: number)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(mark.isStrike ? "好球" : "坏球").font(.headline)
-                                    Text(mark.zone.title).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer(); Image(systemName: "pencil.circle")
-                            }.frame(minHeight: 44)
-                        }.disabled(log.ended).accessibilityIdentifier("pitchEvent_\(index)")
-                    } else {
-                        if kind != .bullpen { Text("\(index + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 36) }
-                        Text(eventTitle(event)).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    }
-                }
-                Divider()
-            }
-            if log.events.count > visibleEventLimit {
-                Button("显示更早的记录") { visibleEventLimit += 30 }.accessibilityIdentifier("fieldEarlierEvents")
-            }
-        }.padding(18).background(.white, in: RoundedRectangle(cornerRadius: 18))
+    private func recent(_ log: FieldLog) -> some View {
+        DisclosureGroup(isExpanded: $showsProcess) {
+            VStack(alignment: .leading, spacing: 8) {
+                recentEvents(log)
+            }.padding(.top, 8)
+        } label: {
+            Text("本轮过程 · \(log.events.count)")
+                .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+                .accessibilityIdentifier("fieldProcess")
+        }
+        .padding(.horizontal, 12)
+        .background(.white, in: RoundedRectangle(cornerRadius: 12))
     }
+    @ViewBuilder private func recentEvents(_ log: FieldLog) -> some View {
+        if log.events.isEmpty { Text("从上方按钮开始记录").foregroundStyle(.secondary).padding(.vertical, 20) }
+        ForEach(Array(log.events.indices.suffix(visibleEventLimit).reversed()), id: \.self) { index in
+            let event = log.events[index]
+            HStack {
+                if case .pitch(let mark) = event {
+                    let number = log.events.prefix(index + 1).filter { if case .pitch = $0 { return true }; return false }.count
+                    Text("\(number)").font(.caption.bold().monospacedDigit()).foregroundStyle(.white)
+                        .frame(width: 28, height: 28).background(mark.isStrike ? PitchLocationMap.strikeColor : PitchLocationMap.ballColor, in: Circle())
+                    Button {
+                        correction = PitchSelection(id: index, mark: mark, number: number)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(mark.isStrike ? "好球" : "坏球").font(.headline)
+                                Text(mark.zone.title).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer(); Image(systemName: "pencil.circle")
+                        }.frame(minHeight: 44).contentShape(Rectangle())
+                    }.disabled(log.ended).accessibilityIdentifier("pitchEvent_\(index)")
+                } else {
+                    if kind != .bullpen { Text("\(index + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 36) }
+                    Text(eventTitle(event)).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+            }
+            Divider()
+        }
+        if log.events.count > visibleEventLimit {
+            Button("显示更早的记录") { visibleEventLimit += 30 }.accessibilityIdentifier("fieldEarlierEvents")
+        }
+    }
+
     private func eventTitle(_ event: FieldEvent) -> String {
         switch event {
         case .batting(let contact): return contact.title
         case .bullpenOut: return "出局 +1"
         case .pitch(let mark): return mark.zone.title
-        case .game(let action):
-            switch action { case .strike: return "好球 +1"; case .ball: return "坏球 +1"; case .out: return "出局 +1"; case .clearBatter: return "下一位打者" }
+        case .game(let action): return action.title
+        case .gameCorrection(let count):
+            return "修正计数 · 客 \(count.awayRuns) 比 \(count.homeRuns) 主 · 好球 \(count.strikes) · 坏球 \(count.balls) · 出局 \(count.outs)"
         }
     }
     @discardableResult private func change(_ mutate: (inout FieldLog) -> Void) -> Bool {
