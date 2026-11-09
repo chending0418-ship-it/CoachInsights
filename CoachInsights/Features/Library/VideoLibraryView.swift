@@ -78,71 +78,100 @@ struct VideoLibraryView: View {
         VStack(alignment:.leading,spacing:6) {
             VideoCover(asset:item.asset,repository:repository).frame(height:110).clipShape(RoundedRectangle(cornerRadius:10))
             Text(item.session.name).font(.subheadline.bold()).lineLimit(1).foregroundStyle(.primary)
-            Text("\(item.session.sportValue) · \(item.asset.createdAt.formatted(date:.abbreviated,time:.omitted))").font(.caption2).foregroundStyle(.secondary)
-        }.accessibilityElement(children:.combine).accessibilityIdentifier("videoCard_"+item.id)
+            Text("\(item.session.sportValue) · \(item.asset.createdAt.formatted(date:.abbreviated,time:.omitted))")
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
     }
     private var libraryPanel: some View {
         List {
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(mode.title).font(.title2.weight(.bold))
-                    if mode == .comparison {
-                        Text("选择第一段视频，再添加另一段动作。").font(.subheadline).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                if mode == .comparison {
+                    Text("先选第一段视频，再添加第二段。").font(.footnote).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 8) {
+                    Button { photoImport = true } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo").symbolRenderingMode(.monochrome).accessibilityHidden(true)
+                            Text("相册")
+                        }.foregroundStyle(.white)
+                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("rootPhotos")
+                    Button("文件", systemImage: "folder") { fileImport = true }
+                        .buttonStyle(.bordered).accessibilityIdentifier("rootFiles")
+                    Spacer(minLength: 0)
+                    if mode == .analysis {
+                        Menu {
+                            Button("新建分析", systemImage: "plus") { showCreate = true }.accessibilityIdentifier("createSession")
+                            Button("拍摄", systemImage: "video") { showCapture = true }.accessibilityIdentifier("rootCapture")
+                        } label: { Label("新建", systemImage: "plus").frame(minHeight: 44) }
+                            .accessibilityIdentifier("libraryCreateMenu")
                     }
-                    Label("本机资料库", systemImage: "iphone.and.arrow.forward")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Button("相册",systemImage:"photo.on.rectangle") { photoImport=true }.buttonStyle(.borderedProminent).accessibilityIdentifier("rootPhotos")
-                        Button("文件",systemImage:"folder") { fileImport=true }.buttonStyle(.bordered).accessibilityIdentifier("rootFiles")
+                }.font(.subheadline)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("搜索分析名称", text: $query)
+                        .submitLabel(.search).accessibilityIdentifier("librarySearch")
+                    if !query.isEmpty {
+                        Button("清除搜索", systemImage: "xmark.circle.fill") { query = "" }
+                            .labelStyle(.iconOnly).buttonStyle(.plain).frame(minWidth: 44, minHeight: 44)
                     }
-                    if mode == .analysis { HStack {
-                        Button { showCreate = true } label: { Label("新建分析", systemImage: "plus") }
-                            .labelStyle(.titleOnly).lineLimit(1)
-                            .buttonStyle(.bordered).accessibilityIdentifier("createSession")
-                        Button { showCapture = true } label: { Label("拍摄", systemImage: "video") }
-                            .buttonStyle(.bordered).accessibilityIdentifier("rootCapture")
-                    } }
-                }.padding(.vertical, 8)
-            }.listRowBackground(Theme.paper)
+                    Divider().frame(height: 22)
+                    Menu {
+                        Picker("运动", selection: $sport) {
+                            ForEach(["全部", "打击", "投球"], id: \.self) { Text($0) }
+                        }
+                        Picker("日期", selection: $period) {
+                            ForEach(["全部日期", "最近 7 天", "最近 30 天"], id: \.self) { Text($0) }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.title3).frame(width: 44, height: 44)
+                            .foregroundStyle(sport != "全部" || period != "全部日期" ? Theme.burgundy : .secondary)
+                    }.accessibilityLabel("筛选").accessibilityIdentifier("sportFilter")
+                    .accessibilityValue(sport + "，" + period)
+                }.padding(.leading, 12).frame(minHeight: 44)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                Picker("浏览方式", selection: $browseVideos) {
+                    Text("视频").tag(true)
+                    Text("分析记录").tag(false)
+                }.pickerStyle(.segmented).accessibilityIdentifier("libraryBrowseMode")
+            }.listRowBackground(Theme.paper).listRowSeparator(.hidden)
             if let issue = library.issue {
                 Section {
                     Text(issue).foregroundStyle(.red)
                     Button("重试") { Task { await library.retry() } }
                 }
             }
-            Section {
-                Picker("运动", selection: $sport) {
-                    ForEach(["全部", "打击", "投球"], id: \.self) { Text($0) }
-                }.accessibilityIdentifier("sportFilter")
-                Picker("日期", selection: $period) {
-                    ForEach(["全部日期", "最近 7 天", "最近 30 天"], id: \.self) { Text($0) }
-                }
-            }
-            Section {
-                Picker("浏览方式",selection:$browseVideos) { Text("视频").tag(true);Text("分析记录").tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("libraryBrowseMode")
-            }
             if browseVideos,!videos.isEmpty,let repository=library.repository {
                 Section("视频 · \(videos.count)") {
                     LazyVGrid(columns:[GridItem(.adaptive(minimum:130),spacing:12)],spacing:16) {
                         ForEach(videos) { item in
-                            Button { openCompact(item.session,videoID:item.asset.id) } label: { videoCard(item,repository:repository) }.buttonStyle(.plain)
+                            Button {
+                                openCompact(item.session, videoID: item.asset.id)
+                            } label: {
+                                videoCard(item, repository: repository)
+                            }.buttonStyle(.plain).accessibilityIdentifier("videoCard_" + item.id)
                         }
-                    }.padding(.vertical,6)
+                    }.padding(.vertical, 6)
+                        .listRowSeparator(.hidden).listRowBackground(Theme.paper)
                 }
             }
-            Section("分析记录 · \(filtered.count)") {
-                if filtered.isEmpty {
-                    EmptyPanel(icon: "rectangle.stack", title: query.isEmpty ? (mode == .comparison ? "选择第一段视频" : "从一份分析开始") : "没有找到记录",
-                               detail: query.isEmpty ? (mode == .comparison ? "从相册或文件添加视频，再选择第二段动作。" : "先记录打击或投球，随后添加视频。") : "试试其他名称或筛选条件。")
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(filtered.filter { !browseVideos || (try? $0.snapshot().videoIDs.isEmpty) == true }) { session in
-                    Button { openCompact(session) } label: { SessionRow(session: session) }.buttonStyle(.plain)
-                        .swipeActions { Button("删除", role: .destructive) { pendingDelete = session } }
+            let records = filtered.filter { !browseVideos || (try? $0.snapshot().videoIDs.isEmpty) == true }
+            if !records.isEmpty || filtered.isEmpty {
+                Section("分析记录 · \(records.count)") {
+                    if filtered.isEmpty {
+                        EmptyPanel(icon: "rectangle.stack", title: query.isEmpty ? (mode == .comparison ? "选择第一段视频" : "从一份分析开始") : "没有找到记录",
+                                   detail: query.isEmpty ? (mode == .comparison ? "从相册或文件添加视频，再选择第二段动作。" : "先记录打击或投球，随后添加视频。") : "试试其他名称或筛选条件。")
+                            .listRowBackground(Color.clear)
+                    }
+                    ForEach(records) { session in
+                        Button { openCompact(session) } label: { SessionRow(session: session) }.buttonStyle(.plain)
+                            .swipeActions { Button("删除", role: .destructive) { pendingDelete = session } }
+                    }
                 }
             }
         }
-        .scrollContentBackground(.hidden).background(Theme.paper)
+        .listStyle(.plain).scrollContentBackground(.hidden).background(Theme.paper)
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(mode.title).navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { NavigationLink { HelpView() } label: { Label("使用说明与隐私", systemImage: "questionmark.circle") } }
@@ -154,7 +183,6 @@ struct VideoLibraryView: View {
             }
             #endif
         }
-        .searchable(text: $query, prompt: "搜索分析名称")
         .overlay { if library.busy { ProgressView("正在清理本机副本…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
     }
     private func openCompact(_ session:AnalysisSession,videoID:UUID?=nil) {

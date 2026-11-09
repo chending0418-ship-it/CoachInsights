@@ -12,10 +12,10 @@ final class CoachInsightsUITests:XCTestCase {
     @MainActor func openVideoLibrary(_ app:XCUIApplication) {
         if app.buttons["scene_personal"].exists { app.buttons["scene_personal"].tap() }
         if app.buttons["tool_videoAnalysis"].exists { app.buttons["tool_videoAnalysis"].tap() }
-        XCTAssertTrue(app.buttons["createSession"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["libraryCreateMenu"].waitForExistence(timeout:10))
     }
     @MainActor func create(_ app:XCUIApplication,_ name:String) {
-        app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
+        app.buttons["libraryCreateMenu"].tap();app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
         XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText(name);app.buttons["confirmCreate"].tap()
         let record=app.staticTexts[name].firstMatch;XCTAssertTrue(record.waitForExistence(timeout:5));record.tap()
     }
@@ -203,7 +203,7 @@ final class CoachInsightsUITests:XCTestCase {
         waitLabel(app.staticTexts["frameReadout"],"第 2 /")
     }
     @MainActor func testSimulatorCaptureFlow() {
-        let app=launch();app.buttons["rootCapture"].tap()
+        let app=launch();app.buttons["libraryCreateMenu"].tap();app.buttons["rootCapture"].tap()
         XCTAssertTrue(app.buttons["simulateCapture"].waitForExistence(timeout:5));app.buttons["simulateCapture"].tap()
         let save=app.buttons["saveCapture"];XCTAssertTrue(save.waitForExistence(timeout:10));if !save.isHittable { app.swipeUp() };save.tap()
         let open=app.buttons["openCapturedAnalysis"];XCTAssertTrue(open.waitForExistence(timeout:15));if !open.isHittable { app.swipeUp() };open.tap()

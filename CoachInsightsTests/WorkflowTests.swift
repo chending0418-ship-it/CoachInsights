@@ -39,7 +39,10 @@ import UIKit
         XCTAssertEqual(w.frameIndex,15);XCTAssertEqual(w.time,0.25,accuracy:0.00001)
         let valid=w.snapshot,savedBefore=try record.snapshot();w.snapshot.version=2;w.save();XCTAssertNotNil(w.saveIssue);XCTAssertEqual(try record.snapshot(),savedBefore)
         w.snapshot=valid;w.save();XCTAssertNil(w.saveIssue)
-        w.tool="arrow";w.add(points:[UnitPointValue(x:0.2,y:0.3),UnitPointValue(x:0.8,y:0.7)])
+        w.overlaysVisible = false
+        w.activateDrawingTool("arrow")
+        XCTAssertTrue(w.overlaysVisible)
+        w.add(points:[UnitPointValue(x:0.2,y:0.3),UnitPointValue(x:0.8,y:0.7)])
         XCTAssertEqual(w.visibleAnnotations.count,1)
         let annotation=try XCTUnwrap(w.snapshot.annotations.first)
         w.step(1);try await wait{w.frameReady};XCTAssertEqual(w.visibleAnnotations.count,0)
@@ -240,7 +243,7 @@ import UIKit
         w.selectedAnnotation=nil;w.color="#722F37";w.selectedAnnotation=id
         XCTAssertEqual(w.color,"#FFFFFF")
         w.lineWidth=7;w.styleSelection();XCTAssertEqual(w.snapshot.annotations[0].color,"#FFFFFF");XCTAssertEqual(w.snapshot.annotations[0].lineWidth,7)
-        w.undo();XCTAssertEqual(w.lineWidth,3)
+        w.undo();XCTAssertEqual(w.lineWidth,4)
         w.redo();XCTAssertEqual(w.lineWidth,7)
         w.step(1);XCTAssertNil(w.selectedAnnotation);w.stopAndSave()
     }

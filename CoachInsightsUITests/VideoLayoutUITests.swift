@@ -10,7 +10,7 @@ final class VideoLayoutUITests: XCTestCase {
     }
     @MainActor private func create(_ app: XCUIApplication, name: String) {
         app.buttons["scene_personal"].tap(); app.buttons["tool_videoAnalysis"].tap()
-        app.buttons["createSession"].tap()
+        app.buttons["libraryCreateMenu"].tap(); app.buttons["createSession"].tap()
         let field = app.textFields["sessionName"]; XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap(); field.typeText(name); app.buttons["confirmCreate"].tap()
         let row = app.staticTexts[name].firstMatch; XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
@@ -42,6 +42,65 @@ final class VideoLayoutUITests: XCTestCase {
                 : b.frame.minX > a.frame.minX + 20 && abs(a.frame.minY - b.frame.minY) < 3
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 8), .completed)
+    }
+
+    @MainActor func testArrowAndEllipseRenderAfterOverlaysWereHidden() throws {
+        let app = launch()
+        create(app, name: "Visible marks")
+        fixture(app)
+        let canvas = app.otherElements["analysisCanvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 5))
+        app.buttons["videoOptions"].tap()
+        app.buttons["toggleOverlays"].tap()
+        app.buttons["drawingTools"].tap()
+        XCTAssertTrue(app.buttons["tool_arrow"].isSelected)
+        XCTAssertTrue(app.buttons["playPause"].isHittable)
+        let baseline = try yellowPixels(in: canvas, app: app)
+        func drag(from x: CGFloat, _ y: CGFloat, to endX: CGFloat, _ endY: CGFloat) {
+            canvas.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y))
+                .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: endX, dy: endY)))
+        }
+        drag(from: 0.18, 0.42, to: 0.48, 0.58)
+        wait("label CONTAINS '1 个标注'", on: app.staticTexts["annotationCount"])
+        let arrowPixels = try yellowPixels(in: canvas, app: app)
+        XCTAssertGreaterThan(arrowPixels, baseline + 25, "The arrow must be painted on the video")
+        app.buttons["tool_ellipse"].tap()
+        drag(from: 0.55, 0.40, to: 0.84, 0.60)
+        wait("label CONTAINS '2 个标注'", on: app.staticTexts["annotationCount"])
+        XCTAssertGreaterThan(try yellowPixels(in: canvas, app: app), arrowPixels + 25, "The ellipse must also be visible")
+        shot("beta-annotation-workbench")
+        app.buttons["nextFrame"].tap()
+        wait("label CONTAINS '第 2 /'", on: app.staticTexts["frameReadout"])
+        XCTAssertLessThan(try yellowPixels(in: canvas, app: app), arrowPixels, "Frame-scoped shapes must disappear on the next frame")
+        app.buttons["previousFrame"].tap()
+        wait("label CONTAINS '第 1 /'", on: app.staticTexts["frameReadout"])
+        XCTAssertGreaterThan(try yellowPixels(in: canvas, app: app), arrowPixels + 25)
+        fixture(app)
+        app.buttons["closeVideo"].tap()
+        XCTAssertTrue(app.textFields["librarySearch"].isHittable)
+        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "videoCard_"))
+        XCTAssertEqual(cards.count, 2)
+        let left = cards.element(boundBy: 0), right = cards.element(boundBy: 1)
+        XCTAssertTrue(left.isHittable && right.isHittable)
+        XCTAssertLessThanOrEqual(left.frame.maxX, right.frame.minX)
+        shot("beta-video-library")
+    }
+
+    @MainActor private func yellowPixels(in canvas: XCUIElement, app: XCUIApplication) throws -> Int {
+        let image = try XCTUnwrap(UIImage(data: XCUIScreen.main.screenshot().pngRepresentation)?.cgImage)
+        let scale = CGFloat(image.width) / app.frame.width
+        let rect = canvas.frame.insetBy(dx: 10, dy: 10).applying(CGAffineTransform(scaleX: scale, y: scale))
+        let crop = try XCTUnwrap(image.cropping(to: rect.integral))
+        var rgba = [UInt8](repeating: 0, count: crop.width * crop.height * 4)
+        return try rgba.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(data: buffer.baseAddress, width: crop.width, height: crop.height,
+                bitsPerComponent: 8, bytesPerRow: crop.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(crop, in: CGRect(x: 0, y: 0, width: crop.width, height: crop.height))
+            return stride(from: 0, to: buffer.count, by: 4).reduce(into: 0) { count, offset in
+                if buffer[offset] > 205 && buffer[offset + 1] > 160 && buffer[offset + 2] < 120 { count += 1 }
+            }
+        }
     }
 
     @MainActor func testPhoneLandscapeCanvasKeepsFrameAnnotationAndControls() throws {
@@ -85,7 +144,7 @@ final class VideoLayoutUITests: XCTestCase {
         wait("label == '横屏全屏'", on: app.buttons["analysisFullscreen"])
         XCTAssertEqual(app.staticTexts["frameReadout"].label, before)
         app.buttons["closeVideo"].tap()
-        XCTAssertTrue(app.buttons["createSession"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["libraryCreateMenu"].waitForExistence(timeout: 5))
     }
 
     @MainActor func testIPadPortraitComparisonAutomaticRotationAndManualRestore() throws {

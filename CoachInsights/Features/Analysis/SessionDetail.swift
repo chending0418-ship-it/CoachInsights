@@ -141,12 +141,9 @@ struct AnalysisEditor: View {
                         immersiveCanvas(geometry.size)
                     } else {
                         quickActions
-                        HStack(spacing:0) {
-                            canvas.frame(maxWidth:.infinity,maxHeight:.infinity).clipped()
-                            if showTools && geometry.size.width>=700 { ScrollView { drawingControls }.frame(width:244).background(Color(white:0.12)) }
-                        }.frame(maxWidth:.infinity,maxHeight:.infinity)
-                        if showTools && geometry.size.width<700 { ScrollView { drawingControls }.frame(height:155).background(Color(white:0.12)) }
-                        playbackControls(compact:landscape)
+                        canvas.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                        if showTools { drawingControls }
+                        playbackControls(compact: landscape)
                     }
                 } else {
                     Spacer()
@@ -192,35 +189,67 @@ struct AnalysisEditor: View {
         .onAppear { w.resumeDisplay() }
         .onChange(of: w.metadata != nil, initial: true) { _, loaded in mediaReady(loaded) }
         .onChange(of:scenePhase) { _,phase in if phase != .active { w.stopAndSave() } else { w.resumeDisplay() } }
-        .onChange(of:showTools) { _,value in if !value && !immersive { w.tool="view" } }
+
         .onChange(of: immersive) { _, focused in if !focused && w.tool != "view" { showTools = true } }
     }
     private var quickActions:some View {
-        HStack(spacing:0) {
-            Button { Task { await screenshot() } } label: { Label("截图",systemImage:"camera").frame(maxWidth:.infinity,minHeight:44) }.disabled(screenshotBusy || w.metadata == nil || w.seeking || w.scrubbing || w.preparing).accessibilityIdentifier("quickScreenshot")
-            Button { w.pause();showTools.toggle() } label: { Label("绘图",systemImage:"pencil.tip.crop.circle").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("drawingTools")
-            Button { w.pause();showPose=true } label: { Label("人体分析",systemImage:"figure.stand").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("poseTools")
-            Button { w.pause();w.save();showCompare=true } label: { Label("对比",systemImage:"rectangle.split.2x1").frame(maxWidth:.infinity,minHeight:44) }.accessibilityIdentifier("openComparison")
+        HStack(spacing: 0) {
+            Button { Task { await screenshot() } } label: {
+                workspaceAction("截图", symbol: "camera")
+            }.disabled(screenshotBusy || w.seeking || w.scrubbing || w.preparing).accessibilityIdentifier("quickScreenshot")
+            Button {
+                w.pause()
+                showTools.toggle()
+                w.activateDrawingTool(showTools ? "arrow" : "view")
+            } label: {
+                workspaceAction("绘图", symbol: "pencil.tip", selected: showTools)
+            }.accessibilityIdentifier("drawingTools").accessibilityAddTraits(showTools ? .isSelected : [])
+            Button { w.pause(); showPose = true } label: {
+                workspaceAction("人体", symbol: "figure.stand")
+            }.accessibilityLabel("人体分析").accessibilityIdentifier("poseTools")
+            Button { w.pause(); w.save(); showCompare = true } label: {
+                workspaceAction("对比", symbol: "rectangle.split.2x1")
+            }.accessibilityIdentifier("openComparison")
             Menu {
-                Picker("当前素材",selection:Binding(get:{w.selectedVideoID ?? UUID()},set:{id in Task { w.save();await w.select(id) }})) { ForEach(w.assets) { Text($0.originalName).tag($0.id) } }
-                Button("添加素材",systemImage:"plus") { w.pause();showAdd=true }
-                Button("时间轴与片段",systemImage:"timeline.selection") { w.pause();showTimeline=true }.accessibilityIdentifier("openTimeline")
-                Button("保存关键帧",systemImage:"bookmark.badge.plus") { w.pause();showKeyframe=true }.accessibilityIdentifier("addKeyframe")
-                Button("关键帧列表",systemImage:"bookmark") { w.pause();showNodes=true }.accessibilityIdentifier("openKeyframes")
-                Button(w.overlaysVisible ? "隐藏标注与骨架":"显示标注与骨架",systemImage:w.overlaysVisible ? "eye.slash":"eye") { w.overlaysVisible.toggle() }.accessibilityIdentifier("toggleOverlays")
-            } label: { Image(systemName:"slider.horizontal.3").frame(width:44,height:44) }.accessibilityLabel("素材与显示").accessibilityIdentifier("videoOptions")
+                Picker("当前素材", selection: Binding(get: { w.selectedVideoID }, set: { id in
+                    guard let id else { return }
+                    Task { w.save(); await w.select(id) }
+                })) { ForEach(w.assets) { Text($0.originalName).tag(Optional($0.id)) } }
+                Button("添加素材", systemImage: "plus") { w.pause(); showAdd = true }
+                Button("保存关键帧", systemImage: "bookmark.badge.plus") { w.pause(); showKeyframe = true }.accessibilityIdentifier("addKeyframe")
+                Button("关键帧列表", systemImage: "bookmark") { w.pause(); showNodes = true }.accessibilityIdentifier("openKeyframes")
+                Button(w.muted ? "开启声音" : "静音", systemImage: w.muted ? "speaker.wave.2" : "speaker.slash") {
+                    w.muted.toggle()
+                    w.playback?.player.isMuted = w.muted
+                }
+                Button(w.overlaysVisible ? "隐藏标注与骨架" : "显示标注与骨架", systemImage: w.overlaysVisible ? "eye.slash" : "eye") {
+                    w.overlaysVisible.toggle()
+                    if !w.overlaysVisible { showTools = false; w.activateDrawingTool("view") }
+                }.accessibilityIdentifier("toggleOverlays")
+            } label: { workspaceAction("选项", symbol: "slider.horizontal.3") }
+                .accessibilityIdentifier("videoOptions")
             Button(action: toggleFullscreen) {
-                Image(systemName: immersive ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                    .frame(width: 44, height: 44)
+                workspaceAction(immersive ? "退出" : "全屏", symbol: immersive ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
             }.accessibilityLabel(immersive ? "退出全屏，返回竖屏" : "横屏全屏")
                 .accessibilityIdentifier("analysisFullscreen")
-        }.labelStyle(.iconOnly).font(.title3).background(immersive ? Color.black.opacity(0.6) : Color(white:0.08))
+        }.buttonStyle(.plain).padding(.horizontal, 6)
+            .frame(maxWidth: 640).frame(maxWidth: .infinity)
+            .background(immersive ? Color.black.opacity(0.78) : Color(white: 0.08))
+    }
+    private func workspaceAction(_ title: String, symbol: String, selected: Bool = false) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .medium))
+            Text(title).font(.caption2).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .foregroundStyle(selected ? Theme.rose : .white)
+        .background(selected ? Theme.burgundy.opacity(0.55) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
     }
     private var canvas: some View {
         ZStack(alignment:.topLeading) {
             AnalysisCanvas(workspace:w)
             if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
-            if w.tool != "view" { Text(w.rangeMode == "单帧" ? "绘图 · 当前帧":"绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
         }
     }
     private func immersiveCanvas(_ size: CGSize) -> some View {
@@ -231,10 +260,10 @@ struct AnalysisEditor: View {
             }
             .overlay(alignment: .topTrailing) {
                 if showTools {
-                    ScrollView { drawingControls }
-                        .frame(width: min(320, size.width * 0.42), height: min(240, max(120, size.height - 112)))
-                        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
-                        .padding(.top, 54).padding(.trailing, 8)
+                    drawingControls
+                        .frame(width: min(360, size.width * 0.55))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 52).padding(.trailing, 8)
                 }
             }
             .overlay(alignment: .bottom) { immersivePlayback }
@@ -266,29 +295,42 @@ struct AnalysisEditor: View {
                 .accessibilityLabel("播放速度").accessibilityIdentifier("playbackRate")
         }.padding(.horizontal, 8).background(.black.opacity(0.65))
     }
-    private func playbackControls(compact:Bool)->some View {
-        VStack(spacing:compact ? 2:6) {
-            Text("第 \(w.frameIndex+1) / \(w.metadata?.timeline.frames.count ?? 0) 帧 · \(w.time,specifier:"%.3f") s")
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary).accessibilityIdentifier("frameReadout")
-            VideoTimeline(workspace:w,compact:compact)
-            HStack(spacing:12) {
-                Button { w.looping.toggle() } label: { Image(systemName:"repeat").foregroundStyle(w.looping ? Theme.rose:.white).frame(width:44,height:44) }.accessibilityLabel(w.looping ? "关闭循环":"开启循环")
-                FrameStepButton(direction:-1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
-                Spacer(minLength:0)
-                Button { if w.playing || w.preparing { w.pause();w.save() } else { w.play() } } label: { Image(systemName:w.playing || w.preparing ? "pause.fill":"play.fill").font(.title2).frame(width:48,height:44) }.accessibilityLabel(w.playing ? "暂停":"播放").accessibilityIdentifier("playPause")
-                Spacer(minLength:0)
-                FrameStepButton(direction:1) { w.step(1) }.accessibilityIdentifier("nextFrame")
-                Menu { Picker("速度",selection:Binding(get:{w.rate},set:{w.setRate($0)})) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } } } label: { Text("\(w.rate.formatted())×").font(.callout.monospacedDigit()).frame(minWidth:44,minHeight:44) }.accessibilityLabel("播放速度").accessibilityIdentifier("playbackRate")
+    private func playbackControls(compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("第 \(w.frameIndex + 1) / \(w.metadata?.timeline.frames.count ?? 0) 帧 · \(w.time, specifier: "%.3f") s")
+                    .font(.caption.monospacedDigit()).accessibilityIdentifier("frameReadout")
+                Spacer(minLength: 0)
+                Text("\(w.snapshot.annotations.count) 个标注 · \(w.snapshot.keyframes.count) 个关键帧")
+                    .font(.caption2).accessibilityIdentifier("annotationCount")
+            }.lineLimit(1).minimumScaleFactor(0.8).foregroundStyle(.secondary)
+            VideoTimeline(workspace: w, compact: true)
+            HStack(spacing: 0) {
+                Button { w.pause(); showTimeline = true } label: {
+                    workspaceAction("片段", symbol: "timeline.selection").frame(width: 48)
+                }.accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
+                Spacer(minLength: 0)
+                FrameStepButton(direction: -1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
+                Button {
+                    if w.playing || w.preparing { w.pause(); w.save() } else { w.play() }
+                } label: {
+                    Image(systemName: w.playing || w.preparing ? "pause.fill" : "play.fill")
+                        .font(.title2).frame(width: 60, height: 44)
+                }.accessibilityLabel(w.playing ? "暂停" : "播放").accessibilityIdentifier("playPause")
+                FrameStepButton(direction: 1) { w.step(1) }.accessibilityIdentifier("nextFrame")
+                Spacer(minLength: 0)
+                Menu {
+                    Picker("速度", selection: Binding(get: { w.rate }, set: { w.setRate($0) })) {
+                        ForEach([1.0, 0.5, 0.25, 0.1, 0.05], id: \.self) { Text("\($0.formatted())×").tag($0) }
+                    }
+                    Button(w.looping ? "关闭循环" : "开启循环", systemImage: "repeat") { w.looping.toggle() }
+                } label: {
+                    Text("\(w.rate.formatted())×").font(.callout.monospacedDigit()).frame(minWidth: 44, minHeight: 44)
+                }.accessibilityLabel("播放速度").accessibilityIdentifier("playbackRate")
             }
-            if !compact {
-                HStack {
-                    Button { w.muted.toggle();w.playback?.player.isMuted=w.muted } label: { Image(systemName:w.muted ? "speaker.slash":"speaker.wave.2").frame(width:44,height:44) }.accessibilityLabel("切换静音")
-                    Text("\(w.snapshot.annotations.count) 个标注 · \(w.snapshot.keyframes.count) 个关键帧").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("annotationCount")
-                    Spacer(minLength:0)
-                    Button("关键帧",systemImage:"bookmark") { w.pause();showKeyframe=true }.font(.caption).frame(minHeight:44).accessibilityIdentifier("addKeyframe")
-                }
-            }
-        }.padding(.horizontal,12).padding(.top,6).background(Color(white:0.08))
+        }.padding(.horizontal, 12).padding(.top, compact ? 4 : 8)
+            .frame(maxWidth: 720).frame(maxWidth: .infinity)
+            .background(Color(white: 0.08))
     }
     private var importControls:some View {
         Group {
@@ -309,45 +351,82 @@ struct AnalysisEditor: View {
             screenshotURL=try await ExportService().screenshot(source:source,time:w.time,size:recipe.size,directory:w.repository.files.root.appendingPathComponent("Cache/Exports"))
         } catch { w.issue=error.localizedDescription }
     }
-    private var drawingControls:some View {
-        VStack(alignment:.leading,spacing:2) {
-            ScrollView(.horizontal,showsIndicators:false) {
-                HStack(spacing:4) {
-                    ForEach([("view","hand.draw","画面"),("select","cursorarrow","选择"),("line","line.diagonal","直线"),("arrow","arrow.up.right","箭头"),("ellipse","circle","圆框"),("freehand","pencil.tip","手绘"),("text","textformat","文字"),("angle","angle","角度")],id:\.0) { tool in
-                        Button { w.pause();w.tool=tool.0 } label: {
-                            Label(tool.2,systemImage:tool.1).font(.caption).padding(.horizontal,10).frame(minHeight:44)
-                                .background(w.tool==tool.0 ? Theme.burgundy:Color(white:0.2),in:RoundedRectangle(cornerRadius:8))
-                        }.accessibilityIdentifier("tool_"+tool.0)
-                    }
+    private let drawingTools = [
+        (id: "view", symbol: "hand.draw", title: "画面"),
+        (id: "select", symbol: "cursorarrow", title: "选择"),
+        (id: "line", symbol: "line.diagonal", title: "直线"),
+        (id: "arrow", symbol: "arrow.up.right", title: "箭头"),
+        (id: "ellipse", symbol: "circle", title: "圆框"),
+        (id: "freehand", symbol: "pencil.tip", title: "手绘")
+    ]
+    private var drawingTitle: String {
+        drawingTools.first { $0.id == w.tool }?.title ?? (w.tool == "text" ? "文字" : "角度")
+    }
+    private var drawingControls: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                ForEach(drawingTools, id: \.id) { tool in
+                    Button { w.activateDrawingTool(tool.id) } label: {
+                        Image(systemName: tool.symbol)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(w.tool == tool.id ? Theme.burgundy : .clear, in: RoundedRectangle(cornerRadius: 8))
+                            .contentShape(Rectangle())
+                    }.accessibilityLabel(tool.title).accessibilityIdentifier("tool_" + tool.id)
+                        .accessibilityAddTraits(w.tool == tool.id ? .isSelected : [])
                 }
+                Menu {
+                    Button("文字", systemImage: "textformat") { w.activateDrawingTool("text") }.accessibilityIdentifier("tool_text")
+                    Button("角度", systemImage: "angle") { w.activateDrawingTool("angle") }.accessibilityIdentifier("tool_angle")
+                } label: {
+                    Image(systemName: "ellipsis").frame(maxWidth: .infinity, minHeight: 44)
+                        .background(["text", "angle"].contains(w.tool) ? Theme.burgundy : .clear, in: RoundedRectangle(cornerRadius: 8))
+                }.accessibilityLabel("更多绘图工具")
             }
-            if w.tool == "view" {
-                HStack { Text("双指缩放 · 单指移动 · 双击复位").font(.caption).foregroundStyle(.secondary)
-                    Spacer(minLength:0);Button("复位") { w.updateView(ViewSettings()) }.font(.caption).frame(minHeight:44)
-                }
-            } else {
-                HStack(spacing:0) {
-                    ForEach(["#722F37","#FFFFFF","#F9C74F","#33C3EE"],id:\.self) { color in
-                        Button { w.color=color;w.styleSelection() } label: {
-                            Circle().fill(Color(uiColor:UIColor(hex:color))).frame(width:22,height:22).overlay(Circle().stroke(w.color==color ? Color.white:Color.gray,lineWidth:w.color==color ? 3:1)).frame(width:44,height:44)
-                        }.accessibilityLabel("颜色 "+color)
-                    }
-                    Spacer(minLength:0)
+            HStack(spacing: 0) {
+                if w.tool == "view" {
+                    Text("双指缩放 · 单指移动").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("复位") { w.updateView(ViewSettings()) }.font(.caption).frame(minHeight: 44)
+                } else {
                     Menu {
-                        Picker("线宽",selection:$workspace.lineWidth) { ForEach([2.0,4.0,7.0],id:\.self) { Text("\(Int($0)) pt").tag($0) } }
-                        Picker("显示范围",selection:$workspace.rangeMode) { Text("当前帧").tag("单帧");Text("整个片段").tag("片段") }
-                    } label: { Text(w.rangeMode=="单帧" ? "当前帧":"整个片段").font(.caption).frame(minWidth:44,minHeight:44) }.accessibilityLabel("标注样式与显示范围")
-                }.onChange(of:w.lineWidth) { _,_ in w.styleSelection() }
-                HStack {
-                    Button("撤销",systemImage:"arrow.uturn.backward") { w.undo() }.disabled(w.undoStack.isEmpty).accessibilityIdentifier("undoAnnotation")
-                    Button("重做",systemImage:"arrow.uturn.forward") { w.redo() }.disabled(w.redoStack.isEmpty)
-                    Spacer(minLength:0)
-                    Button("删除",systemImage:"trash",role:.destructive) { w.deleteSelection() }.disabled(w.selectedAnnotation==nil).accessibilityIdentifier("deleteAnnotation")
-                }.font(.caption).frame(minHeight:44)
-                if w.tool=="text" { TextField("标注文字",text:$workspace.textValue).textFieldStyle(.roundedBorder).onSubmit { w.styleSelection() } }
-                if w.tool=="angle" { Text("依次选三个点，第二点为角度顶点。").font(.caption).foregroundStyle(.secondary) }
+                        ForEach([("金黄", "#F9C74F"), ("白色", "#FFFFFF"), ("天蓝", "#33C3EE"), ("酒红", "#722F37")], id: \.1) { color in
+                            Button(color.0, systemImage: w.color == color.1 ? "checkmark.circle" : "circle") {
+                                w.color = color.1; w.styleSelection()
+                            }
+                        }
+                        Picker("线宽", selection: $workspace.lineWidth) {
+                            ForEach([2.0, 4.0, 7.0], id: \.self) { Text("\(Int($0)) pt").tag($0) }
+                        }
+                        Picker("显示范围", selection: $workspace.rangeMode) {
+                            Text("当前帧").tag("单帧"); Text("整个片段").tag("片段")
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(Color(uiColor: UIColor(hex: w.color))).frame(width: 12, height: 12)
+                            Text(drawingTitle + " · " + (w.rangeMode == "单帧" ? "当前帧" : "整个片段"))
+                                .font(.caption).lineLimit(1).minimumScaleFactor(0.8)
+                            Image(systemName: "chevron.down").font(.caption2)
+                        }.frame(minHeight: 44)
+                    }.accessibilityLabel("标注样式与显示范围").accessibilityIdentifier("drawingStyle")
+                        .onChange(of: w.lineWidth) { _, _ in w.styleSelection() }
+                    Spacer(minLength: 4)
+                    Button { w.undo() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 44, height: 44) }
+                        .disabled(w.undoStack.isEmpty).accessibilityLabel("撤销").accessibilityIdentifier("undoAnnotation")
+                    Button { w.redo() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 44, height: 44) }
+                        .disabled(w.redoStack.isEmpty).accessibilityLabel("重做")
+                    Button(role: .destructive) { w.deleteSelection() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                        .disabled(w.selectedAnnotation == nil).accessibilityLabel("删除标注").accessibilityIdentifier("deleteAnnotation")
+                }
+            }.padding(.horizontal, 6)
+            if w.tool == "text" {
+                TextField("标注文字", text: $workspace.textValue).textFieldStyle(.roundedBorder)
+                    .onSubmit { w.styleSelection() }.padding(.bottom, 6)
+            } else if w.tool == "angle" {
+                Text("依次点三个位置，第二点为顶点。").font(.caption).foregroundStyle(.secondary).padding(.bottom, 6)
             }
-        }.padding(.horizontal,8).padding(.vertical,4).foregroundStyle(.white)
+        }.buttonStyle(.plain).padding(.horizontal, 8).padding(.top, 4).foregroundStyle(.white)
+            .frame(maxWidth: 560).frame(maxWidth: .infinity)
+            .background(Color(white: 0.12))
     }
     private var keyframes: some View {
         VStack(alignment: .leading) {
