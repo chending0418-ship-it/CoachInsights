@@ -89,8 +89,12 @@ struct VideoLibraryView: View {
                     Text("先选第一段视频，再添加第二段。").font(.footnote).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 8) {
-                    Button("相册", systemImage: "photo.on.rectangle") { photoImport = true }
-                        .buttonStyle(.borderedProminent).accessibilityIdentifier("rootPhotos")
+                    Button { photoImport = true } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo").symbolRenderingMode(.monochrome).accessibilityHidden(true)
+                            Text("相册")
+                        }.foregroundStyle(.white)
+                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("rootPhotos")
                     Button("文件", systemImage: "folder") { fileImport = true }
                         .buttonStyle(.bordered).accessibilityIdentifier("rootFiles")
                     Spacer(minLength: 0)
