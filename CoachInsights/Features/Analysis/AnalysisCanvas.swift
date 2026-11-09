@@ -74,7 +74,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         readyObserver=playerLayer.observe(\.isReadyForDisplay,options:[.new]) { [weak self] _,_ in
             DispatchQueue.main.async { self?.setNeedsLayout();self?.setNeedsDisplay() }
         }
-        let touch = CanvasTouchRecognizer(target: nil, action: nil)
+        let touch = CanvasTouchRecognizer(target: self, action: #selector(handleCanvasTouch(_:)))
         touch.cancelsTouchesInView = false; touch.delaysTouchesBegan = false; touch.delaysTouchesEnded = false; touch.delegate = self
         addGestureRecognizer(touch)
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:)))
@@ -127,7 +127,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     private let overlay = CanvasOverlay()
     @objc private func resetView() { guard tool == "view" else { return };settings=ViewSettings();onView?(settings);setNeedsLayout();setNeedsDisplay() }
     override func gestureRecognizerShouldBegin(_ recognizer:UIGestureRecognizer)->Bool {
-        if recognizer is UITapGestureRecognizer { return tool == "view" }
+        if recognizer is UITapGestureRecognizer || recognizer is UIPinchGestureRecognizer { return tool == "view" }
         return true
     }
     @objc private func pinch(_ gesture: UIPinchGestureRecognizer) {
@@ -137,9 +137,18 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         settings = value; setNeedsDisplay(); setNeedsLayout()
         if gesture.state == .ended { onView?(value) }
     }
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, geometry.isValid else { return }
-        let location = touch.location(in: self)
+    @objc private func handleCanvasTouch(_ gesture: CanvasTouchRecognizer) {
+        switch gesture.state {
+        case .began: beginTouch(at: gesture.point)
+        case .changed: moveTouch(to: gesture.point)
+        case .ended: endTouch(at: gesture.point)
+        case .cancelled, .failed: cancelTouch()
+        default: break
+        }
+    }
+
+    private func beginTouch(at location: CGPoint) {
+        guard geometry.isValid else { return }
         start = location; originalSettings = settings
         if tool == "select" {
             if let selected = annotations.first(where: { $0.id == selectedID }),
@@ -162,10 +171,9 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         }
         updateOverlay()
     }
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let location = touches.first?.location(in: self), let start else { return }
+    private func moveTouch(to location: CGPoint) {
+        guard let start else { return }
         if tool == "view", let originalSettings {
-            guard (event?.allTouches?.count ?? 1)<2 else { return }
             settings.pan.x = originalSettings.pan.x + (location.x-start.x)/bounds.width
             settings.pan.y = originalSettings.pan.y + (location.y-start.y)/bounds.height
             setNeedsLayout()
@@ -182,21 +190,21 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         if tool == "view" { setNeedsDisplay() }
         updateOverlay()
     }
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    private func endTouch(at location: CGPoint) {
         guard start != nil else { return }
         if tool == "view" { onView?(settings) }
         else if tool == "select", let edit { onEdit?(edit) }
         else if tool == "angle" {
             if draft.count == 3 { onAdd?(draft); draft.removeAll() }
         } else {
-            if let location = touches.first?.location(in: self) { extendStroke(to: location) }
+            extendStroke(to: location)
             if (tool == "text" && draft.count == 1) || draft.count >= 2 { onAdd?(draft) }
             draft.removeAll()
         }
         start = nil; original = nil; edit = nil; handleIndex = nil
         updateOverlay()
     }
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    private func cancelTouch() {
         clearGesture()
         updateOverlay()
     }
@@ -247,10 +255,39 @@ private final class CanvasOverlay: UIView {
     }
 }
 
-// Claim canvas touches immediately so the surrounding page cannot steal a drawing stroke.
-private final class CanvasTouchRecognizer:UIGestureRecognizer {
-    override func touchesBegan(_ touches:Set<UITouch>,with event:UIEvent) { state = .began }
-    override func touchesMoved(_ touches:Set<UITouch>,with event:UIEvent) { state = .changed }
-    override func touchesEnded(_ touches:Set<UITouch>,with event:UIEvent) { state = .ended }
-    override func touchesCancelled(_ touches:Set<UITouch>,with event:UIEvent) { state = .cancelled }
+// Recognize the initial contact so a surrounding scroll gesture cannot take the stroke.
+private final class CanvasTouchRecognizer: UIGestureRecognizer {
+    private var trackedTouch: UITouch?
+    private(set) var point = CGPoint.zero
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard trackedTouch == nil, touches.count == 1, let touch = touches.first else {
+            state = trackedTouch == nil ? .failed : .cancelled
+            return
+        }
+        trackedTouch = touch
+        point = touch.location(in: view)
+        state = .began
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let trackedTouch, touches.contains(trackedTouch) else { return }
+        point = trackedTouch.location(in: view)
+        state = .changed
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let trackedTouch, touches.contains(trackedTouch) else { return }
+        point = trackedTouch.location(in: view)
+        state = .ended
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        state = .cancelled
+    }
+
+    override func reset() {
+        trackedTouch = nil
+        super.reset()
+    }
 }

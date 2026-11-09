@@ -279,7 +279,7 @@ struct AnalysisEditor: View {
                 .accessibilityLabel(w.playing ? "暂停" : "播放").accessibilityIdentifier("playPause")
             FrameStepButton(direction:1) { w.step(1) }.accessibilityIdentifier("nextFrame")
             if let metadata = w.metadata {
-                Slider(value: Binding(get: { w.time }, set: { w.scrub(to: $0) }), in: 0...max(0.001, metadata.timeline.duration.seconds), onEditingChanged: { editing in
+                Slider(value: Binding(get: { w.time }, set: { w.moveSlider(to: $0) }), in: 0...max(0.001, metadata.timeline.duration.seconds), onEditingChanged: { editing in
                     if editing { w.beginScrubbing() } else { w.endScrubbing() }
                 }).accessibilityIdentifier("frameSlider")
             }

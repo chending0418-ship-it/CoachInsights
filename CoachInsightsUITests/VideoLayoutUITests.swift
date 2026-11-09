@@ -103,6 +103,21 @@ final class VideoLayoutUITests: XCTestCase {
         }
     }
 
+    @MainActor func testDrawingAfterSliderRestoresHiddenOverlays() {
+        let app = launch(); create(app, name: "Drawing after seek"); fixture(app)
+        app.buttons["videoOptions"].tap()
+        app.buttons["toggleOverlays"].tap()
+        app.sliders["frameSlider"].adjust(toNormalizedSliderPosition: 0.55)
+        app.buttons["drawingTools"].tap(); app.buttons["tool_line"].tap()
+        let canvas = app.otherElements["analysisCanvas"]
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.65)))
+        wait("label CONTAINS '1 个标注'", on: app.staticTexts["annotationCount"])
+        shot("video-drawing-after-slider")
+        app.buttons["videoOptions"].tap()
+        XCTAssertTrue(app.buttons["隐藏标注与骨架"].exists)
+    }
+
     @MainActor func testPhoneLandscapeCanvasKeepsFrameAnnotationAndControls() throws {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom == .pad, "Phone landscape focus")
         let app = launch(); create(app, name: "Landscape review"); fixture(app)

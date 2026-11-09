@@ -7,14 +7,14 @@ import SwiftUI
     @StateObject private var fieldTools = FieldToolsStore()
     var body: some Scene {
         WindowGroup {
-            Group {
+            AppLaunchScreen {
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--layout-probe") { LayoutProbeView() }
                 else { RootView() }
                 #else
                 RootView()
                 #endif
-            }.environmentObject(library).environmentObject(quickTools).environmentObject(fieldTools).tint(Theme.burgundy).preferredColorScheme(.light)
+            }.environmentObject(library).environmentObject(quickTools).environmentObject(fieldTools).tint(Theme.burgundy)
         }
     }
 }

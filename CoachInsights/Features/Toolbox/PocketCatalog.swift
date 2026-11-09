@@ -95,7 +95,7 @@ enum PocketTool: String, CaseIterable, Identifiable {
         case .planTimer: return "跟随训练项目分段计时"
         case .battingLog: return "滚地、高飞等简单计数"
         case .bullpenLog: return "牛棚好坏球、出局与总球数"
-        case .gameCounter: return "当前好坏球与出局数"
+        case .gameCounter: return "主客队比分、好坏球与出局数"
         case .stopwatch: return "开始、暂停、分段计时"
         case .countdown: return "设定时长，即刻开始"
         case .tacticsBoard: return "棒球场底图，随手画"

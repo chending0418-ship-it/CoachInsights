@@ -38,12 +38,26 @@ struct PitchMark: Codable, Equatable {
     init(zone: PitchZone) { self.zone = zone; isStrike = zone.isStrikeZone }
 }
 
-enum GameAction: String, Codable { case strike, ball, out, clearBatter }
+enum GameAction: String, Codable {
+    case strike, ball, out, clearBatter, awayRun, homeRun
+
+    var title: String {
+        switch self {
+        case .strike: return "好球 +1"
+        case .ball: return "坏球 +1"
+        case .out: return "出局 +1"
+        case .clearBatter: return "下一位打者"
+        case .awayRun: return "客队得分 +1"
+        case .homeRun: return "主队得分 +1"
+        }
+    }
+}
 enum FieldEvent: Codable, Equatable {
     case batting(BattingContact)
     case pitch(PitchMark)
     case bullpenOut
     case game(GameAction)
+    case gameCorrection(GameCountCorrection)
 }
 
 enum FieldUndo: Codable, Equatable {
@@ -52,11 +66,25 @@ enum FieldUndo: Codable, Equatable {
     case replace(Int, FieldEvent)
 }
 
+struct GameCountCorrection: Codable, Equatable {
+    let awayRuns: Int
+    let homeRuns: Int
+    let strikes: Int
+    let balls: Int
+    let outs: Int
+
+    var isValid: Bool {
+        awayRuns >= 0 && homeRuns >= 0
+            && (0...2).contains(strikes) && (0...3).contains(balls) && (0...2).contains(outs)
+    }
+}
+
 struct GameCount: Equatable {
     var strikes = 0, balls = 0, outs = 0, sides = 0
+    var awayRuns = 0, homeRuns = 0
     var notice: String?
     mutating func apply(_ action: GameAction) {
-        notice = nil
+        if action != .awayRun && action != .homeRun { notice = nil }
         switch action {
         case .strike:
             strikes += 1
@@ -67,8 +95,24 @@ struct GameCount: Equatable {
         case .out:
             balls = 0; strikes = 0; addOut(); notice = outs == 0 ? "三出局，换边" : "出局，下一位打者"
         case .clearBatter: balls = 0; strikes = 0; notice = "下一位打者"
+        case .awayRun: if awayRuns < Int.max { awayRuns += 1 }
+        case .homeRun: if homeRuns < Int.max { homeRuns += 1 }
         }
     }
+    var correction: GameCountCorrection {
+        .init(awayRuns: awayRuns, homeRuns: homeRuns, strikes: strikes, balls: balls, outs: outs)
+    }
+
+    mutating func apply(_ correction: GameCountCorrection) {
+        guard correction.isValid else { return }
+        awayRuns = correction.awayRuns
+        homeRuns = correction.homeRuns
+        strikes = correction.strikes
+        balls = correction.balls
+        outs = correction.outs
+        notice = nil
+    }
+
     private mutating func addOut() {
         outs += 1
         if outs == 3 { outs = 0; balls = 0; strikes = 0; sides += 1 }
@@ -93,7 +137,13 @@ struct FieldLog: Codable, Identifiable, Equatable {
     func count(_ contact: BattingContact) -> Int { events.filter { $0 == .batting(contact) }.count }
     var gameCount: GameCount {
         var result = GameCount()
-        for event in events { if case .game(let action) = event { result.apply(action) } }
+        for event in events {
+            switch event {
+            case .game(let action): result.apply(action)
+            case .gameCorrection(let correction): result.apply(correction)
+            default: break
+            }
+        }
         return result
     }
     var summary: String {
@@ -102,13 +152,15 @@ struct FieldLog: Codable, Identifiable, Equatable {
         case .bullpen: return "总球数 \(pitches.count) · 好球 \(strikeCount) · 坏球 \(pitches.count - strikeCount) · 出局 \(outCount)"
         case .game:
             let count = gameCount
-            return "好球 \(count.strikes) · 坏球 \(count.balls) · 出局 \(count.outs) · 已换边 \(count.sides) 次"
+            return "客 \(count.awayRuns) 比 \(count.homeRuns) 主 · 好球 \(count.strikes) · 坏球 \(count.balls) · 出局 \(count.outs) · 已换边 \(count.sides) 次"
         }
     }
     mutating func append(_ event: FieldEvent) {
         guard !ended, events.count < Self.eventLimit else { return }
         switch (kind, event) {
         case (.batting, .batting), (.bullpen, .pitch), (.bullpen, .bullpenOut), (.game, .game):
+            checkpoint(.removeLast); events.append(event)
+        case (.game, .gameCorrection(let correction)) where correction.isValid && correction != gameCount.correction:
             checkpoint(.removeLast); events.append(event)
         default: break
         }

@@ -19,7 +19,7 @@ struct VideoTimeline:View {
             if let metadata=w.metadata {
                 let duration=max(0.001,metadata.timeline.duration.seconds)
                 ZStack(alignment:.topLeading) {
-                    Slider(value:Binding(get:{w.time},set:{w.scrub(to:$0)}),in:0...duration,onEditingChanged:{editing in if editing { w.beginScrubbing() } else { w.endScrubbing() } }).accessibilityIdentifier("frameSlider").tint(Theme.rose)
+                    Slider(value:Binding(get:{w.time},set:{w.moveSlider(to:$0)}),in:0...duration,onEditingChanged:{editing in if editing { w.beginScrubbing() } else { w.endScrubbing() } }).accessibilityIdentifier("frameSlider").tint(Theme.rose)
                     GeometryReader { g in
                         ForEach(w.snapshot.keyframes.filter{$0.videoID==w.selectedVideoID}) { keyframe in
                             Circle().fill(.yellow).frame(width:5,height:5).position(x:g.size.width*keyframe.time.seconds/duration,y:3)

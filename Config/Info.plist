@@ -11,7 +11,7 @@
 <key>LSRequiresIPhoneOS</key><true/>
 <key>ITSAppUsesNonExemptEncryption</key><false/>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
-<key>UILaunchScreen</key><dict/>
+<key>UILaunchStoryboardName</key><string>LaunchScreen</string>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>NSCameraUsageDescription</key><string>拍摄用于本机动作分析的视频，或使用相机进行 AR 测距。</string>

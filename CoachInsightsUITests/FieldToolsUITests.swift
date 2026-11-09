@@ -17,6 +17,18 @@ final class FieldToolsUITests: XCTestCase {
         for _ in 0..<8 { if element.isHittable { break }; app.swipeDown() }
         XCTAssertTrue(element.isHittable, id); element.tap()
     }
+    @MainActor private func tapFirstPitch(_ app: XCUIApplication) {
+        let pitch = app.buttons["pitchEvent_0"]
+        let footer = app.buttons["fieldOptions"]
+        // XCUI can mark an offscreen row hittable when it lies under the fixed footer.
+        for _ in 0..<4 {
+            if pitch.isHittable && pitch.frame.midY < footer.frame.minY - 8 { break }
+            app.swipeUp()
+        }
+        XCTAssertLessThan(pitch.frame.midY, footer.frame.minY)
+        pitch.tap()
+    }
+
     @MainActor private func mapTap(_ app: XCUIApplication, x: CGFloat, y: CGFloat, correcting: Bool = false) {
         let scope = correcting ? app.scrollViews["pitchCorrectionSheet"] : app
         let map = scope.descendants(matching: .any).matching(identifier: "pitchMap").firstMatch
@@ -63,11 +75,16 @@ final class FieldToolsUITests: XCTestCase {
 
     @MainActor func testBullpenGridCorrectionUndoReopenAndHistory() {
         var app = launch(); open(app, scene: "quick", tool: "bullpenLog"); name(app, "Bullpen round")
+        XCTAssertTrue(app.buttons["bullpenOut"].isHittable)
+        XCTAssertTrue(app.staticTexts["fieldProcess"].isHittable)
         mapTap(app, x: 0.5, y: 0.49); mapTap(app, x: 0.5, y: 0.12)
         mapTap(app, x: 0.38, y: 0.32); mapTap(app, x: 0.65, y: 0.67); mapTap(app, x: 0.84, y: 0.42)
         tap(app, "bullpenOut")
         XCTAssertTrue(label(app, "bullpenTotal").contains("5"))
-        tap(app, "pitchEvent_0")
+        XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
+        shot("pitch-compact-collapsed")
+        app.staticTexts["fieldProcess"].tap()
+        tapFirstPitch(app)
         let correction = app.scrollViews["pitchCorrectionSheet"]
         XCTAssertTrue(correction.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: app.buttons["pitchCorrectionSave"])], timeout: 5), .completed)
@@ -86,12 +103,33 @@ final class FieldToolsUITests: XCTestCase {
         app.terminate(); app = launch(reset: false); open(app, scene: "quick", tool: "bullpenLog")
         XCTAssertTrue(label(app, "bullpenTotal").contains("5"))
         toRecords(app); app.staticTexts["Bullpen round"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["pitchEvent_0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["fieldProcess"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
+        app.staticTexts["fieldProcess"].tap()
+        tapFirstPitch(app)
     }
 
     @MainActor func testGameBoundariesUndoAndSavedHistory() {
         var app = launch(); open(app, scene: "team", tool: "gameCounter"); name(app, "Game round")
-        for id in ["game_strike", "game_ball", "game_out", "gameNextBatter", "fieldSave", "fieldOptions"] { XCTAssertTrue(app.buttons[id].isHittable, id) }
+        for id in ["game_awayRun", "game_homeRun", "game_ball", "game_strike", "game_out", "gameNextBatter", "fieldOptions"] {
+            XCTAssertTrue(app.buttons[id].isHittable, id)
+        }
+        XCTAssertTrue(app.staticTexts["fieldProcess"].isHittable)
+        tap(app, "game_awayRun"); tap(app, "game_homeRun"); tap(app, "game_homeRun")
+        tap(app, "fieldUndo")
+        XCTAssertEqual(app.buttons["game_awayRun"].value as? String, "1")
+        XCTAssertEqual(app.buttons["game_homeRun"].value as? String, "1")
+        XCTAssertTrue(app.buttons["gameEditCount"].isHittable)
+        app.buttons["gameEditCount"].tap()
+        let homeScore = app.textFields["editHomeScore"]
+        XCTAssertTrue(homeScore.waitForExistence(timeout: 5))
+        homeScore.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).tap()
+        homeScore.typeText(XCUIKeyboardKey.delete.rawValue + "4")
+        XCTAssertEqual(homeScore.value as? String, "4")
+        app.buttons["saveGameCount"].tap()
+        XCTAssertEqual(app.buttons["game_homeRun"].value as? String, "4")
+        tap(app, "fieldUndo")
+        XCTAssertEqual(app.buttons["game_homeRun"].value as? String, "1")
         for _ in 0..<4 { tap(app, "game_ball") }
         XCTAssertTrue(app.staticTexts["gameBoundary"].label.contains("四坏"))
         for _ in 0..<3 { tap(app, "game_strike") }
@@ -106,6 +144,8 @@ final class FieldToolsUITests: XCTestCase {
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Game round")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); XCTAssertEqual(app.buttons["game_out"].value as? String, "2")
+        XCTAssertEqual(app.buttons["game_awayRun"].value as? String, "1")
+        XCTAssertEqual(app.buttons["game_homeRun"].value as? String, "1")
     }
 
     @MainActor func testShareCardLongContentPhotoAndCancel() {

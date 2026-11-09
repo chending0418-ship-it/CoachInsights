@@ -45,6 +45,30 @@ import Vision
         XCTAssertEqual(round.gameCount.outs, 2); XCTAssertEqual(round.gameCount.balls, 0)
     }
 
+    func testGameCorrectionPersistsAndUndoesWithoutChangingSides() throws {
+        var round = FieldLog(kind: .game)
+        for _ in 0..<3 { round.append(.game(.out)) }
+        round.append(.game(.awayRun))
+        let original = round.gameCount.correction
+        let corrected = GameCountCorrection(awayRuns: 0, homeRuns: 4, strikes: 2, balls: 3, outs: 1)
+        round.append(.gameCorrection(corrected))
+        round.append(.gameCorrection(corrected))
+        let invalid = GameCountCorrection(awayRuns: -1, homeRuns: 0, strikes: 3, balls: 4, outs: 3)
+        round.append(.gameCorrection(invalid))
+
+        let encoded = try JSONEncoder().encode(round)
+        var reopened = try JSONDecoder().decode(FieldLog.self, from: encoded)
+        XCTAssertEqual(reopened.gameCount.correction, corrected)
+        XCTAssertEqual(reopened.gameCount.sides, 1)
+        reopened.append(.game(.strike))
+        XCTAssertEqual(reopened.gameCount.outs, 2)
+        reopened.undo()
+        XCTAssertEqual(reopened.gameCount.correction, corrected)
+        reopened.undo()
+        XCTAssertEqual(reopened.gameCount.correction, original)
+        XCTAssertEqual(reopened.gameCount.sides, 1)
+    }
+
     func testPitchMapCoordinatesAndLegacyMarksRemainConsistent() throws {
         for zone in PitchZone.allCases { XCTAssertEqual(PitchZone.at(zone.point), zone) }
         let point = FieldPoint(x: 0.53, y: 0.51)
