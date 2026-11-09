@@ -60,19 +60,38 @@ struct VideoCover:View {
     let repository:LibraryRepository
     @State private var image:UIImage?
     var body:some View {
-        ZStack(alignment:.bottomTrailing) {
-            Color(white:0.15)
-            if let image { Image(uiImage:image).resizable().scaledToFill() }
-            else { Image(systemName:"video").foregroundStyle(.white.opacity(0.6)).frame(maxWidth:.infinity,maxHeight:.infinity) }
-            if let info=try? asset.metadata() { Text("\(Int(info.timeline.duration.seconds)/60):\(String(format:"%02d",Int(info.timeline.duration.seconds)%60))").font(.caption2.monospacedDigit()).padding(4).background(.black.opacity(0.65),in:RoundedRectangle(cornerRadius:4)).foregroundStyle(.white).padding(4) }
-        }.clipped().task(id:asset.id) {
-            do {
-                let metadata=try asset.metadata(),url=try await repository.files.existingURL(asset.relativePath)
-                let local=try await LocalMedia.asset(url:url,metadata:metadata)
-                let store=repository.thumbnails
-                let value=try await store.image(contentHash:asset.contentHash,frame:0,provider:FrameProvider(asset:local,metadata:metadata,maximumDimension:240,costLimit:1024*1024))
-                guard !Task.isCancelled else { return };image=value
-            } catch { image=nil }
-        }
+        Color(white: 0.15)
+            .overlay {
+                if let image {
+                    GeometryReader { geometry in
+                        Image(uiImage: image).resizable().scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                    }
+                    .accessibilityHidden(true)
+                } else {
+                    Image(systemName: "video").foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .clipped()
+            .overlay(alignment: .bottomTrailing) {
+                if let info = try? asset.metadata() {
+                    let seconds = Int(info.timeline.duration.seconds)
+                    Text("\(seconds / 60):\(String(format: "%02d", seconds % 60))")
+                        .font(.caption2.monospacedDigit()).foregroundStyle(.white)
+                        .padding(4).background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 4))
+                        .padding(4)
+                }
+            }
+            .contentShape(Rectangle())
+            .task(id: asset.id) {
+                do {
+                    let metadata=try asset.metadata(),url=try await repository.files.existingURL(asset.relativePath)
+                    let local=try await LocalMedia.asset(url:url,metadata:metadata)
+                    let store=repository.thumbnails
+                    let value=try await store.image(contentHash:asset.contentHash,frame:0,provider:FrameProvider(asset:local,metadata:metadata,maximumDimension:240,costLimit:1024*1024))
+                    guard !Task.isCancelled else { return };image=value
+                } catch { image=nil }
+            }
     }
 }

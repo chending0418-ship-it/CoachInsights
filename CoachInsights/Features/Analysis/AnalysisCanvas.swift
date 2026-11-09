@@ -35,7 +35,7 @@ struct AnalysisCanvas: UIViewRepresentable {
 }
 
 final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
-    var frameKey="" { didSet { if frameKey != oldValue { draft=[];start=nil;original=nil;edit=nil } } }
+    var frameKey="" { didSet { if frameKey != oldValue { clearGesture() } } }
     var image: CGImage?
     let playerLayer = AVPlayerLayer()
     var live = false
@@ -44,7 +44,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     var annotations: [Annotation] = []
     var pose: PoseFrame?
     var confidence: Float = 0.3
-    var tool = "view" { didSet { if oldValue != tool { draft.removeAll(); setNeedsDisplay() } } }
+    var tool = "view" { didSet { if oldValue != tool { clearGesture(); updateOverlay() } } }
     var selectedID: UUID?
     var strokeColor = "#722F37"
     var strokeWidth: Double = 3
@@ -69,6 +69,8 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         super.init(frame: frame)
         isOpaque = true; contentMode = .redraw; backgroundColor = .black; clipsToBounds = true; isMultipleTouchEnabled = true
         layer.addSublayer(playerLayer)
+        overlay.isUserInteractionEnabled = false
+        addSubview(overlay)
         readyObserver=playerLayer.observe(\.isReadyForDisplay,options:[.new]) { [weak self] _,_ in
             DispatchQueue.main.async { self?.setNeedsLayout();self?.setNeedsDisplay() }
         }
@@ -86,7 +88,9 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layoutSubviews() {
         super.layoutSubviews()
+        CATransaction.begin(); CATransaction.setDisableActions(true)
         playerLayer.isHidden = !live || !playerLayer.isReadyForDisplay
+        CATransaction.commit()
         guard geometry.isValid else { return }
         guard lastLayoutSize != bounds.size || lastImageSize != imageSize || lastSettings != settings else { return }
         lastLayoutSize=bounds.size;lastImageSize=imageSize;lastSettings=settings
@@ -102,6 +106,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         playerLayer.mask = mask
         playerLayer.videoGravity = .resize
         CATransaction.commit()
+        updateOverlay()
     }
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext(), geometry.isValid else { return }
@@ -109,16 +114,14 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
             AnalysisRenderer.draw(image: image, in: context, size: bounds.size, settings: settings,
                                   annotations: [], pose: nil, confidence: confidence)
         } else { context.setFillColor(UIColor.black.cgColor); context.fill(bounds) }
-        updateOverlay()
     }
     func updateOverlay() {
         guard geometry.isValid else { return }
         // Only the transparent overlay redraws on playback ticks; retain the static
         // backing image underneath the player during preparation and loop seeks.
-        overlay.image = image; overlay.geometry = geometry; overlay.annotations = annotations.filter { $0.id != edit?.id } + (edit.map { [$0] } ?? [])
+        overlay.geometry = geometry; overlay.annotations = annotations.filter { $0.id != edit?.id } + (edit.map { [$0] } ?? [])
         overlay.pose = pose; overlay.confidence = confidence; overlay.selectedID = selectedID
-        overlay.draft = draft; overlay.tool = tool; overlay.strokeColor = strokeColor; overlay.strokeWidth = strokeWidth
-        if overlay.superview == nil { addSubview(overlay); overlay.isUserInteractionEnabled = false }
+        overlay.draft = draft; overlay.tool = tool; overlay.strokeColor = strokeColor; overlay.strokeWidth = strokeWidth; overlay.textValue = textValue
         overlay.frame = bounds; overlay.setNeedsDisplay()
     }
     private let overlay = CanvasOverlay()
@@ -157,7 +160,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
             if tool == "angle" { draft.append(UnitPointValue(point)) }
             else { draft = [UnitPointValue(point)] }
         }
-        setNeedsDisplay()
+        updateOverlay()
     }
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let location = touches.first?.location(in: self), let start else { return }
@@ -173,22 +176,39 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
             if let handleIndex { value.points[handleIndex] = UnitPointValue(clamp(b)) }
             else { value.points = original.points.map { UnitPointValue(clamp(CGPoint(x: $0.x+b.x-a.x, y: $0.y+b.y-a.y))) } }
             edit = value
-        } else if tool != "angle", tool != "text", let point = geometry.normalizedPoint(from: location, allowOutside: true), !draft.isEmpty {
-            if tool == "freehand" { draft.append(UnitPointValue(clamp(point))) }
-            else { draft = [draft[0], UnitPointValue(clamp(point))] }
+        } else {
+            extendStroke(to: location)
         }
-        setNeedsDisplay()
+        if tool == "view" { setNeedsDisplay() }
+        updateOverlay()
     }
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard start != nil else { return }
         if tool == "view" { onView?(settings) }
         else if tool == "select", let edit { onEdit?(edit) }
         else if tool == "angle" {
             if draft.count == 3 { onAdd?(draft); draft.removeAll() }
-        } else if tool == "text" || draft.count >= 2 { onAdd?(draft); draft.removeAll() }
-        start = nil; original = nil; edit = nil; setNeedsDisplay()
+        } else {
+            if let location = touches.first?.location(in: self) { extendStroke(to: location) }
+            if (tool == "text" && draft.count == 1) || draft.count >= 2 { onAdd?(draft) }
+            draft.removeAll()
+        }
+        start = nil; original = nil; edit = nil; handleIndex = nil
+        updateOverlay()
     }
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        start = nil; original = nil; edit = nil; draft.removeAll(); setNeedsDisplay()
+        clearGesture()
+        updateOverlay()
+    }
+    private func clearGesture() {
+        start = nil; original = nil; edit = nil; handleIndex = nil; draft.removeAll()
+    }
+    private func extendStroke(to location: CGPoint) {
+        guard tool != "view", tool != "select", tool != "angle", tool != "text",
+              let start, distance(start, location) >= 2, let first = draft.first,
+              let point = geometry.normalizedPoint(from: location, allowOutside: true) else { return }
+        if tool == "freehand" { draft.append(UnitPointValue(clamp(point))) }
+        else { draft = [first, UnitPointValue(clamp(point))] }
     }
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         gestureRecognizer is UIPinchGestureRecognizer || otherGestureRecognizer is UIPinchGestureRecognizer || (tool == "view" && (gestureRecognizer is UITapGestureRecognizer || otherGestureRecognizer is UITapGestureRecognizer))
@@ -198,10 +218,9 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
 }
 
 private final class CanvasOverlay: UIView {
-    var image: CGImage?
     var geometry = VideoGeometry(imageSize: .zero, viewportSize: .zero)
     var annotations: [Annotation] = []; var pose: PoseFrame?; var confidence: Float = 0.3
-    var selectedID: UUID?; var draft: [UnitPointValue] = []; var tool = "line"; var strokeColor = "#722F37"; var strokeWidth: Double = 3
+    var selectedID: UUID?; var draft: [UnitPointValue] = []; var tool = "line"; var strokeColor = "#722F37"; var strokeWidth: Double = 3; var textValue = ""
     override init(frame: CGRect) { super.init(frame: frame); backgroundColor = .clear; isOpaque = false }
     required init?(coder: NSCoder) { fatalError() }
     override func draw(_ rect: CGRect) {
@@ -213,7 +232,7 @@ private final class CanvasOverlay: UIView {
         for annotation in annotations { AnalysisRenderer.draw(annotation, context: context, geometry: geometry) }
         if !draft.isEmpty {
             AnalysisRenderer.draw(Annotation(videoID: UUID(), kind: tool, points: draft, color: strokeColor, lineWidth: strokeWidth,
-                                             range: ClipRange(start: MediaTime(seconds: 0), end: MediaTime(seconds: 1))), context: context, geometry: geometry)
+                                             text: tool == "text" ? textValue : nil, range: ClipRange(start: MediaTime(seconds: 0), end: MediaTime(seconds: 1))), context: context, geometry: geometry)
         }
         if let pose { AnalysisRenderer.drawPose(pose, context: context, geometry: geometry, confidence: confidence, showAngles: true) }
         if let selected = annotations.first(where: { $0.id == selectedID }) {

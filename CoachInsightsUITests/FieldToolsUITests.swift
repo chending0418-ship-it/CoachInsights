@@ -41,15 +41,16 @@ final class FieldToolsUITests: XCTestCase {
 
     @MainActor func testBattingUndoResetRestoreHistoryContinueDelete() {
         var app = launch(); open(app, scene: "quick", tool: "battingLog"); name(app, "Batting round")
+        for id in ["batting_ground", "batting_line", "batting_fly", "batting_miss", "fieldSave", "fieldOptions"] { XCTAssertTrue(app.buttons[id].isHittable, id) }
         tap(app, "batting_ground"); tap(app, "batting_line"); tap(app, "batting_fly"); tap(app, "batting_miss")
         XCTAssertTrue(label(app, "battingTotal").contains("4"))
-        tap(app, "fieldUndo"); tap(app, "fieldReset"); app.buttons["清零本轮"].tap()
+        tap(app, "fieldUndo"); tap(app, "fieldOptions"); app.buttons["fieldReset"].tap(); app.buttons["清零本轮"].tap()
         tap(app, "fieldUndo")
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
         tap(app, "fieldSave"); shot("phase00-batting")
         app.terminate(); app = launch(reset: false); open(app, scene: "quick", tool: "battingLog")
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
-        tap(app, "fieldEnd"); app.buttons["保存并结束本轮"].tap()
+        tap(app, "fieldOptions"); app.buttons["fieldEnd"].tap(); app.buttons["保存并结束本轮"].tap()
         toRecords(app)
         app.segmentedControls["recordSceneFilter"].buttons["随手工具"].tap()
         let record = app.staticTexts["Batting round"].firstMatch
@@ -90,6 +91,7 @@ final class FieldToolsUITests: XCTestCase {
 
     @MainActor func testGameBoundariesUndoAndSavedHistory() {
         var app = launch(); open(app, scene: "team", tool: "gameCounter"); name(app, "Game round")
+        for id in ["game_strike", "game_ball", "game_out", "gameNextBatter", "fieldSave", "fieldOptions"] { XCTAssertTrue(app.buttons[id].isHittable, id) }
         for _ in 0..<4 { tap(app, "game_ball") }
         XCTAssertTrue(app.staticTexts["gameBoundary"].label.contains("四坏"))
         for _ in 0..<3 { tap(app, "game_strike") }
@@ -103,7 +105,7 @@ final class FieldToolsUITests: XCTestCase {
         app.buttons["recordsTab"].tap(); app.segmentedControls["recordSceneFilter"].buttons["团训"].tap()
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Game round")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
-        XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); XCTAssertTrue(label(app, "gameCount").contains("2"))
+        XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); XCTAssertEqual(app.buttons["game_out"].value as? String, "2")
     }
 
     @MainActor func testShareCardLongContentPhotoAndCancel() {

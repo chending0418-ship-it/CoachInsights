@@ -36,8 +36,8 @@ import AVFoundation
     @Published var busy = false
     @Published var progress: Double = 0
     @Published var tool = "view" { didSet { if tool != "view" { pause() } } }
-    @Published var color = "#722F37"
-    @Published var lineWidth: Double = 3
+    @Published var color = "#F9C74F"
+    @Published var lineWidth: Double = 4
     @Published var textValue = "关注点"
     @Published var selectedAnnotation: UUID? { didSet { loadSelectionStyle() } }
     @Published var rangeMode = "单帧"
@@ -254,13 +254,14 @@ import AVFoundation
     }
     func pause(refreshFrame:Bool=true) {
         let wasPlaying=playing
+        let interruptedPreparation = preparing && frame?.index != frameIndex
         endTask?.cancel();preparing=false
         if wasPlaying,let metadata,let seconds=playback?.player.currentTime().seconds,seconds.isFinite {
             frameIndex=metadata.timeline.presentingFrame(at:MediaTime(seconds:seconds),in:activeClip) ?? frameIndex
         }
         playback?.player.pause();playing=false
         if let metadata { snapshot.playheads[key]=metadata.timeline.frames[safe:frameIndex]?.presentationTime }
-        if wasPlaying && refreshFrame { seek(frame:frameIndex) }
+        if refreshFrame && (wasPlaying || interruptedPreparation) { seek(frame:frameIndex) }
     }
     func stopAndSave() {
         if scrubbing { endScrubbing() }
@@ -325,10 +326,16 @@ import AVFoundation
         guard let metadata else { return }
         snapshot.clips[key] = ClipRange(start: metadata.timeline.frames[0].presentationTime, end: metadata.timeline.duration); save()
     }
+    func activateDrawingTool(_ value: String) {
+        if value != "select" { selectedAnnotation = nil }
+        if value != "view" && !overlaysVisible { overlaysVisible = true }
+        tool = value
+    }
     func add(points: [UnitPointValue]) {
-        guard let selectedVideoID, let metadata, !points.isEmpty else { return }
+        guard !playing, frameReady, let selectedVideoID, let metadata,
+              let sample = metadata.timeline.frames[safe: frameIndex], !points.isEmpty else { return }
         recordHistory()
-        let sample = metadata.timeline.frames[frameIndex]
+        snapshot.overlayVisibility[key] = true
         let range = rangeMode == "片段" ? clip : ClipRange(start: sample.presentationTime,
                                   end: MediaTime(CMTimeAdd(sample.presentationTime.cmTime,sample.duration.cmTime)))
         let value = Annotation(videoID: selectedVideoID, kind: tool, points: points, color: color, lineWidth: lineWidth,
