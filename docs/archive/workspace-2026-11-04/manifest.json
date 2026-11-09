@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-04",
+  "interpretLinksRelativeToOriginalPath": true,
+  "files": [
+    {
+      "originalPath": "apps/coach-insights/AGENTS.md",
+      "file": "AGENTS-before.txt",
+      "sha256": "e0668949ee56fb9e99023b21a2c6f611bb294c64f8dee0ec947699df9218cb83"
+    },
+    {
+      "originalPath": "apps/coach-insights/README.md",
+      "file": "README-before.md",
+      "sha256": "f0649b3df90ddc97c52ecd89da5c84e7c9051ef85b6e256d2dbd895ce4f32a3d"
+    },
+    {
+      "originalPath": "apps/coach-insights/TODO.md",
+      "file": "TODO-before.md",
+      "sha256": "9bb9dd31f8a3efd59094f68fc07052ef6759374e9bb488a4512039c802cdc703"
+    }
+  ]
+}

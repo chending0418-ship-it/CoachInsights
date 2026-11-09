@@ -93,11 +93,11 @@
     "executor": "Codex",
     "scheduling": "No staffing or calendar schedule; implementation follows dependencies and acceptance gates",
     "todo": "TODO.md",
-    "plan": "docs/v1.0-development-plan.md",
+    "plan": "docs/plans/v1.0-development-plan.md",
     "initialDeploymentTarget": "iOS / iPadOS 17+",
     "executionStatus": "All 62 version 1.0 TODO items completed under the user-approved auxiliary-estimate scope. iPhone/iPad simulator regression: 81 passed, zero failures, one device-specific skip. Updated Release compiled for arm64 simulator and iOS, installed and launched on both QA simulators. Historical accuracy measurements retained without a 90% release blocker; development branch only, no main merge.",
     "validation": "iPhone and iPad simulators only; physical-device verification is not required per user instruction",
-    "validationRecord": "docs/v1.0-validation.md",
-    "poseQualityRecord": "docs/pose-engine-validation.md"
+    "validationRecord": "docs/validation/v1.0-validation.md",
+    "poseQualityRecord": "docs/validation/pose-engine-validation.md"
   }
 }

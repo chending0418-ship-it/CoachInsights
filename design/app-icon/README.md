@@ -6,7 +6,7 @@
 
 生成方式：内置 image_gen 编辑，2026-10-20。当前生成原图为 coach-insights-icon-v3.png；App 使用 ../../CoachInsights/Assets.xcassets/AppIcon.appiconset/AppIcon.png（1024 × 1024、不透明 PNG）。尺寸转换仅用于原生资源打包。
 
-验证：Release 模拟器构建通过，已在 iPhone 与 iPad 模拟器检查桌面图标。预览截图保存在忽略的 artifacts/icon-iphone-v3.png 与 artifacts/icon-ipad-v3.png。
+验证：Release 模拟器构建通过，已在 iPhone 与 iPad 模拟器检查桌面图标。预览截图保存在忽略的 artifacts/design/previews/icon-iphone-v3.png 与 artifacts/design/previews/icon-ipad-v3.png。
 
 ## 完整生成提示词
 
