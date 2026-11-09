@@ -1,7 +1,10 @@
 import SwiftUI
 
 @main struct CoachInsightsApp: App {
+    @UIApplicationDelegateAdaptor(PocketAppDelegate.self) private var delegate
     @StateObject private var library = LibraryStore()
+    @StateObject private var quickTools = QuickToolsStore()
+    @StateObject private var fieldTools = FieldToolsStore()
     var body: some Scene {
         WindowGroup {
             Group {
@@ -11,7 +14,7 @@ import SwiftUI
                 #else
                 RootView()
                 #endif
-            }.environmentObject(library).tint(Theme.burgundy).preferredColorScheme(.light)
+            }.environmentObject(library).environmentObject(quickTools).environmentObject(fieldTools).tint(Theme.burgundy).preferredColorScheme(.light)
         }
     }
 }

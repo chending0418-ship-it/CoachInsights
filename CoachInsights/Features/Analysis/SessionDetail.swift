@@ -1,6 +1,26 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct MediaWorkspaceFocusPreferenceKey: PreferenceKey {
+    static var defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+struct MediaWorkspaceNavigationHiddenPreferenceKey: PreferenceKey {
+    static var defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+/// Requests a layout change without locking the device orientation. Physical
+/// rotation continues to work, and leaving focus can return to portrait.
+@MainActor private enum MediaSceneOrientation {
+    static func request(_ mask: UIInterfaceOrientationMask) {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+    }
+}
+
 struct SessionDetail: View {
     @EnvironmentObject private var library: LibraryStore
     let session: AnalysisSession
@@ -10,11 +30,31 @@ struct SessionDetail: View {
     @State private var name = ""
     @State private var renaming = false
     @State private var deleting = false
+    @State private var fullscreenRequested = false
+    @State private var mediaLoaded = false
+    @State private var pageVisible = false
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        Group {
-            if let workspace { AnalysisEditor(workspace: workspace) }
-            else { ProgressView("打开本机分析…").frame(maxWidth:.infinity,maxHeight:.infinity).background(.black) }
+        GeometryReader { geometry in
+            let immersive = mediaLoaded && (fullscreenRequested ||
+                (UIDevice.current.userInterfaceIdiom == .phone && geometry.size.width > geometry.size.height))
+            Group {
+                if let workspace {
+                    AnalysisEditor(workspace: workspace, immersive: immersive, toggleFullscreen: { toggleFullscreen(immersive) }, mediaReady: { mediaLoaded = $0 })
+                } else { ProgressView("打开本机分析…").frame(maxWidth:.infinity,maxHeight:.infinity).background(.black) }
+            }
+            .overlay(alignment: .topLeading) {
+                if immersive {
+                    closeButton.frame(width: 44, height: 44).background(.black.opacity(0.65), in: Circle()).padding(4)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if immersive { sessionMenu.background(.black.opacity(0.65), in: Circle()).padding(4) }
+            }
+            .toolbar(immersive && pageVisible ? .hidden : .visible, for: .navigationBar)
+            .statusBarHidden(immersive && pageVisible)
+            .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: mediaLoaded && pageVisible)
+            .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: immersive && pageVisible)
         }
         .navigationTitle(session.name).navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
@@ -22,20 +62,10 @@ struct SessionDetail: View {
         .toolbarColorScheme(.dark,for:.navigationBar)
         .toolbar {
             ToolbarItem(placement:.topBarLeading) {
-                Button("关闭视频",systemImage:"xmark") { workspace?.stopAndSave();if let onClose { onClose() } else { dismiss() } }
-                    .labelStyle(.iconOnly).accessibilityIdentifier("closeVideo")
+                closeButton
             }
             ToolbarItem(placement:.topBarTrailing) {
-                Menu {
-                    Button("重命名",systemImage:"pencil") { name=session.name;renaming=true }.accessibilityIdentifier("renameSession")
-                    if let w=workspace {
-                        Button("镜像",systemImage:"arrow.left.and.right.righttriangle.left.righttriangle.right") { w.pause();var v=w.viewSettings;v.mirrored.toggle();w.updateView(v) }
-                        Button("旋转 90°",systemImage:"rotate.right") { w.pause();var v=w.viewSettings;v.quarterTurns+=1;w.updateView(v) }
-                        Button("复位画面",systemImage:"arrow.counterclockwise") { w.updateView(ViewSettings()) }
-                        NavigationLink { ExportView(session:session,initialVideoID:w.selectedVideoID,initialPose:w.overlaysVisible && w.poseSettings.visible,initialAnnotations:w.overlaysVisible) } label: { Label("导出分析",systemImage:"square.and.arrow.up") }
-                    }
-                    Button("删除记录",systemImage:"trash",role:.destructive) { deleting=true }.accessibilityIdentifier("deleteSession")
-                } label: { Image(systemName:"ellipsis.circle").frame(width:44,height:44) }.accessibilityLabel("更多操作").accessibilityIdentifier("moreActions")
+                sessionMenu
             }
         }
         .alert("删除分析记录？",isPresented:$deleting) {
@@ -51,12 +81,42 @@ struct SessionDetail: View {
             let value=AnalysisWorkspace(session:session,repository:repository)
             value.selectedVideoID=initialVideoID;workspace=value;await value.reload()
         }
-        .onDisappear { workspace?.stopAndSave() }
+        .onAppear { pageVisible = true }
+        .onDisappear { pageVisible = false; workspace?.stopAndSave() }
+    }
+    private var closeButton: some View {
+        Button("关闭视频", systemImage: "xmark") {
+            workspace?.stopAndSave()
+            if fullscreenRequested { MediaSceneOrientation.request(.portrait) }
+            fullscreenRequested = false
+            if let onClose { onClose() } else { dismiss() }
+        }.labelStyle(.iconOnly).foregroundStyle(.white).accessibilityIdentifier("closeVideo")
+    }
+    private var sessionMenu: some View {
+        Menu {
+            Button("重命名",systemImage:"pencil") { name=session.name;renaming=true }.accessibilityIdentifier("renameSession")
+            if let w=workspace {
+                Button("镜像",systemImage:"arrow.left.and.right.righttriangle.left.righttriangle.right") { w.pause();var v=w.viewSettings;v.mirrored.toggle();w.updateView(v) }
+                Button("旋转 90°",systemImage:"rotate.right") { w.pause();var v=w.viewSettings;v.quarterTurns+=1;w.updateView(v) }
+                Button("复位画面",systemImage:"arrow.counterclockwise") { w.updateView(ViewSettings()) }
+                NavigationLink { ExportView(session:session,initialVideoID:w.selectedVideoID,initialPose:w.overlaysVisible && w.poseSettings.visible,initialAnnotations:w.overlaysVisible) } label: { Label("导出分析",systemImage:"square.and.arrow.up") }
+            }
+            Button("删除记录",systemImage:"trash",role:.destructive) { deleting=true }.accessibilityIdentifier("deleteSession")
+        } label: { Image(systemName:"ellipsis.circle").frame(width:44,height:44) }
+            .foregroundStyle(.white).accessibilityLabel("更多操作").accessibilityIdentifier("moreActions")
+    }
+    private func toggleFullscreen(_ immersive: Bool) {
+        workspace?.pause(); workspace?.save()
+        fullscreenRequested = !immersive
+        MediaSceneOrientation.request(immersive ? .portrait : .landscape)
     }
 }
 
 struct AnalysisEditor: View {
     @ObservedObject var workspace: AnalysisWorkspace
+    var immersive = false
+    var toggleFullscreen: () -> Void = {}
+    var mediaReady: (Bool) -> Void = { _ in }
     @State private var importing=false
     @State private var photos=false
     @State private var capture=false
@@ -66,6 +126,7 @@ struct AnalysisEditor: View {
     @State private var showNodes=false
     @State private var showAdd=false
     @State private var showCompare=false
+    @State private var showTimeline=false
     @State private var keyframeName=""
     @State private var screenshotURL:URL?
     @State private var screenshotBusy=false
@@ -76,17 +137,17 @@ struct AnalysisEditor: View {
             let landscape=geometry.size.width>geometry.size.height
             VStack(spacing:0) {
                 if w.metadata != nil {
-                    quickActions
-                    HStack(spacing:0) {
-                        ZStack(alignment:.topLeading) {
-                            AnalysisCanvas(workspace:w)
-                            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
-                            if w.tool != "view" { Text(w.rangeMode == "单帧" ? "绘图 · 当前帧":"绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
-                        }.frame(maxWidth:.infinity,maxHeight:.infinity).clipped()
-                        if showTools && geometry.size.width>=700 { ScrollView { drawingControls }.frame(width:244).background(Color(white:0.12)) }
-                    }.frame(maxWidth:.infinity,maxHeight:.infinity)
-                    if showTools && geometry.size.width<700 { ScrollView { drawingControls }.frame(height:155).background(Color(white:0.12)) }
-                    playbackControls(compact:landscape)
+                    if immersive {
+                        immersiveCanvas(geometry.size)
+                    } else {
+                        quickActions
+                        HStack(spacing:0) {
+                            canvas.frame(maxWidth:.infinity,maxHeight:.infinity).clipped()
+                            if showTools && geometry.size.width>=700 { ScrollView { drawingControls }.frame(width:244).background(Color(white:0.12)) }
+                        }.frame(maxWidth:.infinity,maxHeight:.infinity)
+                        if showTools && geometry.size.width<700 { ScrollView { drawingControls }.frame(height:155).background(Color(white:0.12)) }
+                        playbackControls(compact:landscape)
+                    }
                 } else {
                     Spacer()
                     EmptyPanel(icon:"video.badge.plus",title:"添加分析素材",detail:"拍摄或导入视频，逐帧看清动作。\n原片与分析仅保存在当前设备。")
@@ -115,6 +176,13 @@ struct AnalysisEditor: View {
         .sheet(isPresented:$photos) { PhotoImportView { result in photos=false;switch result { case .success(let selection):w.notice=selection.notice;w.importFile(selection.url,timing:selection.timing)
         case .failure(let error):if !(error is CancellationError) { w.issue=error.localizedDescription } } } }
         .sheet(isPresented:$capture,onDismiss:{Task { await w.reload() }}) { NavigationStack { CaptureView(session:w.session) } }
+        .sheet(isPresented:$showTimeline) {
+            NavigationStack {
+                ScrollView { VideoTimeline(workspace: w).padding() }
+                    .navigationTitle("时间轴与片段")
+                    .toolbar { Button("完成") { w.save(); showTimeline = false } }
+            }.presentationDetents([.medium, .large]).preferredColorScheme(.dark)
+        }
         .sheet(isPresented:$showPose) { NavigationStack { PoseToolsView(workspace:w) } }
         .sheet(isPresented:$showNodes) { NavigationStack { ScrollView { keyframes.padding() }.navigationTitle("关键帧").toolbar { Button("完成") { showNodes=false } } }.presentationDetents([.medium,.large]) }
         .sheet(isPresented:Binding(get:{screenshotURL != nil},set:{if !$0 { screenshotURL=nil }})) { if let screenshotURL { ShareSheet(url:screenshotURL) } }
@@ -122,8 +190,10 @@ struct AnalysisEditor: View {
         .confirmationDialog("添加素材",isPresented:$showAdd,titleVisibility:.visible) { importControls }
         .alert("命名关键帧",isPresented:$showKeyframe) { TextField("动作节点或自定义名称",text:$keyframeName);Button("保存") { w.addKeyframe(keyframeName);keyframeName="" };Button("取消",role:.cancel) {} }
         .onAppear { w.resumeDisplay() }
+        .onChange(of: w.metadata != nil, initial: true) { _, loaded in mediaReady(loaded) }
         .onChange(of:scenePhase) { _,phase in if phase != .active { w.stopAndSave() } else { w.resumeDisplay() } }
-        .onChange(of:showTools) { _,value in if !value { w.tool="view" } }
+        .onChange(of:showTools) { _,value in if !value && !immersive { w.tool="view" } }
+        .onChange(of: immersive) { _, focused in if !focused && w.tool != "view" { showTools = true } }
     }
     private var quickActions:some View {
         HStack(spacing:0) {
@@ -134,10 +204,67 @@ struct AnalysisEditor: View {
             Menu {
                 Picker("当前素材",selection:Binding(get:{w.selectedVideoID ?? UUID()},set:{id in Task { w.save();await w.select(id) }})) { ForEach(w.assets) { Text($0.originalName).tag($0.id) } }
                 Button("添加素材",systemImage:"plus") { w.pause();showAdd=true }
+                Button("时间轴与片段",systemImage:"timeline.selection") { w.pause();showTimeline=true }.accessibilityIdentifier("openTimeline")
+                Button("保存关键帧",systemImage:"bookmark.badge.plus") { w.pause();showKeyframe=true }.accessibilityIdentifier("addKeyframe")
                 Button("关键帧列表",systemImage:"bookmark") { w.pause();showNodes=true }.accessibilityIdentifier("openKeyframes")
                 Button(w.overlaysVisible ? "隐藏标注与骨架":"显示标注与骨架",systemImage:w.overlaysVisible ? "eye.slash":"eye") { w.overlaysVisible.toggle() }.accessibilityIdentifier("toggleOverlays")
             } label: { Image(systemName:"slider.horizontal.3").frame(width:44,height:44) }.accessibilityLabel("素材与显示").accessibilityIdentifier("videoOptions")
-        }.labelStyle(.iconOnly).font(.title3).background(Color(white:0.08))
+            Button(action: toggleFullscreen) {
+                Image(systemName: immersive ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+            }.accessibilityLabel(immersive ? "退出全屏，返回竖屏" : "横屏全屏")
+                .accessibilityIdentifier("analysisFullscreen")
+        }.labelStyle(.iconOnly).font(.title3).background(immersive ? Color.black.opacity(0.6) : Color(white:0.08))
+    }
+    private var canvas: some View {
+        ZStack(alignment:.topLeading) {
+            AnalysisCanvas(workspace:w)
+            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
+            if w.tool != "view" { Text(w.rangeMode == "单帧" ? "绘图 · 当前帧":"绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
+        }
+    }
+    private func immersiveCanvas(_ size: CGSize) -> some View {
+        canvas
+            .frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+            .overlay(alignment: .top) {
+                quickActions.padding(.horizontal, 56).padding(.top, 4)
+            }
+            .overlay(alignment: .topTrailing) {
+                if showTools {
+                    ScrollView { drawingControls }
+                        .frame(width: min(320, size.width * 0.42), height: min(240, max(120, size.height - 112)))
+                        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 54).padding(.trailing, 8)
+                }
+            }
+            .overlay(alignment: .bottom) { immersivePlayback }
+    }
+    private var immersivePlayback: some View {
+        HStack(spacing: 6) {
+            Button { w.pause(); showTimeline = true } label: { Image(systemName: "timeline.selection").frame(width: 44, height: 44) }
+                .accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
+            FrameStepButton(direction:-1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
+            Button {
+                if w.playing || w.preparing { w.pause(); w.save() } else { w.play() }
+            } label: { Image(systemName: w.playing || w.preparing ? "pause.fill" : "play.fill").font(.title2).frame(width: 44, height: 44) }
+                .accessibilityLabel(w.playing ? "暂停" : "播放").accessibilityIdentifier("playPause")
+            FrameStepButton(direction:1) { w.step(1) }.accessibilityIdentifier("nextFrame")
+            if let metadata = w.metadata {
+                Slider(value: Binding(get: { w.time }, set: { w.scrub(to: $0) }), in: 0...max(0.001, metadata.timeline.duration.seconds), onEditingChanged: { editing in
+                    if editing { w.beginScrubbing() } else { w.endScrubbing() }
+                }).accessibilityIdentifier("frameSlider")
+            }
+            Text("第 \(w.frameIndex + 1) / \(w.metadata?.timeline.frames.count ?? 0) 帧 · \(w.time, specifier: "%.3f") s")
+                .font(.caption2.monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+                .frame(maxWidth: 174).accessibilityIdentifier("frameReadout")
+            Menu {
+                Picker("速度", selection: Binding(get: { w.rate }, set: { w.setRate($0) })) {
+                    ForEach([1.0,0.5,0.25,0.1,0.05], id: \.self) { Text("\($0.formatted())×").tag($0) }
+                }
+                Button(w.looping ? "关闭循环" : "开启循环") { w.looping.toggle() }
+            } label: { Text("\(w.rate.formatted())×").font(.callout.monospacedDigit()).frame(minWidth: 44, minHeight: 44) }
+                .accessibilityLabel("播放速度").accessibilityIdentifier("playbackRate")
+        }.padding(.horizontal, 8).background(.black.opacity(0.65))
     }
     private func playbackControls(compact:Bool)->some View {
         VStack(spacing:compact ? 2:6) {

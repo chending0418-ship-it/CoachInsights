@@ -46,6 +46,10 @@ import SwiftUI
     }
     func remove(_ session: AnalysisSession) async {
         busy = true; defer { busy = false }
+        let id = session.id
+        // Retire UI references before SwiftData invalidates the deleted object.
+        // Reload below also restores the row if deletion fails.
+        sessions.removeAll { $0.id == id }
         do { try await repository?.delete(session); reload() }
         catch { issue = error.localizedDescription; reload() }
     }

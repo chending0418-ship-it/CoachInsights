@@ -1,4 +1,4 @@
-# Coach Insights app icon
+# 棒球训练助手 Drill Buddy app icon
 
 定稿方案：v3，洞察之眼 + 棒球瞳孔，用户于 2026-10-20 确认采用。突出 Insights 的观察、分析与发现，同时保留明确的棒球元素；不使用 C 字母或教练形象。
 

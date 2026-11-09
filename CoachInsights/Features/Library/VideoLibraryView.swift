@@ -1,9 +1,13 @@
 import SwiftUI
 
-struct RootView: View {
+enum VideoLibraryMode {
+    case analysis, comparison
+    var title: String { self == .analysis ? "视频分析" : "动作对比" }
+}
+
+struct VideoLibraryView: View {
+    let mode: VideoLibraryMode
     @EnvironmentObject private var library: LibraryStore
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var selection: UUID?
     @State private var query = ""
     @State private var sport = "全部"
     @State private var period = "全部日期"
@@ -17,7 +21,6 @@ struct RootView: View {
     @State private var openImported=false
     @State private var importSelection:NewVideoSelection?
     @State private var importedSession:AnalysisSession?
-    private var usesSplit:Bool { sizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad }
     private var videos:[LibraryVideoItem] {
         guard let repository=library.repository,let all=try? repository.assets() else { return [] }
         return filtered.flatMap { session -> [LibraryVideoItem] in
@@ -26,30 +29,25 @@ struct RootView: View {
         }
     }
     private var filtered: [AnalysisSession] {
-        library.sessions.filter { session in
-            (query.isEmpty || session.name.localizedCaseInsensitiveContains(query))
+        guard !library.busy else { return [] }
+        return library.sessions.filter { session in
+            (mode == .analysis || (try? session.snapshot().videoIDs.isEmpty) == false)
+            && (query.isEmpty || session.name.localizedCaseInsensitiveContains(query))
             && (sport == "全部" || session.sportValue == sport)
             && (period == "全部日期" || session.createdAt >= Calendar.current.date(
                 byAdding: .day, value: period == "最近 7 天" ? -7 : -30, to: Date())!)
         }
     }
     var body: some View {
-        Group {
-            if usesSplit {
-                NavigationSplitView {
-                    libraryPanel
-                } detail: {
-                    NavigationStack {
-                        if let session = library.sessions.first(where: { $0.id == selection }) {
-                            SessionDetail(session: session,initialVideoID:initialVideoID,onClose:{selection=nil;initialVideoID=nil}).id(session.id.uuidString + (initialVideoID?.uuidString ?? ""))
-                        } else {
-                            EmptyPanel(icon: "viewfinder", title: "让每一帧都有发现",
-                                       detail: "从左侧打开记录，或新建一份分析。\n所有素材与分析仅保存在这台设备。")
-                        }
-                    }
+        libraryPanel.navigationDestination(isPresented: $openImported) {
+            if let importedSession {
+                if mode == .comparison {
+                    ComparisonView(session: importedSession, initialVideoID: initialVideoID)
+                } else {
+                    SessionDetail(session: importedSession, initialVideoID: initialVideoID, onClose: {
+                        initialVideoID = nil; openImported = false
+                    })
                 }
-            } else {
-                NavigationStack { libraryPanel.navigationDestination(isPresented:$openImported) { if let importedSession { SessionDetail(session:importedSession,initialVideoID:initialVideoID,onClose:{selection=nil;initialVideoID=nil;openImported=false}) } } }
             }
         }
         .fileImporter(isPresented:$fileImport,allowedContentTypes:[.movie]) { result in
@@ -61,29 +59,20 @@ struct RootView: View {
             case .failure(let error):if !(error is CancellationError) { library.issue=error.localizedDescription }
         } } }
         .sheet(item:$importSelection) { value in NewVideoImportView(selection:value) { session in
-            importedSession=session;selection=session.id;initialVideoID=nil;importSelection=nil
-            if !usesSplit { openImported=true }
+            importedSession=session;initialVideoID=nil;importSelection=nil;openImported=true
         } }
-        .sheet(isPresented: $showCreate) { CreateSessionView { selection = $0 } }
+        .sheet(isPresented: $showCreate) { CreateSessionView { _ in } }
         .sheet(isPresented: $showCapture) { NavigationStack { CaptureView() } }
         .alert("删除分析记录？", isPresented: Binding(get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } })) {
             Button("取消", role: .cancel) { pendingDelete = nil }
             Button("删除", role: .destructive) {
                 if let session = pendingDelete {
-                    if selection == session.id { selection = nil }
                     Task { await library.remove(session) }
                 }
                 pendingDelete = nil
             }
         } message: { Text("仅清理这份记录和不再被其他记录使用的本机副本。") }
-        .onChange(of:sizeClass) { _,value in
-            guard UIDevice.current.userInterfaceIdiom == .pad else { return }
-            if value == .compact,let session=library.sessions.first(where:{$0.id==selection}) {
-                importedSession=session;openImported=true
-            } else if value == .regular { openImported=false }
-        }
-        .task { await library.retry() }
     }
     private func videoCard(_ item:LibraryVideoItem,repository:LibraryRepository)->some View {
         VStack(alignment:.leading,spacing:6) {
@@ -93,24 +82,26 @@ struct RootView: View {
         }.accessibilityElement(children:.combine).accessibilityIdentifier("videoCard_"+item.id)
     }
     private var libraryPanel: some View {
-        List(selection: $selection) {
+        List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("COACH INSIGHTS").font(.caption.weight(.black)).tracking(3).foregroundStyle(Theme.burgundy)
-                    Text("看清动作的每个细节").font(.title2.weight(.bold))
+                    Text(mode.title).font(.title2.weight(.bold))
+                    if mode == .comparison {
+                        Text("选择第一段视频，再添加另一段动作。").font(.subheadline).foregroundStyle(.secondary)
+                    }
                     Label("本机资料库", systemImage: "iphone.and.arrow.forward")
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button("相册",systemImage:"photo.on.rectangle") { photoImport=true }.buttonStyle(.borderedProminent).accessibilityIdentifier("rootPhotos")
                         Button("文件",systemImage:"folder") { fileImport=true }.buttonStyle(.bordered).accessibilityIdentifier("rootFiles")
                     }
-                    HStack {
+                    if mode == .analysis { HStack {
                         Button { showCreate = true } label: { Label("新建分析", systemImage: "plus") }
                             .labelStyle(.titleOnly).lineLimit(1)
                             .buttonStyle(.bordered).accessibilityIdentifier("createSession")
                         Button { showCapture = true } label: { Label("拍摄", systemImage: "video") }
                             .buttonStyle(.bordered).accessibilityIdentifier("rootCapture")
-                    }
+                    } }
                 }.padding(.vertical, 8)
             }.listRowBackground(Theme.paper)
             if let issue = library.issue {
@@ -134,35 +125,25 @@ struct RootView: View {
                 Section("视频 · \(videos.count)") {
                     LazyVGrid(columns:[GridItem(.adaptive(minimum:130),spacing:12)],spacing:16) {
                         ForEach(videos) { item in
-                            Group {
-                                if usesSplit {
-                                    Button { selection=item.session.id;initialVideoID=item.asset.id } label: { videoCard(item,repository:repository) }
-                                } else { Button { openCompact(item.session,videoID:item.asset.id) } label: { videoCard(item,repository:repository) } }
-                            }.buttonStyle(.plain)
+                            Button { openCompact(item.session,videoID:item.asset.id) } label: { videoCard(item,repository:repository) }.buttonStyle(.plain)
                         }
                     }.padding(.vertical,6)
                 }
             }
             Section("分析记录 · \(filtered.count)") {
                 if filtered.isEmpty {
-                    EmptyPanel(icon: "rectangle.stack", title: query.isEmpty ? "从一份分析开始" : "没有找到记录",
-                               detail: query.isEmpty ? "先记录打击或投球，随后添加视频。" : "试试其他名称或筛选条件。")
+                    EmptyPanel(icon: "rectangle.stack", title: query.isEmpty ? (mode == .comparison ? "选择第一段视频" : "从一份分析开始") : "没有找到记录",
+                               detail: query.isEmpty ? (mode == .comparison ? "从相册或文件添加视频，再选择第二段动作。" : "先记录打击或投球，随后添加视频。") : "试试其他名称或筛选条件。")
                         .listRowBackground(Color.clear)
                 }
                 ForEach(filtered.filter { !browseVideos || (try? $0.snapshot().videoIDs.isEmpty) == true }) { session in
-                    if usesSplit {
-                        Button { selection=session.id;initialVideoID=nil } label: { SessionRow(session:session) }.buttonStyle(.plain)
-                            .listRowBackground(selection == session.id ? Theme.rose.opacity(0.3) : Color.clear)
-                            .contextMenu { Button("删除记录", role: .destructive) { pendingDelete = session } }
-                    } else {
-                        Button { openCompact(session) } label: { SessionRow(session: session) }.buttonStyle(.plain)
-                            .swipeActions { Button("删除", role: .destructive) { pendingDelete = session } }
-                    }
+                    Button { openCompact(session) } label: { SessionRow(session: session) }.buttonStyle(.plain)
+                        .swipeActions { Button("删除", role: .destructive) { pendingDelete = session } }
                 }
             }
         }
         .scrollContentBackground(.hidden).background(Theme.paper)
-        .navigationTitle("素材库").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(mode.title).navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { NavigationLink { HelpView() } label: { Label("使用说明与隐私", systemImage: "questionmark.circle") } }
             #if DEBUG
@@ -177,20 +158,29 @@ struct RootView: View {
         .overlay { if library.busy { ProgressView("正在清理本机副本…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
     }
     private func openCompact(_ session:AnalysisSession,videoID:UUID?=nil) {
-        selection=session.id;initialVideoID=videoID;importedSession=session;openImported=true
+        initialVideoID=videoID;importedSession=session;openImported=true
     }
 }
 
 struct SessionRow: View {
-    let session: AnalysisSession
+    let name: String
+    let sport: Sport
+    let createdAt: Date
+
+    init(session: AnalysisSession) {
+        self.init(name: session.name, sport: session.sport, createdAt: session.createdAt)
+    }
+    init(name: String, sport: Sport, createdAt: Date) {
+        self.name = name; self.sport = sport; self.createdAt = createdAt
+    }
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: session.sport == .batting ? "figure.baseball" : "baseball")
+            Image(systemName: sport == .batting ? "figure.baseball" : "baseball")
                 .font(.title2).frame(width: 44, height: 50)
                 .foregroundStyle(Theme.burgundy).background(Theme.rose.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 5) {
-                Text(session.name).font(.headline).foregroundStyle(.primary)
-                Text("\(session.sportValue) · \(session.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                Text(name).font(.headline).foregroundStyle(.primary)
+                Text("\(sport.rawValue) · \(createdAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)

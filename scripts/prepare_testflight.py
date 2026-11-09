@@ -45,7 +45,11 @@ def inspect(archive):
     check("iphone_and_ipad", set(info.get("UIDeviceFamily", [])) == {1, 2})
     check("minimum_ios_17", info.get("MinimumOSVersion") == "17.0")
     check("version_present", bool(info.get("CFBundleShortVersionString")) and bool(info.get("CFBundleVersion")))
-    check("display_name", info.get("CFBundleDisplayName") == "Coach Insights")
+    check("display_name", info.get("CFBundleDisplayName") == "Drill Buddy")
+    for locale, name in {"en": "Drill Buddy", "zh-Hans": "棒球训练助手"}.items():
+        path = app / f"{locale}.lproj/InfoPlist.strings"
+        localized = plistlib.loads(subprocess.check_output(["plutil", "-convert", "xml1", "-o", "-", str(path)])) if path.is_file() else {}
+        check(f"display_name_{locale}", localized.get("CFBundleDisplayName") == name)
     check("usage_descriptions", all(info.get(key) for key in ["NSCameraUsageDescription", "NSMicrophoneUsageDescription", "NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"]))
     check("encryption_declaration", info.get("ITSAppUsesNonExemptEncryption") is False)
     check("compiled_icons", (app / "Assets.car").is_file() and bool(info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon")))
