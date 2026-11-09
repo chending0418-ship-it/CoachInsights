@@ -60,7 +60,7 @@ final class LaunchScreenTests: XCTestCase {
             context.fill(CGRect(x: 0, y: 0, width: 16, height: 32))
         }.pngData())
         let hash = SHA256.hash(data: picture).map { String(format: "%02x", $0) }.joined()
-        let descriptor = LaunchBackgroundImage(path: "/api/v3/app/launch-assets/\(hash).png", sha256: hash,
+        let descriptor = LaunchBackgroundImage(path: "/api/v3/app/drill-buddy/launch-assets/\(hash).png", sha256: hash,
                                                mimeType: "image/png", byteCount: picture.count, width: 16, height: 32)
         let config = LaunchScreenConfiguration(revision: 1, message: "新开屏", backgroundImage: descriptor)
         let visible = cache.presentation()
@@ -80,7 +80,7 @@ final class LaunchScreenTests: XCTestCase {
         let previous = LaunchScreenConfiguration(revision: 1, message: "离线可用")
         try JSONEncoder().encode(previous).write(to: cache.manifest)
         let hash = String(repeating: "a", count: 64)
-        let descriptor = LaunchBackgroundImage(path: "/api/v3/app/launch-assets/\(hash).png", sha256: hash,
+        let descriptor = LaunchBackgroundImage(path: "/api/v3/app/drill-buddy/launch-assets/\(hash).png", sha256: hash,
                                                mimeType: "image/png", byteCount: 3, width: 1, height: 1)
         let candidate = LaunchScreenConfiguration(revision: 2, message: "更新", backgroundImage: descriptor)
         for fixture in [LaunchTransportFixture(config: candidate, offline: true),

@@ -16,7 +16,7 @@ struct LaunchBackgroundImage: Codable, Equatable {
         let suffix = mimeType == "image/png" ? "png" : "jpg"
         guard ["image/png", "image/jpeg"].contains(mimeType),
               sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
-              path == "/api/v3/app/launch-assets/\(sha256).\(suffix)",
+              path == "/api/v3/app/drill-buddy/launch-assets/\(sha256).\(suffix)",
               byteCount > 0, byteCount <= 3 * 1024 * 1024,
               width > 0, width <= 4096, height > 0, height <= 8192,
               width * height <= 16_000_000 else { throw LaunchScreenFailure.invalidConfiguration }
@@ -63,7 +63,7 @@ struct LaunchScreenPresentation {
 struct LaunchScreenDiskCache: Sendable {
     let directory: URL
     static var standard: Self {
-        .init(directory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("AppLaunchScreen", isDirectory: true))
+        .init(directory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("DrillBuddyLaunchScreen", isDirectory: true))
     }
     var manifest: URL { directory.appendingPathComponent("configuration.json") }
     func imageURL(_ image: LaunchBackgroundImage) -> URL { directory.appendingPathComponent(image.sha256 + ".image") }
@@ -78,7 +78,7 @@ struct LaunchScreenDiskCache: Sendable {
     func presentation(at date: Date = Date()) -> LaunchScreenPresentation? {
         do {
             let config = try configuration()
-            // Revision zero carries the scorekeeper’s built-in copy.
+            // Revision zero uses the built-in artwork.
             guard config.revision > 0 else { return .bundled }
             guard config.enabled else { return nil }
             guard config.isInSchedule(at: date) else { return .bundled }
@@ -127,7 +127,7 @@ private final class LaunchScreenRedirectBlocker: NSObject, URLSessionTaskDelegat
 }
 
 struct LaunchScreenHTTPTransport: LaunchScreenTransport {
-    static let productionURL = URL(string: "https://baseballmaster.cc/api/v3/app/launch-screen")!
+    static let productionURL = URL(string: "https://baseballmaster.cc/api/v3/app/drill-buddy/launch-screen")!
     let endpoint: URL
     private let session: URLSession
     init(endpoint: URL = productionURL) {

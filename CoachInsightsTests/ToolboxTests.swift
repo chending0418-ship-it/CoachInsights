@@ -37,7 +37,7 @@ import XCTest
     }
 
     func testMovedToolsKeepAvailabilityAndExistingBoardRecordsFollowTeamScene() {
-        XCTAssertEqual(Set(PocketScene.team.tools), Set([.teamPlan, .planTimer, .gameCounter, .tacticsBoard]))
+        XCTAssertEqual(PocketScene.team.tools, [.gameCounter, .tacticsBoard, .teamPlan, .planTimer])
         XCTAssertEqual(Set(PocketScene.quick.tools), Set([.stopwatch, .countdown, .battingLog, .bullpenLog, .distance]))
         XCTAssertTrue(PocketTool.tacticsBoard.isAvailable)
         XCTAssertTrue(PocketTool.battingLog.isAvailable)

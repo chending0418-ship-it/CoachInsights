@@ -239,7 +239,8 @@ import AVFoundation
         if playing { playback.player.rate=Float(rate);return }
         if scrubbing { endScrubbing() }
         runner.cancel();prefetchTask?.cancel();selectedAnnotation=nil;tool="view";seeking=false;preparing=true
-        if reachedEnd { frameIndex=bounds.lowerBound };reachedEnd=false
+        if reachedEnd || frameIndex >= bounds.upperBound { frameIndex = bounds.lowerBound }
+        reachedEnd = false
         playback.player.currentItem?.forwardPlaybackEndTime=clip.end.cmTime
         let index=frameIndex
         endTask?.cancel()
@@ -288,26 +289,32 @@ import AVFoundation
     }
     private func tick(_ observed: Double) {
         let seconds=playback?.player.currentTime().seconds ?? observed
-        guard playing, seconds.isFinite, let metadata else { return }
+        guard playing, !preparing, seconds.isFinite, let metadata else { return }
         frameIndex = metadata.timeline.presentingFrame(at:MediaTime(seconds:seconds),in:activeClip) ?? frameIndex
         if externallyClocked { return }
         if seconds >= clip.end.seconds { handleBoundary() }
     }
     private func handleBoundary() {
-        guard playing,!externallyClocked,let metadata,let playback,
+        guard playing, !preparing, !externallyClocked, let metadata, let playback,
               let bounds=metadata.timeline.frameBounds(in:clip) else { return }
         guard playback.player.currentTime().seconds >= clip.end.seconds-0.00001 else { return }
         let shouldLoop=looping
         if shouldLoop {
             endTask?.cancel();runner.cancel();frameIndex=bounds.lowerBound;reachedEnd=false
+            preparing = true
             snapshot.playheads[key]=metadata.timeline.frames[frameIndex].presentationTime
             let index=frameIndex
             endTask=Task { [weak self] in
                 guard let self else { return }
                 let ready=await playback.seek(frame:index)
                 guard !Task.isCancelled else { return }
-                guard ready else { issue="循环播放未能定位，请重试。";return }
-                playing=true;playback.player.playImmediately(atRate:Float(rate))
+                preparing = false
+                guard ready else {
+                    seek(frame: index)
+                    issue = "循环播放未能定位，请重试。"
+                    return
+                }
+                playback.player.playImmediately(atRate: Float(rate))
             }
         } else {
             pause(refreshFrame:false);seek(frame:bounds.upperBound);reachedEnd=true;save()

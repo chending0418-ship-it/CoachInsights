@@ -29,7 +29,10 @@ enum PocketScene: String, CaseIterable, Identifiable {
         }
     }
 
-    var tools: [PocketTool] { PocketTool.allCases.filter { $0.scene == self } }
+    var tools: [PocketTool] {
+        let tools = PocketTool.allCases.filter { $0.scene == self }
+        return tools.filter(\.isAvailable) + tools.filter { !$0.isAvailable }
+    }
 }
 
 enum PocketTool: String, CaseIterable, Identifiable {

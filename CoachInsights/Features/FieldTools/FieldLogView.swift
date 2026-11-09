@@ -155,8 +155,8 @@ struct FieldLogView: View {
             let count = log.gameCount
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
-                    gameButton("客队", value: count.awayRuns, action: .awayRun, score: true)
-                    gameButton("主队", value: count.homeRuns, action: .homeRun, score: true)
+                    scoreTile("客队", value: count.awayRuns, add: .awayRun, subtract: .removeAwayRun)
+                    scoreTile("主队", value: count.homeRuns, add: .homeRun, subtract: .removeHomeRun)
                 }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
                 HStack(spacing: 8) {
                     gameButton("好球 S", value: count.strikes, action: .strike)
@@ -212,19 +212,54 @@ struct FieldLogView: View {
         }
     }
 
-    private func gameButton(_ title: String, value: Int, action: GameAction, score: Bool = false) -> some View {
+    private func scoreTile(_ title: String, value: Int, add: GameAction, subtract: GameAction) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                change { $0.append(.game(subtract)) }
+            } label: {
+                Image(systemName: "minus.circle").frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(value == 0)
+            .opacity(value == 0 ? 0.4 : 1)
+            .accessibilityLabel(subtract.title)
+            .accessibilityIdentifier("game_" + subtract.rawValue)
+
+            Button {
+                change { $0.append(.game(add)) }
+            } label: {
+                VStack(spacing: 4) {
+                    Text(title).font(.caption.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Text(value.formatted()).font(.largeTitle.bold()).monospacedDigit()
+                        Image(systemName: "plus.circle").font(.caption)
+                    }
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 8)
+                .padding(.trailing, 12).contentShape(Rectangle())
+            }
+            .accessibilityLabel(add.title)
+            .accessibilityValue(value.formatted())
+            .accessibilityIdentifier("game_" + add.rawValue)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .background(Theme.burgundy, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func gameButton(_ title: String, value: Int, action: GameAction) -> some View {
         Button { change { $0.append(.game(action)) } } label: {
             VStack(spacing: 4) {
                 Text(title).font(.caption.weight(.semibold))
                 HStack(spacing: 6) {
-                    Text(value.formatted()).font(score ? .largeTitle.bold() : .title2.bold()).monospacedDigit()
+                    Text(value.formatted()).font(.title2.bold()).monospacedDigit()
                     Image(systemName: "plus.circle").font(.caption)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(score ? Theme.burgundy : .white, in: RoundedRectangle(cornerRadius: 12))
-            .foregroundStyle(score ? .white : Theme.burgundy)
+            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            .foregroundStyle(Theme.burgundy)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(action.title)
