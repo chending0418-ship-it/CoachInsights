@@ -31,6 +31,6 @@
 
 2026-11-06 用户授权更新官网，本期功能介绍已作为[首批更新预告](https://baseballmaster.cc/coach-insights#first-update)发布，并按用户反馈扩为[10 张界面图库](https://baseballmaster.cc/coach-insights#screenshots)，覆盖视频分析、动作对比、打击／投球、模拟比赛、白板、秒表、倒计时和记录筛选。视频预览使用 CC0 公开演示素材，不使用私有视频。官网沿用当前已发布英文全名 Baseball Drill Buddy；App 展示名与发布状态沿用上表。
 
-2026-11-09：以既有文档整理 PR #3 为基线，单独提审 1.1 第 00 期实现。最新本地模拟器构建与 29 项核心用例通过；未打包或上传。
+2026-11-09：1.1 第 00 期已提交 [App 草稿 PR #4](https://github.com/chending0418-ship-it/CoachInsights/pull/4)，以 [文档整理 PR #3](https://github.com/chending0418-ship-it/CoachInsights/pull/3) 的分支为审查基线。最新模拟器测试构建与 29 项核心用例通过；未合并、打包或上传。
 
 两份原根目录 Organizer 导出已按包内实际版本归档至工作区 `local/releases/coach-insights/`；路径及 IPA 哈希见 [本地交付索引](../../../management/local-deliveries.json)。原名中的时间戳完整保留。
