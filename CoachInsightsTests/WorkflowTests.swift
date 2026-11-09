@@ -247,6 +247,27 @@ import UIKit
         w.redo();XCTAssertEqual(w.lineWidth,7)
         w.step(1);XCTAssertNil(w.selectedAnnotation);w.stopAndSave()
     }
+    func testDrawingOnLastFrameCanStartReplay() async throws {
+        let repository = try LibraryRepository(root: root.appendingPathComponent("Library"))
+        let session = try repository.create(name: "末帧标注后播放", sport: .batting)
+        let source = try await fixture(duration: 1.2)
+        _ = try await repository.importVideo(source, into: session)
+        let workspace = track(AnalysisWorkspace(session: session, repository: repository))
+        await workspace.reload()
+        let metadata = try XCTUnwrap(workspace.metadata)
+        let last = try XCTUnwrap(metadata.timeline.frameBounds(in: workspace.clip)).upperBound
+        workspace.seek(frame: last)
+        try await wait { workspace.frameReady }
+        workspace.activateDrawingTool("arrow")
+        workspace.add(points: [.init(x: 0.2, y: 0.3), .init(x: 0.7, y: 0.6)])
+        XCTAssertEqual(workspace.snapshot.annotations.count, 1)
+
+        workspace.looping = false
+        workspace.play()
+        try await wait { workspace.playing && workspace.frameIndex > 0 && workspace.frameIndex < last }
+        XCTAssertEqual(workspace.snapshot.annotations.count, 1)
+    }
+
     func testSingleLoopStopsOnLastFrameAndCanReplay() async throws {
         let repository=try LibraryRepository(root:root.appendingPathComponent("Library")),session=try repository.create(name:"循环边界",sport:.batting)
         let source=try await fixture(fps:30,duration:0.3);_=try await repository.importVideo(source,into:session)

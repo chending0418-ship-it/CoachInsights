@@ -108,7 +108,7 @@ struct RootView: View {
                             HStack {
                                 Label(tool.title, systemImage: tool.symbol)
                                 Spacer(minLength: 0)
-                                if !tool.isAvailable { Text("待完善").font(.caption2).foregroundStyle(.secondary) }
+                                ToolAvailabilityBadge(available: tool.isAvailable)
                             }
                             .foregroundStyle(toolboxPath.last == .tool(tool) && section == .toolbox ? Theme.burgundy : .primary)
                         }.accessibilityIdentifier("sidebar_" + tool.rawValue)
@@ -223,6 +223,23 @@ private struct ToolboxHomeView: View {
     }
 }
 
+private struct ToolAvailabilityBadge: View {
+    let available: Bool
+
+    var body: some View {
+        if available {
+            Text("已上线")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(Theme.burgundy, in: Capsule())
+                .fixedSize()
+        } else {
+            Text("待完善").font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct ToolSceneView: View {
     let scene: PocketScene
 
@@ -236,7 +253,7 @@ private struct ToolSceneView: View {
                             Text(tool.title).font(.headline).foregroundStyle(.primary)
                             Text(tool.summary).font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            if !tool.isAvailable { Text("待完善").font(.caption2).foregroundStyle(Theme.burgundy) }
+                            ToolAvailabilityBadge(available: tool.isAvailable)
                         }
                         .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
                         .padding(18).background(.white, in: RoundedRectangle(cornerRadius: 18))

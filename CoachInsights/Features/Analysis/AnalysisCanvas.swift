@@ -8,7 +8,8 @@ struct AnalysisCanvas: UIViewRepresentable {
         let redraw = view.image !== workspace.frame?.image || view.settings != workspace.viewSettings || view.live != workspace.playing
         view.frameKey = (workspace.selectedVideoID?.uuidString ?? "") + ":" + String(workspace.frameIndex)
         view.image = workspace.frame?.image
-        view.playerLayer.player = workspace.playback?.player
+        let player = workspace.playback?.player
+        if view.playerLayer.player !== player { view.playerLayer.player = player }
         view.live = workspace.playing
         view.isUserInteractionEnabled = workspace.tool == "view" || (!workspace.playing && workspace.frameReady)
         view.settings = workspace.viewSettings

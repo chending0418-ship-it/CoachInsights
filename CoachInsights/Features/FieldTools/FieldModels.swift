@@ -39,7 +39,7 @@ struct PitchMark: Codable, Equatable {
 }
 
 enum GameAction: String, Codable {
-    case strike, ball, out, clearBatter, awayRun, homeRun
+    case strike, ball, out, clearBatter, awayRun, homeRun, removeAwayRun, removeHomeRun
 
     var title: String {
         switch self {
@@ -49,6 +49,8 @@ enum GameAction: String, Codable {
         case .clearBatter: return "下一位打者"
         case .awayRun: return "客队得分 +1"
         case .homeRun: return "主队得分 +1"
+        case .removeAwayRun: return "客队得分 −1"
+        case .removeHomeRun: return "主队得分 −1"
         }
     }
 }
@@ -84,19 +86,24 @@ struct GameCount: Equatable {
     var awayRuns = 0, homeRuns = 0
     var notice: String?
     mutating func apply(_ action: GameAction) {
-        if action != .awayRun && action != .homeRun { notice = nil }
+
         switch action {
         case .strike:
+            notice = nil
             strikes += 1
             if strikes == 3 { strikes = 0; balls = 0; addOut(); notice = outs == 0 ? "三振，三出局，换边" : "三振出局" }
         case .ball:
+            notice = nil
             balls += 1
             if balls == 4 { balls = 0; strikes = 0; notice = "四坏保送，下一位打者" }
         case .out:
+            notice = nil
             balls = 0; strikes = 0; addOut(); notice = outs == 0 ? "三出局，换边" : "出局，下一位打者"
         case .clearBatter: balls = 0; strikes = 0; notice = "下一位打者"
         case .awayRun: if awayRuns < Int.max { awayRuns += 1 }
         case .homeRun: if homeRuns < Int.max { homeRuns += 1 }
+        case .removeAwayRun: if awayRuns > 0 { awayRuns -= 1 }
+        case .removeHomeRun: if homeRuns > 0 { homeRuns -= 1 }
         }
     }
     var correction: GameCountCorrection {
@@ -158,6 +165,9 @@ struct FieldLog: Codable, Identifiable, Equatable {
     mutating func append(_ event: FieldEvent) {
         guard !ended, events.count < Self.eventLimit else { return }
         switch (kind, event) {
+        case (.game, .game(.removeAwayRun)) where gameCount.awayRuns == 0,
+             (.game, .game(.removeHomeRun)) where gameCount.homeRuns == 0:
+            return
         case (.batting, .batting), (.bullpen, .pitch), (.bullpen, .bullpenOut), (.game, .game):
             checkpoint(.removeLast); events.append(event)
         case (.game, .gameCorrection(let correction)) where correction.isValid && correction != gameCount.correction:

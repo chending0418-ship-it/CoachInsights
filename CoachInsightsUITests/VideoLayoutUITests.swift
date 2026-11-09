@@ -24,8 +24,8 @@ final class VideoLayoutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["frameReadout"].waitForExistence(timeout: 15))
         wait(second ? "label CONTAINS '/ 240 帧'" : "label CONTAINS '/ 60 帧'", on: app.staticTexts["frameReadout"], timeout: 15)
     }
-    @MainActor private func wait(_ predicate: String, on element: XCUIElement, timeout: TimeInterval = 8) {
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)], timeout: timeout), .completed)
+    @MainActor private func wait(_ predicate: String, on element: XCUIElement, timeout: TimeInterval = 8, value: String? = nil) {
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate, argumentArray: value.map { [$0] }), object: element)], timeout: timeout), .completed)
     }
     @MainActor private func shot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -116,6 +116,28 @@ final class VideoLayoutUITests: XCTestCase {
         shot("video-drawing-after-slider")
         app.buttons["videoOptions"].tap()
         XCTAssertTrue(app.buttons["隐藏标注与骨架"].exists)
+    }
+
+    @MainActor func testVideoResumesWithDrawingToolsOpen() {
+        let app = launch(); create(app, name: "Resume after drawing"); fixture(app)
+        let play = app.buttons["playPause"]
+        let readout = app.staticTexts["frameReadout"]
+        let canvas = app.otherElements["analysisCanvas"]
+
+        app.sliders["frameSlider"].adjust(toNormalizedSliderPosition: 0.2)
+        app.buttons["drawingTools"].tap()
+        app.buttons["tool_line"].tap()
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.4))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.6)))
+        wait("label CONTAINS '1 个标注'", on: app.staticTexts["annotationCount"])
+        let pausedFrame = readout.label
+
+        play.tap()
+        wait("label == '暂停'", on: play)
+        wait("label != %@", on: readout, value: pausedFrame)
+        play.tap()
+        wait("label == '播放'", on: play)
+        wait("label CONTAINS '1 个标注'", on: app.staticTexts["annotationCount"])
     }
 
     @MainActor func testPhoneLandscapeCanvasKeepsFrameAnnotationAndControls() throws {
