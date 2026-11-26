@@ -84,6 +84,16 @@ import XCTest
         try await wait { workspace.playing }
         workspace.beginSharedScrub()
         XCTAssertFalse(workspace.playing)
+        var leftPreviews = Set<Int>()
+        var rightPreviews = Set<Int>()
+        for input in 1...60 {
+            workspace.scrubShared(to: Double(input) / 75)
+            try await Task.sleep(for: .milliseconds(16))
+            if let image = workspace.left.frame { leftPreviews.insert(image.index) }
+            if let image = workspace.right.frame { rightPreviews.insert(image.index) }
+        }
+        XCTAssertGreaterThan(leftPreviews.count, 2, "Left image must update with the finger still down")
+        XCTAssertGreaterThan(rightPreviews.count, 2, "Right image must update with the finger still down")
         for position in [0.8, 0.2] {
             workspace.scrubShared(to: position)
             try await wait {
