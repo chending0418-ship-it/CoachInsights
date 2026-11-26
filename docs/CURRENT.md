@@ -26,10 +26,10 @@ iPhone、iPad 共用场边训练工具箱，14 个正式工具入口全部可用
 
 | 项目 | 当前依据 |
 | --- | --- |
-| 版本来源 | `Config/Build.xcconfig`：1.0.1（Build 4） |
-| 用户确认已上传 | 1.0.1（Build 3） |
+| 版本来源 | `Config/Build.xcconfig`：TestFlight Beta 1.1（Build 8） |
+| 最近一次 TestFlight 测试 | 1.1（Build 5），用户已反馈真机结果 |
 | Build 4 | 已有本地未签名归档与包检查报告保留在 `artifacts/build-4-main/`、`artifacts/testflight/`；本地材料不代表 Apple 上传成功 |
-| 上传状态 | 本轮没有执行上传、审核或发行，Build 4 是否上传以用户确认或回执为准 |
+| 上传状态 | 1.1（Build 8）交由用户在 Xcode Organizer 上传，状态以 Apple 回执为准 |
 | 版本交接 | [TestFlight 操作说明](releases/testflight-guide.md)、[Build 4 审查](releases/1.0.1/build-4-review.md) |
 | iPad 首发 UI 评审 | 用户认可专业工作室的布局方向，但要求恢复私教／团训／随手工具结构，并保留 iPhone；当前先规划 iOS 双端，Android 后续预研。已按 [用户优先级](plans/v1.1-todo.md#三期功能与任务拆分2026-11-06) 分为 00／01／02 三期；用户本轮已授权 00 期开发，当前 iPad 宽窗口接入按三大场景组织的工作室侧栏，窄窗口保留紧凑导航；[旧提案](design/ipad-first/README.md) 保留为探索记录，其项目优先架构不作为现行依据 |
 | 功能归属调整 | 2026-11-06：打击记录 T03、投球记录 T04 归随手工具；战术白板 Q03 归团训。入口及记录筛选已按归属调整，原编号与 00 期优先级保持；[针对性核心检查](validation/v1.1-entry-validation.md) 两端各 12 项通过。仓库／本地目录改名已按用户要求取消 |
@@ -37,14 +37,12 @@ iPhone、iPad 共用场边训练工具箱，14 个正式工具入口全部可用
 | 产品设计与待办 | [1.1 功能与模块 TODO](plans/v1.1-todo.md)：按模块编号逐项讨论；视频沿用 [1.0.1 TODO](plans/v1.0.1-todo.md) 与既有进度；[1.0 开发计划](plans/v1.0-development-plan.md)、[1.0 TODO 原文](archive/workspace-2026-11-04/TODO-before.md) 保留原状态 |
 | 1.1 入口重构 | [场景入口与导航](plans/v1.1-toolbox-entry.md)：`codex/v1.1-toolbox-entry` 开发分支已接入私教／团训／随手工具入口和记录筛选，工具内容后续逐项完善；[双端针对性验证通过](validation/v1.1-entry-validation.md) |
 | 1.1 已有工具 | 秒表、倒计时与 ARKit 测距归随手工具，已实现的横屏战术白板现归团训；[本轮验证](validation/v1.1-quick-tools-validation.md)。真实 AR 距离与精度仍需支持设备验证 |
-| 试用反馈 | 投球页压缩为单屏操作，打击分类加轨迹图标，比赛计数增加主客比分。视频时间轴定位后可直接进入绘图。见 [00 期试用反馈调整](plans/v1.1-phase-00.md#2026-11-09-试用反馈调整)。 |
-| 开屏 | 与记录大师共用 [Admin 开屏配置](https://baseballmaster.cc/admin/#launch)。发布的背景、文案、排期、时长与启停由 App 冷启动时在后台同步，下载验证成功后下次冷启动采用。iPhone 和 iPad 的系统启动页与内置默认图采用用户选定的 B 版复古球印。默认图的酒红标志取自品牌 1.3 的 `brand/specifications/1.3/assets/drill-buddy-horizontal.svg`（SHA-256 `02d1f55af1c3ce0f1674b72824b3b63316db6b2dacff98bb630937f4a038d112`），App 内 3× PNG 的 SHA-256 为 `5c7511742300adb6ab0abebe6cdb5c6cbefa1a3cf588830c41e47d16d149953f`。Admin 自定义背景上的反白标志取自 `brand/specifications/1.3/assets/drill-buddy-horizontal-reverse.svg`（SHA-256 `9f258d07728bd5797d79bc24f5069e3a914b030dd6dd821e6041151181b4459d`），在 App 内以 3× PNG 使用（SHA-256 `ef9bba2b017ed5dab7da6b9595ab9c3b1115bd580466f667e7fa5efe7d0d7503`）。 |
+| 开屏 | 本机后续修订接入 [训练助手独立开屏入口](https://baseballmaster.cc/admin/#launch/drill-buddy)，分流需配合后台发布与新 App 构建。发布的背景、文案、排期、时长与启停由 App 冷启动时在后台同步，下载验证成功后下次冷启动采用。iPhone 和 iPad 的系统启动页与内置默认图采用用户选定的 B 版复古球印。默认图的酒红标志取自品牌 1.3 的 `brand/specifications/1.3/assets/drill-buddy-horizontal.svg`（SHA-256 `02d1f55af1c3ce0f1674b72824b3b63316db6b2dacff98bb630937f4a038d112`），App 内 3× PNG 的 SHA-256 为 `5c7511742300adb6ab0abebe6cdb5c6cbefa1a3cf588830c41e47d16d149953f`。Admin 自定义背景上的反白标志取自 `brand/specifications/1.3/assets/drill-buddy-horizontal-reverse.svg`（SHA-256 `9f258d07728bd5797d79bc24f5069e3a914b030dd6dd821e6041151181b4459d`），在 App 内以 3× PNG 使用（SHA-256 `ef9bba2b017ed5dab7da6b9595ab9c3b1115bd580466f667e7fa5efe7d0d7503`）。 |
 | 功能验证 | [1.0.1 验证](validation/v1.0.1-validation.md)、[姿态引擎验证](validation/pose-engine-validation.md) |
-| 投球分析研究 | [iPhone 摄像头测速、转速、变化量与球种可行性](plans/iphone-pitch-analysis-feasibility.md)：已完成公开片段追踪、合成实验及 10,000 条 Statcast 的五特征转速回归；70 位新投手的 2057 球测试 MAE 约 208rpm，尚未接入 App 或通过真机精度验收 |
 | 品牌与图标 | [公共产品品牌规范](../../../brand/COACH-POCKET.md)、[工程图标说明](../design/app-icon/README.md) |
-| 目录整理 | [迁移记录](../../../management/MIGRATION.md)，工程、Bundle ID、1.0.1（4）配置保持不变 |
+| 目录整理 | [迁移记录](../../../management/MIGRATION.md)，迁移时工程、Bundle ID 与当时的版本配置保持不变 |
 
-产品支持 iPhone 与 iPad；资料保存在本机，人体识别为辅助估算。1.1 已实现入口层级、记录筛选，以及秒表、倒计时、战术白板、测距、打击记录、投球落点与模拟比赛计数；已有视频分析／对比继续可用，其余 5 个工具标明待完善。计时工具保留当前状态；白板、主动保存的测距及三种计数历史接入记录。投球地图为捕手视角的手动图上落点，使用连续编号和好／坏球分色；不代表摄像头自动追踪或测速。公共图片卡片支持长内容分页、相册和系统分享，00 期通过明确的 Debug 示例验证，真实计划／笔记／练习卡在 01／02 接入；在线链接尚未接入。完整视频性能和长时验收继续按既有记录处理。发布配置仍为 1.0.1（4）。
+产品支持 iPhone 与 iPad；资料保存在本机，人体识别为辅助估算。1.1 已实现入口层级、记录筛选，以及秒表、倒计时、战术白板、测距、打击记录、投球落点与模拟比赛计数；已有视频分析／对比继续可用，其余 5 个工具标明待完善。计时工具保留当前状态；白板、主动保存的测距及三种计数历史接入记录。投球地图为捕手视角的手动图上落点，使用连续编号和好／坏球分色；不代表摄像头自动追踪或测速。公共图片卡片支持长内容分页、相册和系统分享，00 期通过明确的 Debug 示例验证，真实计划／笔记／练习卡在 01／02 接入；在线链接尚未接入。完整视频性能和长时验收继续按既有记录处理。00 期 TestFlight 候选的发布配置为 1.1（5）。
 
 本机 build/、artifacts/、私有视频、签名配置和历史 IPA 完整保留且继续被 Git 忽略。研究环境在新路径重新建立，原环境和迁移前目录保存在工作区 local/。
 
@@ -56,6 +54,14 @@ iPhone、iPad 共用场边训练工具箱，14 个正式工具入口全部可用
 
 两份原根目录 Organizer 导出已按包内实际版本归档至工作区 `local/releases/coach-insights/`；路径及 IPA 哈希见 [本地交付索引](../../../management/local-deliveries.json)。原名中的时间戳完整保留。
 
-## 2026-11-26 场边记录与界面评审
+2026-11-09：用户启动 1.1 第 00 期 TestFlight 验收。本次候选使用 1.1（5），沿用原 Bundle ID，范围以 PR #4 的 00 期实现为准。01 期仍暂停。是否已可安装以 App Store Connect 处理及测试组状态为准。
 
-新增 [T04-05 投球记录双站位](plans/v1.1-todo.md#t04-05-教练站在投手后方记录2026-11-26待实现)，待实现。以 Git 主线 1.1 Beta（Build 8）评审 iPhone 与 iPad 的现行界面；问题、验收场景与三个可操作方向见[界面与操作评审](design/2026-11-ui-review/README.md)。用户随后选定 A「场边速记」，确认投手后方的本垒板在图上方。手机与 iPad 的[全页高保真原型](design/2026-11-ui-review/a-full/index.html)作为设计依据；原生开发及视频分析故障复现另行安排。
+2026-11-09：根据 1.1（5）的 TestFlight 真机反馈，在 `codex/v1.1-beta-feedback` 调整视频分析、选片页与三种计数页。进入绘图时恢复标注显示，绘制中独立刷新叠层。双端以截图像素验证箭头和圆框、切帧后隐藏与恢复，以及相邻缩略图点击区域互不重叠。三种计数的撤销、保存重开和投球纠错通过模拟器检查。手动全屏用例通过。模拟器自动转屏用例仍失败，iPhone 在原 Build 5 源码上也复现，留待真机复核。证据在 `artifacts/validation/beta-feedback/`。本轮为本机修复，等待下一次 Beta 打包与真机验收。
+
+2026-11-09：为上一轮真机反馈准备 1.1（6）TestFlight Beta，包含标注可见性、视频分析工具布局、选片缩略图点击范围、计数页和相册图标修复。保留 1.0.0 作为首次正式发布版本。
+
+2026-11-09：1.1（7）包含 iPhone 和 iPad 的 B 版「复古球印」内置开屏及 Admin 同步、Build 6 打击布局的四个轨迹图标、投球单屏与默认收起的本轮过程、比赛比分和计数修正，以及拖动时间轴后的绘图修复。
+
+2026-11-09 Build 7 真机反馈的本机修订：末帧标注后点播放从片段开头重播，循环定位期间合并重复的片段结束事件；比赛计数器主客队比分可直接减一并撤销；三类工具列表和工作室侧栏按已上线优先排列。
+
+2026-11-09：1.1（8）包含画完继续播放和末帧重播修复、主客队比分直接减一、已上线工具排序及高亮，以及训练助手独立 Admin 开屏接入。
