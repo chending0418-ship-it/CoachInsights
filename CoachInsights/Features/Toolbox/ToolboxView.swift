@@ -360,7 +360,8 @@ private struct PocketRecordsView: View {
     @State private var search = ""
     @State private var inspection: UUID?
     @State private var compactDetail: PocketRecord?
-    @State private var openDetailID: UUID?
+    private enum DetailAction { case open(UUID), delete(UUID) }
+    @State private var detailAction: DetailAction?
 
 
     private var records: [PocketRecord] {
@@ -371,37 +372,42 @@ private struct PocketRecordsView: View {
     var body: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= 660
+            let visibleRecords = records
+            let selected = visibleRecords.first(where: { $0.id == inspection }) ?? visibleRecords.first
             HStack(spacing: 0) {
-                recordList(wide: wide)
-                if wide, let selected = records.first(where: { $0.id == inspection }) ?? records.first {
+                recordList(wide: wide, records: visibleRecords, selectedID: selected?.id)
+                if wide, let selected {
                     Divider()
-                    VStack(alignment: .leading,spacing: 14) {
-                        Image(systemName: selected.tool.symbol).font(.largeTitle).foregroundStyle(Theme.burgundy)
-                        Text(selected.tool.title).font(.caption).foregroundStyle(.secondary)
-                        Text(selected.name).font(.title2.bold())
-                        if let summary = selected.summary { Text(summary) }
-                        Text(selected.createdAt,style:.date).foregroundStyle(.secondary)
-                        NavigationLink("打开记录", value:selected.id).buttonStyle(.borderedProminent)
-                    }.padding(20).frame(maxWidth: 285,maxHeight:.infinity,alignment:.topLeading)
+                    RecordInspection(record: selected, open: { openRecord(selected.id) },
+                                     delete: { pendingDelete = selected.id })
+                        .frame(maxWidth: 310)
                 }
             }
         }.background(PocketStyle.paper)
         .navigationTitle("记录")
         .sheet(item: $compactDetail, onDismiss: {
-            if let id = openDetailID { openDetailID = nil; openRecord(id) }
+            switch detailAction {
+            case .open(let id): openRecord(id)
+            case .delete(let id): pendingDelete = id
+            case nil: break
+            }
+            detailAction = nil
         }) { record in
             NavigationStack {
-                RecordInspection(record: record) {
-                    openDetailID = record.id
+                RecordInspection(record: record, open: {
+                    detailAction = .open(record.id)
                     compactDetail = nil
-                }
+                }, delete: {
+                    detailAction = .delete(record.id)
+                    compactDetail = nil
+                })
                     .navigationTitle("记录详情").navigationBarTitleDisplayMode(.inline)
                     .toolbar { Button("完成") { compactDetail = nil } }
             }.presentationDetents([.medium, .large])
         }
     }
 
-    private func recordList(wide: Bool) -> some View {
+    private func recordList(wide: Bool, records: [PocketRecord], selectedID: UUID?) -> some View {
         List {
             NotebookHeading(title: "训练记录", detail: "按名称、场景或工具查找已保存的训练。")
                 .listRowSeparator(.hidden).listRowBackground(Color.clear)
@@ -448,11 +454,19 @@ private struct PocketRecordsView: View {
                                 Text(record.createdAt, style: .date).font(.caption).foregroundStyle(.secondary)
                             } else if let sport = record.sport { SessionRow(name: record.name, sport: sport, createdAt: record.createdAt) }
                         }.padding(.vertical, 4)
-                    Group {
-                        if wide { Button { inspection = record.id } label: { row }.buttonStyle(.plain) }
-                        else { NavigationLink(value: record.id) { row } }
+                    HStack(spacing: 6) {
+                        Button {
+                            if wide { inspection = record.id } else { openRecord(record.id) }
+                        } label: {
+                            row.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("record_" + record.id.uuidString)
+                        if !wide {
+                            Button { compactDetail = record } label: {
+                                Image(systemName: "info.circle").frame(width: 44, height: 44)
+                            }.buttonStyle(.borderless).accessibilityLabel("记录详情，" + record.name)
+                        }
                     }
-                    .accessibilityIdentifier("record_" + record.id.uuidString)
+                    .listRowBackground(wide && record.id == selectedID ? Notebook.inset : Color.white)
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         if !wide { Button("详情", systemImage: "info.circle") { compactDetail = record }.tint(Theme.burgundy) }
                     }
@@ -516,6 +530,7 @@ private struct PocketRecordsView: View {
 struct RecordInspection: View {
     let record: PocketRecord
     let open: () -> Void
+    let delete: () -> Void
 
     var body: some View {
         ScrollView {
@@ -524,6 +539,8 @@ struct RecordInspection: View {
                 LabeledContent("保存日期") { Text(record.createdAt, style: .date) }
                 if let summary = record.summary, !summary.isEmpty { Text(summary) }
                 Button("打开记录", action: open).buttonStyle(.borderedProminent)
+                Button("删除记录", role: .destructive, action: delete)
+                    .frame(minHeight: 44).accessibilityIdentifier("deleteInspectedRecord")
             }.notebookPanel().padding(20).frame(maxWidth: 620)
         }.frame(maxWidth: .infinity).background(Theme.paper)
     }

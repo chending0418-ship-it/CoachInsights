@@ -53,3 +53,28 @@ struct NotebookToolRow: View {
         }.frame(minHeight: 44).contentShape(Rectangle())
     }
 }
+
+struct LatestTrainingCard: View {
+    let title: String
+    let audience: String
+    let date: Date
+    let summary: String
+    let action: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Label(audience, systemImage: icon)
+                Spacer()
+                Text(date, style: .date)
+            }.font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.title2.bold()).foregroundStyle(Notebook.ink)
+            if !summary.isEmpty { Text(summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
+            HStack { Text(action); Spacer(); Image(systemName: "arrow.right") }
+                .font(.caption.bold()).foregroundStyle(Theme.burgundy)
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Notebook.inset, in: RoundedRectangle(cornerRadius: 8))
+            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }
+    }
+}

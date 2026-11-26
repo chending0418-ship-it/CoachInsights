@@ -64,7 +64,7 @@ final class QuickToolsUITests: XCTestCase {
     @MainActor func testCountdownPauseResumeCancelAndFinish() {
         let app = launch()
         app.buttons["tool_countdown"].tap()
-        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["自定义时长"].waitForExistence(timeout: 5))
         shot(app, "quick-countdown-setup")
         app.buttons["30 秒"].tap(); app.buttons["countdownToggle"].tap(); allowSystemPrompt()
         XCTAssertTrue(app.staticTexts["countdownTime"].waitForExistence(timeout: 5))
@@ -75,14 +75,16 @@ final class QuickToolsUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["countdownTime"].label, paused)
         app.buttons["countdownToggle"].tap()
         app.buttons["countdownCancel"].tap()
-        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["自定义时长"].waitForExistence(timeout: 5))
+        app.buttons["自定义时长"].tap()
         app.pickerWheels.element(boundBy: 1).adjust(toPickerWheelValue: "0")
         app.pickerWheels.element(boundBy: 2).adjust(toPickerWheelValue: "3")
+        app.buttons["完成"].tap()
         app.buttons["countdownToggle"].tap()
         wait("label CONTAINS '00:00'", on: app.staticTexts["countdownTime"])
         XCTAssertTrue(app.staticTexts["时间到"].waitForExistence(timeout: 5))
         app.buttons["countdownCancel"].tap()
-        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["自定义时长"].waitForExistence(timeout: 5))
     }
 
     @MainActor func testWhiteboardLandscapeDrawingPlayersPhotoAndRecords() {

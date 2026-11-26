@@ -30,26 +30,37 @@ struct PersonalPlanListView: View {
                     Button("重试读取") { store.reload() }
                 }
             }
-            Section {
-                NotebookHeading(title: "个人训练计划", detail: "已保存 "+String(store.plans.count)+" 份计划")
-                    .listRowBackground(Color.clear)
-                Button("新建计划", systemImage: "plus") { creating = true }
-                    .accessibilityIdentifier("newPersonalPlan")
-                    .disabled(store.readIssue != nil)
-            }
-            Section("已保存计划") {
-                if store.plans.isEmpty {
-                    Text("保存后的计划会在这里和「记录」中显示。")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(store.plans) { plan in
-                    let row = NotebookToolRow(title: plan.title, detail: plan.date.formatted(date: .abbreviated, time: .omitted), icon: "list.clipboard")
-                    if wide {
-                        Button { selection = plan.id } label: { row }.buttonStyle(.plain)
-                    } else {
-                        NavigationLink { PersonalPlanDetailView(id: plan.id) } label: { row }
+            HStack(alignment: .top) {
+                NotebookHeading(title: "个人训练计划", detail: "本机保存 · "+String(store.plans.count)+" 份计划")
+                Button("新建", systemImage: "plus") { creating = true }
+                    .buttonStyle(.borderedProminent).accessibilityIdentifier("newPersonalPlan").disabled(store.readIssue != nil)
+            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            if let first = store.plans.first {
+                if !wide {
+                    Section("最近保存") {
+                        NavigationLink { PersonalPlanDetailView(id: first.id) } label: {
+                            LatestTrainingCard(title: first.title, audience: first.athlete.isEmpty ? "个人训练" : first.athlete,
+                                               date: first.date, summary: first.goal, action: "查看计划", icon: "list.clipboard")
+                        }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                     }
                 }
+                let remaining = wide ? store.plans : Array(store.plans.dropFirst())
+                if !remaining.isEmpty {
+                    Section(wide ? "已保存计划" : "其他计划") {
+                        ForEach(remaining) { plan in
+                            let row = NotebookToolRow(title: plan.title, detail: plan.date.formatted(date: .abbreviated, time: .omitted), icon: "list.clipboard")
+                            if wide {
+                                Button { selection = plan.id } label: { row }.buttonStyle(.plain)
+                                    .listRowBackground(plan.id == (selection ?? first.id) ? Notebook.inset : Notebook.paper)
+                            } else {
+                                NavigationLink { PersonalPlanDetailView(id: plan.id) } label: { row }
+                            }
+                        }
+                    }
+                }
+            } else {
+                ContentUnavailableView("还没有个人训练计划", systemImage: "list.clipboard", description: Text("点「新建」开始填写。"))
+                    .listRowBackground(Color.clear)
             }
         }
         .notebookForm()

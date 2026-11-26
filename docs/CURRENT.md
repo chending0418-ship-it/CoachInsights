@@ -4,7 +4,7 @@
 
 针对 Build 9 的原生页面覆盖问题，以已选 A 稿的 46 个条目为核对表，排除只用于设计评审的页面目录，其余 45 个用户可见页面或操作状态逐项对应。横屏经典白板沿用此前核准的球场几何和操作方式。详见[1.1.0 发布功能计划](plans/1.1.0%20发布功能计划.md)。Build 9 归档仍单独保留。
 
-本机逐页核对图册共 90 张原生截图，iPhone 与 iPad 各 45 张，可按页面名称检索。见 `artifacts/validation/1.1.0-10-pages/index.html`。Build 10 的签名归档及其检查报告位于本机 `artifacts/releases/1.1.0-10/`，TestFlight 由用户自行上传。
+本机逐页核对图册共 90 张原生截图，iPhone 与 iPad 各 45 张，可按页面名称检索。见 `artifacts/validation/1.1.0-10-pages/index.html`。对应 A 稿及原生截图可在同目录的 `compare.html` 并排查看。比赛使用深绿双队比分牌、局数与 B/S/O 灯位；打击使用总挥棒数和四张轨迹卡。Build 10 的本机归档及检查报告目录为 `artifacts/releases/1.1.0-10/`，TestFlight 由用户自行上传。
 
 ## 1.1.0（Build 9）TestFlight 候选版 · 2026-11-26
 

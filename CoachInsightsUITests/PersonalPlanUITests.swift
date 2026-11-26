@@ -80,8 +80,12 @@ final class PersonalPlanUITests: XCTestCase {
         app.navigationBars["计划详情"].buttons.element(boundBy: 0).tap()
         let updated = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Practice plan revised")).firstMatch
         XCTAssertTrue(updated.waitForExistence(timeout: 5))
-        updated.swipeLeft()
-        app.buttons["删除"].tap()
+        if app.buttons["deleteInspectedRecord"].isHittable {
+            app.buttons["deleteInspectedRecord"].tap()
+        } else {
+            updated.swipeLeft()
+            app.buttons["删除"].tap()
+        }
         app.alerts.buttons["删除"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout: 5))
     }

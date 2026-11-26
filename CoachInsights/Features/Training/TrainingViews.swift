@@ -29,31 +29,36 @@ struct TrainingList: View {
         Text(issue)
         Button("重试读取") { store.reload() }
       }
-      NotebookHeading(title: kind.tool.title, detail: "本机保存 · "+String(rows.count)+" 份")
-        .listRowBackground(Color.clear)
-      Button {
-        creating = true
-      } label: {
-        Label("新建" + kind.tool.title, systemImage: "plus")
-      }
-      .disabled(store.issue != nil).accessibilityIdentifier("newTraining")
-      Section("已保存") {
-        if rows.isEmpty { Text("保存后可在这里和训练记录中重新打开。").foregroundStyle(.secondary) }
-        ForEach(rows) { item in
-          if wide {
-            Button {
-              selected = item.id
-            } label: {
-              row(item)
-            }.buttonStyle(.plain)
-          } else {
-            NavigationLink {
-              TrainingDetail(id: item.id)
-            } label: {
-              row(item)
+      HStack(alignment: .top) {
+        NotebookHeading(title: kind.tool.title, detail: "本机保存 · "+String(rows.count)+" 份")
+        Button { creating = true } label: { Label("新建", systemImage: "plus") }
+          .buttonStyle(.borderedProminent).disabled(store.issue != nil).accessibilityIdentifier("newTraining")
+      }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+      if let first = rows.first {
+        if !wide {
+          Section("最近保存") {
+            NavigationLink { TrainingDetail(id: first.id) } label: {
+              LatestTrainingCard(title: first.title, audience: first.audience.isEmpty ? kind.tool.title : first.audience,
+                                 date: first.date, summary: first.body, action: "查看"+kind.tool.title, icon: kind.tool.symbol)
+            }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+          }
+        }
+        let remaining = wide ? rows : Array(rows.dropFirst())
+        if !remaining.isEmpty {
+          Section(wide ? "已保存" : "其他"+kind.tool.title) {
+            ForEach(remaining) { item in
+              if wide {
+                Button { selected = item.id } label: { row(item) }.buttonStyle(.plain)
+                  .listRowBackground(current?.id == item.id ? Notebook.inset : Notebook.paper)
+              } else {
+                NavigationLink { TrainingDetail(id: item.id) } label: { row(item) }
+              }
             }
           }
         }
+      } else {
+        ContentUnavailableView("还没有"+kind.tool.title, systemImage: kind.tool.symbol, description: Text("点「新建」开始填写。"))
+          .listRowBackground(Color.clear)
       }
     }.notebookForm()
   }
@@ -80,6 +85,7 @@ struct TrainingDetail: View {
       if let item = store.item(id) {
         ScrollView {
           VStack(alignment: .leading, spacing: 14) {
+            TrainingSummary(content: item.card)
             if item.kind == .team {
               NavigationLink {
                 PlanRunView(preferred: item.id)
@@ -102,7 +108,6 @@ struct TrainingDetail: View {
                 Image(systemName: "trash")
               }.accessibilityLabel("删除")
             }.buttonStyle(.bordered)
-            TrainingSummary(content: item.card)
           }.padding().frame(maxWidth: 680)
         }.frame(maxWidth: .infinity)
       } else {
