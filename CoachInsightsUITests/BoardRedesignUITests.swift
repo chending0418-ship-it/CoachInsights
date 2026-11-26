@@ -8,7 +8,16 @@ final class BoardRedesignUITests: XCTestCase {
             let frame = app.buttons["boardDraw"].frame
             stableSamples = frame == previous ? stableSamples + 1 : 0
             previous = frame
-            return app.frame.width > app.frame.height && stableSamples >= 2
+            guard stableSamples >= 2 else { return false }
+            if app.frame.width > app.frame.height { return true }
+            // A tall iPad window keeps its portrait bounds while the board rotates
+            // its full drawing surface clockwise inside it.
+            guard UIDevice.current.userInterfaceIdiom == .pad else { return false }
+            let back = app.buttons["boardBack"].frame
+            let export = app.buttons["boardSaveImage"].frame
+            let bottom = app.buttons["boardRedo"].frame
+            return export.midY - back.midY > app.frame.height * 0.5
+                && back.midX - bottom.midX > app.frame.width * 0.5
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 8), .completed)
     }

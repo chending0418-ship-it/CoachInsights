@@ -250,6 +250,7 @@ struct AnalysisEditor: View {
         ZStack(alignment:.topLeading) {
             AnalysisCanvas(workspace:w)
             if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
+            if w.tool != "view" && w.frameReady { Text(w.rangeMode == "单帧" ? "在视频画面上绘图 · 当前帧":"在视频画面上绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
         }
     }
     private func immersiveCanvas(_ size: CGSize) -> some View {

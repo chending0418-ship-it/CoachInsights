@@ -48,7 +48,7 @@ struct TacticsBoardView: View {
                 .rotationEffect(.degrees(rotate ? 90 : 0))
                 .frame(width: bounds.size.width, height: bounds.size.height)
         }
-        .background(Theme.paper)
+        .background(Theme.boardPaper)
         .background(LandscapeToolOrientation().frame(width: 0, height: 0))
         .navigationBarBackButtonHidden().toolbar(.hidden, for: .navigationBar)
         .statusBarHidden().preferredColorScheme(.light)
@@ -92,7 +92,7 @@ struct TacticsBoardView: View {
                     .frame(maxWidth: .infinity).accessibilityIdentifier("boardNotice")
             }
             QuickSaveIssueView()
-        }.background(Theme.paper)
+        }.background(Theme.boardPaper)
     }
 
     private func field(width: CGFloat, height: CGFloat) -> some View {
@@ -262,7 +262,7 @@ struct BoardArtwork: View {
         Canvas { context, size in
             func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * size.width, y: y * size.height) }
             let home = p(0.5, 0.88), first = p(0.70, 0.66), second = p(0.5, 0.44), third = p(0.30, 0.66)
-            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Theme.paper))
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Theme.boardPaper))
             // Project one circular outfield through the same axes as the
             // diamond, so both foul lines pass through their corner bases.
             let fenceScale = 2.4
@@ -334,8 +334,8 @@ struct BoardArtwork: View {
             for player in document.players {
                 let center = p(player.position.x, player.position.y), r = max(11, size.height * 0.038)
                 let circle = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
-                context.fill(circle, with: .color(player.isRunner ? Theme.paper : Theme.burgundy.opacity(0.88)))
-                context.stroke(circle, with: .color(player.isRunner ? Theme.burgundy.opacity(0.68) : Theme.paper), lineWidth: max(1.5, size.height * 0.0025))
+                context.fill(circle, with: .color(player.isRunner ? Theme.boardPaper : Theme.burgundy.opacity(0.88)))
+                context.stroke(circle, with: .color(player.isRunner ? Theme.burgundy.opacity(0.68) : Theme.boardPaper), lineWidth: max(1.5, size.height * 0.0025))
                 context.draw(Text(player.label).font(.system(size: max(11, r * (player.isRunner ? 0.72 : 0.95)), weight: .medium)).foregroundColor(player.isRunner ? Theme.burgundy : .white), at: center)
             }
             context.draw(Text("棒球训练助手 · 战术白板").font(.system(size: max(9, size.height * 0.018))).foregroundColor(Theme.burgundy.opacity(0.45)), at: p(0.82, 0.96))

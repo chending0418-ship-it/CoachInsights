@@ -29,6 +29,20 @@ enum PitchZone: String, Codable, CaseIterable {
     }
 }
 
+enum PitchViewpoint: String, CaseIterable {
+    case catcher, pitcher
+    var title: String { self == .catcher ? "捕手后方" : "投手后方" }
+
+    // Reflection is its own inverse, so taps and saved marks share one transform.
+    func transform(_ point: FieldPoint) -> FieldPoint {
+        self == .catcher ? point : FieldPoint(x: 1 - point.x, y: point.y)
+    }
+
+    func title(for zone: PitchZone) -> String {
+        self == .catcher ? zone.title : PitchZone.at(transform(zone.point)).title
+    }
+}
+
 struct PitchMark: Codable, Equatable {
     var zone: PitchZone
     var isStrike: Bool
@@ -140,6 +154,12 @@ struct FieldLog: Codable, Identifiable, Equatable {
     var title: String { name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? kind.tool.title : name }
     var pitches: [PitchMark] { events.compactMap { if case .pitch(let mark) = $0 { return mark }; return nil } }
     var strikeCount: Int { pitches.filter(\.isStrike).count }
+    var strikeRateText: String {
+        let marks = pitches
+        guard !marks.isEmpty else { return "—" }
+        let strikes = marks.filter(\.isStrike).count
+        return "\(Int((Double(strikes) * 100 / Double(marks.count)).rounded()))%"
+    }
     var outCount: Int { events.filter { $0 == .bullpenOut }.count }
     func count(_ contact: BattingContact) -> Int { events.filter { $0 == .batting(contact) }.count }
     var gameCount: GameCount {
@@ -156,7 +176,7 @@ struct FieldLog: Codable, Identifiable, Equatable {
     var summary: String {
         switch kind {
         case .batting: return BattingContact.allCases.map { "\($0.title) \(count($0))" }.joined(separator: " · ")
-        case .bullpen: return "总球数 \(pitches.count) · 好球 \(strikeCount) · 坏球 \(pitches.count - strikeCount) · 出局 \(outCount)"
+        case .bullpen: return "总球数 \(pitches.count) · 好球 \(strikeCount) · 坏球 \(pitches.count - strikeCount) · 好球率 \(strikeRateText) · 出局 \(outCount)"
         case .game:
             let count = gameCount
             return "客 \(count.awayRuns) 比 \(count.homeRuns) 主 · 好球 \(count.strikes) · 坏球 \(count.balls) · 出局 \(count.outs) · 已换边 \(count.sides) 次"
