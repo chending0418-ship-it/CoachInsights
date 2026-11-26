@@ -49,6 +49,7 @@ struct GameCountEditor: View {
                     Text("未能保存修改，请检查本机储存后重试。").foregroundStyle(.red)
                 }
             }
+            .notebookForm()
             .navigationTitle("修改计数")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

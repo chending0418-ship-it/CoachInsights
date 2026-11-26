@@ -140,15 +140,46 @@ struct AnalysisEditor: View {
                     if immersive {
                         immersiveCanvas(geometry.size)
                     } else {
-                        quickActions
-                        canvas.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
-                        if showTools { drawingControls }
-                        playbackControls(compact: landscape)
+                        if geometry.size.width >= 820 && landscape {
+                            HStack(spacing: 0) {
+                                VStack(spacing: 0) {
+                                    canvas.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                                    playbackControls(compact: landscape)
+                                }
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 16) {
+                                        NotebookHeading(title: "动作分析", detail: w.session.name)
+                                        quickActions
+                                        if showTools { drawingControls }
+                                        Divider()
+                                        keyframes
+                                    }.padding(16)
+                                }.frame(width: 295).foregroundStyle(Notebook.ink).background(Theme.paper).environment(\.colorScheme, .light)
+                            }
+                        } else {
+                            if let metadata = w.metadata {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        Label("\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · \(metadata.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps", systemImage: "film")
+                                            .font(.subheadline.monospacedDigit()).foregroundStyle(Notebook.ink)
+                                            .padding(.horizontal, 16).padding(.vertical, 10)
+                                        let frameHeight = geometry.size.width * metadata.displayHeight / max(1, metadata.displayWidth)
+                                        canvas.frame(height: min(geometry.size.height * 0.52, max(150, frameHeight))).clipped()
+                                        playbackControls(compact: false).foregroundStyle(.white)
+                                        quickActions
+                                        if showTools { drawingControls }
+                                        Divider()
+                                        keyframes.padding(16).foregroundStyle(Notebook.ink)
+                                    }
+                                }.background(Theme.paper).tint(Theme.burgundy)
+                            }
+                        }
                     }
                 } else {
                     Spacer()
                     EmptyPanel(icon:"video.badge.plus",title:"添加分析素材",detail:"拍摄或导入视频，逐帧看清动作。\n原片与分析仅保存在当前设备。")
-                    importControls
+                    ViewThatFits(in: .horizontal) { HStack { importControls }; VStack { importControls } }
+                        .buttonStyle(.bordered).controlSize(.large)
                     #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--real-footage"),!FileManager.default.fileExists(atPath:URL.documentsDirectory.appendingPathComponent("V101-RegressionFixture.mov").path) { Text("本机测试原片缺失").accessibilityIdentifier("realFixtureUnavailable") }
                     #endif
@@ -234,16 +265,16 @@ struct AnalysisEditor: View {
                 .accessibilityIdentifier("analysisFullscreen")
         }.buttonStyle(.plain).padding(.horizontal, 6)
             .frame(maxWidth: 640).frame(maxWidth: .infinity)
-            .background(immersive ? Color.black.opacity(0.78) : Color(white: 0.08))
+            .background(immersive ? Color.black.opacity(0.78) : Theme.paper)
     }
-    private func workspaceAction(_ title: String, symbol: String, selected: Bool = false) -> some View {
+    private func workspaceAction(_ title: String, symbol: String, selected: Bool = false, onDark: Bool = false) -> some View {
         VStack(spacing: 3) {
             Image(systemName: symbol).font(.system(size: 15, weight: .medium))
             Text(title).font(.caption2).lineLimit(1)
         }
         .frame(maxWidth: .infinity, minHeight: 44)
-        .foregroundStyle(selected ? Theme.rose : .white)
-        .background(selected ? Theme.burgundy.opacity(0.55) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .foregroundStyle(immersive || onDark ? Color.white : Theme.burgundy)
+        .background(selected ? (immersive ? Theme.burgundy : Notebook.inset) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
     }
     private var canvas: some View {
@@ -308,7 +339,7 @@ struct AnalysisEditor: View {
             VideoTimeline(workspace: w, compact: true)
             HStack(spacing: 0) {
                 Button { w.pause(); showTimeline = true } label: {
-                    workspaceAction("片段", symbol: "timeline.selection").frame(width: 48)
+                    workspaceAction("片段", symbol: "timeline.selection", onDark: true).frame(width: 48)
                 }.accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
                 Spacer(minLength: 0)
                 FrameStepButton(direction: -1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
@@ -331,7 +362,7 @@ struct AnalysisEditor: View {
             }
         }.padding(.horizontal, 12).padding(.top, compact ? 4 : 8)
             .frame(maxWidth: 720).frame(maxWidth: .infinity)
-            .background(Color(white: 0.08))
+            .background(Color(white: 0.08)).tint(Theme.rose).environment(\.colorScheme, .dark)
     }
     private var importControls:some View {
         Group {
@@ -430,7 +461,11 @@ struct AnalysisEditor: View {
             .background(Color(white: 0.12))
     }
     private var keyframes: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("动作节点").font(.headline).accessibilityAddTraits(.isHeader)
+            if !w.snapshot.keyframes.contains(where: { $0.videoID == w.selectedVideoID }) {
+                Text("在目标帧保存节点，回看时可以直接跳到这里。").font(.subheadline).foregroundStyle(.secondary)
+            }
             Menu("动作节点建议") {
                 ForEach(w.session.sport == .batting ? ["准备","抬腿","前脚落地","击球","随挥"] : ["准备","抬腿顶点","跨步落地","出手","随挥"], id: \.self) { name in
                     Button(name) { w.addKeyframe(name) }
@@ -438,10 +473,11 @@ struct AnalysisEditor: View {
             }.font(.caption)
             ForEach(w.snapshot.keyframes.filter { $0.videoID == w.selectedVideoID }) { keyframe in
                 HStack {
-                    Button("\(keyframe.name) · \(keyframe.time.seconds.formatted(.number.precision(.fractionLength(3)))) s") { w.seek(time: keyframe.time.seconds) }
+                    Button("\(keyframe.name) · \(keyframe.time.seconds.formatted(.number.precision(.fractionLength(3)))) s") { w.seek(time: keyframe.time.seconds); showNodes = false }
                     Spacer()
                     Button { w.removeKeyframe(keyframe.id) } label: { Image(systemName:"xmark.circle") }.accessibilityLabel("删除关键帧")
-                }.font(.caption)
+                }.font(.subheadline.monospacedDigit()).frame(minHeight: 44)
+                Divider()
             }
         }
     }

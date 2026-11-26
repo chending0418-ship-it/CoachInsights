@@ -8,26 +8,9 @@ struct PoseToolsView: View {
     private var statusMessage:String { workspace.poseBusy ? "正在本机逐帧分析…" : workspace.issue ?? workspace.notice ?? "选定片段与主体区域后开始分析。" }
     var body: some View {
         Form {
-            Section("人体识别 · 辅助估算") {
+            Section("指定分析区域") {
                 Text(PoseGuidance.limitations)
                     .font(.callout).accessibilityIdentifier("poseLimitations")
-                Toggle("显示骨架与角度",isOn:Binding(get:{workspace.poseSettings.visible && workspace.overlaysVisible},set:{ value in
-                    workspace.poseSettings.visible=value
-                    if value { workspace.overlaysVisible=true }
-                    workspace.save()
-                }))
-                DisclosureGroup("高级设置",isExpanded:$advanced) {
-                Picker("识别引擎",selection:$workspace.poseSettings.engine) {
-                    Text("Apple Vision（不可用时自动切换）").tag("Apple Vision")
-                    Text("MediaPipe Full · 本机模型").tag(MediaPipePoseEngine.identity)
-                }.disabled(workspace.poseBusy)
-                VStack(alignment:.leading) {
-                    Text("关节最低置信度 \(workspace.poseSettings.minimumConfidence, specifier:"%.2f")")
-                    Slider(value:$workspace.poseSettings.minimumConfidence,in:0.3...0.9)
-                }.disabled(workspace.poseBusy)
-                }
-            }
-            Section("指定分析区域") {
                 if let frame=workspace.frame {
                     PoseRegionPicker(image:UIImage(cgImage:frame.image),region:$region).frame(height:240)
                         .disabled(workspace.poseBusy)
@@ -49,7 +32,24 @@ struct PoseToolsView: View {
                 }.disabled(workspace.poseBusy)
                 Button("恢复全画面") { region=[0,0,1,1];workspace.poseSettings.region=region;workspace.save() }.disabled(workspace.poseBusy)
             }
-        }.safeAreaInset(edge:.bottom) {
+            Section("人体识别 · 辅助估算") {
+                Toggle("显示骨架与角度",isOn:Binding(get:{workspace.poseSettings.visible && workspace.overlaysVisible},set:{ value in
+                    workspace.poseSettings.visible=value
+                    if value { workspace.overlaysVisible=true }
+                    workspace.save()
+                }))
+                DisclosureGroup("高级设置",isExpanded:$advanced) {
+                Picker("识别引擎",selection:$workspace.poseSettings.engine) {
+                    Text("Apple Vision（不可用时自动切换）").tag("Apple Vision")
+                    Text("MediaPipe Full · 本机模型").tag(MediaPipePoseEngine.identity)
+                }.disabled(workspace.poseBusy)
+                VStack(alignment:.leading) {
+                    Text("关节最低置信度 \(workspace.poseSettings.minimumConfidence, specifier:"%.2f")")
+                    Slider(value:$workspace.poseSettings.minimumConfidence,in:0.3...0.9)
+                }.disabled(workspace.poseBusy)
+                }
+            }
+        }.notebookForm().safeAreaInset(edge:.bottom) {
             VStack(alignment:.leading,spacing:8) {
                 if workspace.poseBusy {
                     ProgressView(value:workspace.poseProgress)

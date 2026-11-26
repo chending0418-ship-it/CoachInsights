@@ -29,16 +29,22 @@ struct ExportView:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
-                Text("分享动作里的发现").font(.title2.bold())
-                if !assets.isEmpty {
-                    Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
-                    Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
-                    Toggle("包含可见绘图标注",isOn:$includeAnnotations).disabled(busy)
-                    Toggle("包含可见骨架和角度（辅助估算）",isOn:$includePose).disabled(busy)
-                    if includePose {
-                        Text(PoseGuidance.exportNotice).font(.caption).foregroundStyle(.secondary)
-                            .accessibilityIdentifier("exportPoseLimitations")
-                    }
+                NotebookHeading(title: resultURL == nil ? "导出分析" : "导出结果", detail: session.name)
+                if resultURL == nil, !assets.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let id = videoID, let asset = assets.first(where: { $0.id == id }), let repository = library.repository {
+                            VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
+                                .frame(maxHeight: 190).clipped()
+                        }
+                        Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
+                        Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
+                        Toggle("包含可见绘图标注",isOn:$includeAnnotations).disabled(busy)
+                        Toggle("包含可见骨架和角度（辅助估算）",isOn:$includePose).disabled(busy)
+                        if includePose {
+                            Text(PoseGuidance.exportNotice).font(.caption).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("exportPoseLimitations")
+                        }
+                    }.notebookPanel()
                     if !compare {
                         Picker("视频速度",selection:$rate) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } }.disabled(busy)
                         Toggle("保留原声（仅 1×）",isOn:$audio).disabled(busy || rate != 1)
@@ -50,19 +56,26 @@ struct ExportView:View {
                     Text("导出摘要：\(compare ? "双视频同屏":"当前素材") · \(summaryRate.formatted())× · \(includePose ? "包含可见分析图层":"不含人体图层")").font(.caption).foregroundStyle(.secondary)
                     Text("兼容格式：H.264 · SDR · 30 fps；横画面最长边 1920，竖画面最长边 1920。画面保留原比例，不覆盖原片。")
                         .font(.caption).foregroundStyle(.secondary)
-                } else { EmptyPanel(icon:"square.and.arrow.up",title:"添加视频后导出",detail:"回到分析记录，先导入或拍摄一段视频。") }
+                } else if assets.isEmpty { EmptyPanel(icon:"square.and.arrow.up",title:"添加视频后导出",detail:"回到分析记录，先导入或拍摄一段视频。") }
                 if busy { ProgressView("正在本机导出…",value:progress);Button("取消导出",role:.cancel){task?.cancel()}.accessibilityIdentifier("cancelExport") }
                 if let resultURL {
+                    Divider()
                     if resultURL.pathExtension=="png",let image=UIImage(contentsOfFile:resultURL.path) { Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:300) }
-                    else { VideoPlayer(player:AVPlayer(url:resultURL)).frame(height:240) }
+                    else { ReviewMovie(url: resultURL).aspectRatio(16/9, contentMode: .fit).frame(maxHeight: 360) }
                     HStack {
                         Button("分享 / 存储到文件",systemImage:"square.and.arrow.up") { sharing=true }.accessibilityIdentifier("shareExport")
                         Button("保存到相册",systemImage:"square.and.arrow.down") { Task { await savePhoto(resultURL) } }
                     }.buttonStyle(.bordered)
-                    Text("导出完成").accessibilityIdentifier("exportComplete")
+                    Label("导出完成", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Notebook.fieldGreen).accessibilityIdentifier("exportComplete")
+                    Button("调整导出设置") { self.resultURL = nil; notice = nil; issue = nil }
                 }
                 if let notice { Text(notice).font(.caption) }
-                if let issue { Text(issue).foregroundStyle(.red);Button("重试") { run(screenshot:lastScreenshot) } }
+                if let issue {
+                    Text(issue).foregroundStyle(.red)
+                    if let resultURL { Button("重试保存到相册") { Task { await savePhoto(resultURL) } } }
+                    else { Button("重试导出") { run(screenshot:lastScreenshot) } }
+                }
             }.padding().frame(maxWidth:850).frame(maxWidth:.infinity)
         }.background(Theme.paper).navigationTitle("导出分析").navigationBarTitleDisplayMode(.inline)
         .task {
@@ -95,6 +108,7 @@ struct ExportView:View {
         }
     }
     private func savePhoto(_ url:URL) async {
+        issue = nil
         let status=await PHPhotoLibrary.requestAuthorization(for:.addOnly)
         guard status == .authorized || status == .limited else { issue="未允许保存到相册，可使用分享菜单存储到文件。";return }
         do {

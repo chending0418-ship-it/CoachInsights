@@ -5,15 +5,41 @@ private struct ClockButton: View {
     let title: String
     var color: Color = Theme.burgundy
     var subtle = false
-    var diameter: CGFloat = 80
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.system(size: 19)).foregroundStyle(color)
-                .frame(width: diameter, height: diameter)
-                .background(subtle ? Color.white : Theme.rose.opacity(0.55), in: Circle())
-                .overlay { Circle().stroke(Theme.burgundy.opacity(0.12), lineWidth: 1) }
+            Text(title).font(.headline)
+                .foregroundStyle(subtle ? color : .white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(subtle ? Notebook.paper : color, in: RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(subtle ? Notebook.rule : .clear) }
         }.buttonStyle(.plain)
+    }
+}
+
+private struct TrainingClockDial: View {
+    let fraction: Double
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let radius = min(size.width, size.height) / 2 - 5
+            guard radius > 0 else { return }
+            let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+            context.stroke(Path(ellipseIn: rect), with: .color(Notebook.rule), lineWidth: 2)
+            for index in 0..<60 {
+                let angle = Double(index) * .pi / 30 - .pi / 2
+                let length: CGFloat = index.isMultiple(of: 5) ? 6 : 3
+                var tick = Path()
+                tick.move(to: CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius))
+                tick.addLine(to: CGPoint(x: center.x + cos(angle) * (radius - length), y: center.y + sin(angle) * (radius - length)))
+                context.stroke(tick, with: .color(Notebook.rule), lineWidth: 1)
+            }
+            var arc = Path()
+            arc.addArc(center: center, radius: radius, startAngle: .degrees(-90), endAngle: .degrees(-90 + min(1, max(0, fraction)) * 360), clockwise: false)
+            context.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+        }.aspectRatio(1, contentMode: .fit).accessibilityHidden(true)
     }
 }
 
@@ -49,11 +75,19 @@ struct StopwatchView: View {
     }
 
     private func readout(_ now: Date) -> some View {
-        Text(PocketTimeFormat.stopwatch(watch.elapsed(at: now)))
-            .font(.system(size: 120, weight: .ultraLight)).monospacedDigit()
-            .lineLimit(1).minimumScaleFactor(0.2).frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(watch.elapsed(at: now)))
-            .accessibilityIdentifier("stopwatchTime")
+        let elapsed = watch.elapsed(at: now)
+        return ZStack {
+            TrainingClockDial(fraction: elapsed.truncatingRemainder(dividingBy: 60) / 60, color: Notebook.fieldGreen)
+            VStack(spacing: 6) {
+                Text(watch.isRunning ? "计时中" : elapsed > 0 ? "已暂停" : "准备计时")
+                    .font(.caption).foregroundStyle(Notebook.fieldGreen)
+                Text(PocketTimeFormat.stopwatch(elapsed))
+                    .font(.system(size: 48, weight: .semibold, design: .monospaced))
+                    .lineLimit(1).minimumScaleFactor(0.45)
+                    .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(elapsed))
+                    .accessibilityIdentifier("stopwatchTime")
+            }.padding(.horizontal, 14)
+        }.aspectRatio(1, contentMode: .fit).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var controls: some View {
@@ -64,7 +98,7 @@ struct StopwatchView: View {
                 }
             }.accessibilityIdentifier("stopwatchLapReset")
             Spacer()
-            ClockButton(title: watch.isRunning ? "停止" : "启动") {
+            ClockButton(title: watch.isRunning ? "停止" : "启动", color: Notebook.fieldGreen) {
                 tools.updateStopwatch { value in
                     if value.isRunning { value.pause(at: Date()) } else { value.start(at: Date()) }
                 }
@@ -74,7 +108,12 @@ struct StopwatchView: View {
 
     private func laps(_ now: Date) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                HStack { Text("分段记录").font(.headline); Spacer(); Text("\(watch.laps.count) 段").font(.caption.monospacedDigit()) }
+                    .padding(.vertical, 10)
+                if watch.laps.isEmpty && !watch.isRunning {
+                    Text("开始计时后，可在每个训练环节结束时记一段。").font(.subheadline).foregroundStyle(.secondary)
+                }
                 if watch.isRunning {
                     lapRow(number: watch.laps.count + 1,
                         value: watch.elapsed(at: now) - (watch.laps.last?.total ?? 0), color: .primary)
@@ -110,6 +149,7 @@ struct CountdownView: View {
     @State private var hours = 0
     @State private var minutes = 1
     @State private var seconds = 0
+    @State private var customDuration = false
     private var countdown: PocketCountdown { tools.state.countdown }
 
     var body: some View {
@@ -148,6 +188,16 @@ struct CountdownView: View {
             readDuration()
             if countdown.isFinished(at: Date()) { tools.completeCountdown() }
         }
+        .sheet(isPresented: $customDuration) {
+            NavigationStack {
+                HStack(spacing: 0) {
+                    durationWheel("时", selection: $hours, range: 0..<24, id: "countdownHours")
+                    durationWheel("分", selection: $minutes, range: 0..<60, id: "countdownMinutes")
+                    durationWheel("秒", selection: $seconds, range: 0..<60, id: "countdownSeconds")
+                }.padding().navigationTitle("自定义时长").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("完成") { customDuration = false } }
+            }.presentationDetents([.height(290)])
+        }
         .onChange(of: hours) { _, _ in setDuration() }
         .onChange(of: minutes) { _, _ in setDuration() }
         .onChange(of: seconds) { _, _ in setDuration() }
@@ -157,42 +207,21 @@ struct CountdownView: View {
     }
 
     @ViewBuilder private func face(_ now: Date) -> some View {
-        if countdown.isConfigured {
-            VStack(spacing: 24) {
-                HStack(spacing: 0) {
-                    durationWheel("时", selection: $hours, range: 0..<24, id: "countdownHours")
-                    durationWheel("分", selection: $minutes, range: 0..<60, id: "countdownMinutes")
-                    durationWheel("秒", selection: $seconds, range: 0..<60, id: "countdownSeconds")
-                }.frame(maxWidth: 620)
-                HStack(spacing: 12) {
-                    preset("30 秒", value: 30)
-                    preset("1 分钟", value: 60)
-                    preset("3 分钟", value: 180)
-                    preset("5 分钟", value: 300)
+        let remaining = countdown.isConfigured ? countdown.duration : countdown.remaining(at: now)
+        ZStack {
+            TrainingClockDial(fraction: remaining / max(1, countdown.duration), color: Theme.burgundy)
+            VStack(spacing: 8) {
+                Text(countdown.isConfigured ? "设定时长" : countdown.isFinished(at: now) ? "时间到" : countdown.isRunning ? "计时中" : "已暂停")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Text(PocketTimeFormat.countdown(remaining))
+                    .font(.system(size: 48, weight: .semibold, design: .monospaced)).lineLimit(1).minimumScaleFactor(0.4)
+                    .accessibilityIdentifier("countdownTime")
+                if let end = countdown.deadline {
+                    Label(end.formatted(date: .omitted, time: .shortened), systemImage: "bell").font(.caption)
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            GeometryReader { geo in
-                let size = min(geo.size.width, geo.size.height, 600)
-                ZStack {
-                    Circle().stroke(Theme.rose.opacity(0.6), lineWidth: 7)
-                    Circle().trim(from: 0, to: min(1, countdown.remaining(at: now) / max(1, countdown.duration)))
-                        .stroke(Theme.burgundy, style: StrokeStyle(lineWidth: 7, lineCap: .round)).rotationEffect(.degrees(-90))
-                    VStack(spacing: 15) {
-                        if let end = countdown.deadline {
-                            Label(end.formatted(date: .omitted, time: .shortened), systemImage: "bell.fill")
-                                .foregroundStyle(.gray).font(.title3)
-                        } else {
-                            Text(countdown.isFinished(at: now) ? "时间到" : "已暂停").font(.title3).foregroundStyle(.gray)
-                        }
-                        Text(PocketTimeFormat.countdown(countdown.remaining(at: now)))
-                            .font(.system(size: size * 0.23, weight: .ultraLight)).monospacedDigit()
-                            .lineLimit(1).minimumScaleFactor(0.3).padding(.horizontal, 22)
-                            .accessibilityIdentifier("countdownTime")
-                    }
-                }.frame(width: size, height: size).frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
+            }.padding(.horizontal, 16)
+        }.aspectRatio(1, contentMode: .fit).frame(maxWidth: 360, maxHeight: 360)
+            .padding(8).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func durationWheel(_ unit: String, selection: Binding<Int>, range: Range<Int>, id: String) -> some View {
@@ -230,10 +259,19 @@ struct CountdownView: View {
     }
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if countdown.isConfigured {
+                HStack { Text("快捷时长").font(.headline); Spacer(); Text(PocketTimeFormat.countdown(countdown.duration)).monospacedDigit() }
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                    preset("30 秒", value: 30); preset("1 分钟", value: 60)
+                    preset("3 分钟", value: 180); preset("5 分钟", value: 300)
+                }
+                Button("自定义时长", systemImage: "pencil") { customDuration = true }.frame(maxWidth: .infinity, minHeight: 44)
+            } else {
             HStack {
                 Text("设定时长")
                 Spacer()
                 Text(PocketTimeFormat.countdown(countdown.duration)).foregroundStyle(.gray).monospacedDigit()
+            }
             }
             Divider()
             Label("计时结束时提醒", systemImage: "bell")

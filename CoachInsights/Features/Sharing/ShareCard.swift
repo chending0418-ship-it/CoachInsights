@@ -110,7 +110,8 @@ struct ShareCardPreview: View {
         ScrollView {
             VStack(spacing: 20) {
                 if content.isExample { Text("示例内容 · 用于查看图片样式").font(.callout).foregroundStyle(Theme.burgundy) }
-                Text("长内容自动分页，分享包含全部页面；修改内容后会重新生成。 ").font(.footnote).foregroundStyle(.secondary)
+                NotebookHeading(title: content.title, detail: "图片预览 · 分享时包含全部页面")
+                    .frame(maxWidth: 540)
                 ForEach(images.indices, id: \.self) { index in
                     Image(uiImage: images[index]).resizable().scaledToFit().frame(maxWidth: 540)
                         .overlay { Rectangle().stroke(Theme.burgundy.opacity(0.15)) }
@@ -119,7 +120,7 @@ struct ShareCardPreview: View {
                 Button("重新生成") { generate() }.buttonStyle(.bordered).accessibilityIdentifier("shareCardRegenerate")
             }.padding(20).frame(maxWidth: .infinity)
         }
-        .background(Theme.paper).navigationTitle("图片预览").navigationBarTitleDisplayMode(.inline)
+        .background(Notebook.inset).navigationTitle("图片预览").navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 Text("共 \(images.count) 页").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("shareCardPageCount")

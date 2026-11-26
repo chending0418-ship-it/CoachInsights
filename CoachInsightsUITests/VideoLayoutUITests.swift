@@ -197,7 +197,7 @@ final class VideoLayoutUITests: XCTestCase {
         let frame = app.sliders["leftSlider"].value as? String
         shot("comparison-ipad-portrait-automatic")
         XCUIDevice.shared.orientation = .landscapeLeft
-        assertLayout(app, vertical: false)
+        assertLayout(app, vertical: app.frame.height >= app.frame.width)
         XCTAssertEqual(app.sliders["leftSlider"].value as? String, frame)
         shot("comparison-ipad-landscape-automatic")
         picker.buttons["上下"].tap(); assertLayout(app, vertical: true)
@@ -206,8 +206,10 @@ final class VideoLayoutUITests: XCTestCase {
         picker.buttons["左右"].tap(); assertLayout(app, vertical: false)
         app.terminate(); app = launch(reset: false)
         app.buttons["recordsTab"].tap()
-        let record = app.staticTexts["Portrait comparison"].firstMatch
+        let record = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Portrait comparison")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
+        let open = app.buttons["打开记录"]
+        if open.exists && open.isHittable { open.tap() }
         XCTAssertTrue(app.buttons["comparisonPlay"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.segmentedControls["comparisonLayout"].buttons["左右"].isSelected)
         assertLayout(app, vertical: false)

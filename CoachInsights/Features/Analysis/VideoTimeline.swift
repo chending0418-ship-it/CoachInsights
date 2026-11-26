@@ -70,8 +70,8 @@ struct VideoTimeline:View {
                             Button("恢复完整视频") { w.fullClip() }
                         }
                     }
-                }.navigationTitle("片段范围").toolbar { Button("完成") { w.save();showClip=false } }
-            }.presentationDetents([.medium]).preferredColorScheme(.dark)
+                }.notebookForm().navigationTitle("片段范围").toolbar { Button("完成") { w.save();showClip=false } }
+            }.presentationDetents([.medium, .large]).preferredColorScheme(.light)
         }
     }
 }

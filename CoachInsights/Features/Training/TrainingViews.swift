@@ -18,7 +18,7 @@ struct TrainingList: View {
         }
       }
     }.background(Theme.paper).navigationTitle(kind.tool.title)
-      .sheet(isPresented: $creating) {
+      .fullScreenCover(isPresented: $creating) {
         TrainingEditor(draft: TrainingMaterial(kind: kind), original: nil)
       }
   }
@@ -29,31 +29,38 @@ struct TrainingList: View {
         Text(issue)
         Button("重试读取") { store.reload() }
       }
-      Button {
-        creating = true
-      } label: {
-        Label("新建" + kind.tool.title, systemImage: "plus")
-      }
-      .disabled(store.issue != nil).accessibilityIdentifier("newTraining")
-      Section("已保存") {
-        if rows.isEmpty { Text("保存后可在这里和训练记录中重新打开。").foregroundStyle(.secondary) }
-        ForEach(rows) { item in
-          if wide {
-            Button {
-              selected = item.id
-            } label: {
-              row(item)
-            }.buttonStyle(.plain)
-          } else {
-            NavigationLink {
-              TrainingDetail(id: item.id)
-            } label: {
-              row(item)
+      HStack(alignment: .top) {
+        NotebookHeading(title: kind.tool.title, detail: "本机保存 · "+String(rows.count)+" 份")
+        Button { creating = true } label: { Label("新建", systemImage: "plus") }
+          .buttonStyle(.borderedProminent).disabled(store.issue != nil).accessibilityIdentifier("newTraining")
+      }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+      if let first = rows.first {
+        if !wide {
+          Section("最近保存") {
+            NavigationLink { TrainingDetail(id: first.id) } label: {
+              LatestTrainingCard(title: first.title, audience: first.audience.isEmpty ? kind.tool.title : first.audience,
+                                 date: first.date, summary: first.body, action: "查看"+kind.tool.title, icon: kind.tool.symbol)
+            }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+          }
+        }
+        let remaining = wide ? rows : Array(rows.dropFirst())
+        if !remaining.isEmpty {
+          Section(wide ? "已保存" : "其他"+kind.tool.title) {
+            ForEach(remaining) { item in
+              if wide {
+                Button { selected = item.id } label: { row(item) }.buttonStyle(.plain)
+                  .listRowBackground(current?.id == item.id ? Notebook.inset : Notebook.paper)
+              } else {
+                NavigationLink { TrainingDetail(id: item.id) } label: { row(item) }
+              }
             }
           }
         }
+      } else {
+        ContentUnavailableView("还没有"+kind.tool.title, systemImage: kind.tool.symbol, description: Text("点「新建」开始填写。"))
+          .listRowBackground(Color.clear)
       }
-    }.scrollContentBackground(.hidden)
+    }.notebookForm()
   }
 
   private func row(_ item: TrainingMaterial) -> some View {
@@ -78,6 +85,7 @@ struct TrainingDetail: View {
       if let item = store.item(id) {
         ScrollView {
           VStack(alignment: .leading, spacing: 14) {
+            TrainingSummary(content: item.card)
             if item.kind == .team {
               NavigationLink {
                 PlanRunView(preferred: item.id)
@@ -100,14 +108,13 @@ struct TrainingDetail: View {
                 Image(systemName: "trash")
               }.accessibilityLabel("删除")
             }.buttonStyle(.bordered)
-            TrainingSummary(content: item.card)
           }.padding().frame(maxWidth: 680)
         }.frame(maxWidth: .infinity)
       } else {
         ContentUnavailableView("记录已删除", systemImage: "folder")
       }
     }.background(Theme.paper)
-      .sheet(item: $editing) { TrainingEditor(draft: $0, original: $0) }
+      .fullScreenCover(item: $editing) { TrainingEditor(draft: $0, original: $0) }
       .confirmationDialog("删除这份本机资料？", isPresented: $deleting, titleVisibility: .visible) {
         Button("删除", role: .destructive) {
           do {
@@ -127,8 +134,16 @@ struct TrainingDetail: View {
 }
 
 private struct TrainingEditor: View {
-  @State var draft: TrainingMaterial
+  @State private var draft: TrainingMaterial
+  private let initial: TrainingMaterial
   let original: TrainingMaterial?
+  @State private var discard = false
+
+  init(draft: TrainingMaterial, original: TrainingMaterial?) {
+    _draft = State(initialValue: draft)
+    self.original = original
+    self.initial = draft
+  }
   @EnvironmentObject private var store: TrainingStore
   @Environment(\.dismiss) private var dismiss
   @State private var preview = false
@@ -138,19 +153,23 @@ private struct TrainingEditor: View {
       GeometryReader { geometry in
         if geometry.size.width >= 700 {
           HStack(spacing: 0) {
-            fields(showsPreviewButton: false)
+            fields
             Divider()
             summary.frame(maxWidth: .infinity)
           }
-        } else if preview {
-          summary
         } else {
-          fields(showsPreviewButton: true)
+          VStack(spacing: 0) {
+            Picker("编辑视图", selection: $preview) {
+              Text("填写").tag(false)
+              Text("预览").tag(true)
+            }.pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 8)
+            if preview { summary } else { fields }
+          }
         }
       }.background(Theme.paper)
         .navigationTitle(draft.kind.tool.title).navigationBarTitleDisplayMode(.inline)
         .toolbar {
-          ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+          ToolbarItem(placement: .cancellationAction) { Button("取消") { if draft == initial { dismiss() } else { discard = true } } }
           ToolbarItem(placement: .primaryAction) {
             Button("保存") {
               do {
@@ -159,6 +178,10 @@ private struct TrainingEditor: View {
               } catch { problem = error.localizedDescription }
             }.disabled(!draft.valid).accessibilityIdentifier("trainingSave")
           }
+        }
+        .confirmationDialog("放弃未保存的修改？", isPresented: $discard, titleVisibility: .visible) {
+          Button("放弃修改", role: .destructive) { dismiss() }
+          Button("继续编辑", role: .cancel) { }
         }
         .alert(
           "未能保存", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })
@@ -172,12 +195,12 @@ private struct TrainingEditor: View {
   private var summary: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
-        if preview { Button("返回填写") { preview = false } }
+
         TrainingSummary(content: draft.card)
       }.padding()
     }.frame(maxWidth: .infinity)
   }
-  private func fields(showsPreviewButton: Bool) -> some View {
+  private var fields: some View {
     Form {
       Section {
         TextField("标题", text: $draft.title).accessibilityIdentifier("trainingTitle")
@@ -216,8 +239,7 @@ private struct TrainingEditor: View {
         }
       }
       TextField("教练署名", text: $draft.author)
-      if showsPreviewButton { Button("预览内容") { preview = true }.disabled(!draft.valid) }
-    }.scrollDismissesKeyboard(.interactively)
+    }.notebookForm()
   }
 }
 
@@ -232,9 +254,8 @@ struct TrainingSummary: View {
         Text(content.sections[i].heading).font(.headline).foregroundStyle(Theme.burgundy)
         Text(content.sections[i].body).textSelection(.enabled)
       }
-      if !content.author.isEmpty { Text(content.author).font(.subheadline) }
-    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(
-      .white, in: RoundedRectangle(cornerRadius: 12))
+      if !content.author.isEmpty { Label(content.author, systemImage: "signature").font(.subheadline).foregroundStyle(.secondary) }
+    }.frame(maxWidth: .infinity, alignment: .leading).notebookPanel()
   }
 }
 
@@ -264,6 +285,9 @@ struct PlanRunView: View {
             let stage = run.plan.stages[run.index]
             VStack(alignment: .leading, spacing: 12) {
               Text(run.plan.title).font(.headline)
+              ProgressView(value: Double(run.finished ? run.plan.stages.count : run.index), total: Double(run.plan.stages.count))
+                .tint(Notebook.fieldGreen).accessibilityLabel("已完成环节")
+
               Text(
                 run.finished
                   ? "训练已结束" : "第 \(run.index + 1) / \(run.plan.stages.count) 段 · " + stage.name
@@ -295,8 +319,10 @@ struct PlanRunView: View {
           Picker("选择团训计划", selection: Binding(get: { plan.id }, set: { selected = $0 })) {
             ForEach(plans) { Text($0.title).tag($0.id) }
           }
-          ForEach(plan.stages) { stage in
+          NotebookHeading(title: "环节顺序", detail: plan.summary)
+          ForEach(Array(plan.stages.enumerated()), id: \.element.id) { index, stage in
             HStack {
+              Text(String(format: "%02d", index + 1)).font(.caption.monospacedDigit()).foregroundStyle(Theme.burgundy)
               Text(stage.name)
               Spacer()
               Text("\(stage.minutes) 分钟").foregroundStyle(.secondary)

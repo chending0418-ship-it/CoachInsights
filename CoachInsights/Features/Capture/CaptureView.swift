@@ -15,9 +15,11 @@ struct CaptureView: View {
     @State private var savedSession: AnalysisSession?
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
-                if let url = camera.reviewURL { VideoPlayer(player: AVPlayer(url:url)).frame(height: 280) }
-                else if camera.available { CameraPreview(session:camera.session).frame(height:320).background(.black) }
+            VStack(alignment: .leading, spacing: 18) {
+                NotebookHeading(title: camera.reviewURL == nil ? "拍摄训练动作" : "确认拍摄素材",
+                                detail: camera.reviewURL == nil ? "让球员全身入镜，再开始录制。" : "回看视频后保存到本机记录。")
+                if let url = camera.reviewURL { ReviewMovie(url: url).aspectRatio(4/3, contentMode: .fit).frame(maxHeight: 400) }
+                else if camera.available { CameraPreview(session:camera.session).aspectRatio(4.0/3.0, contentMode: .fit).background(.black).clipShape(RoundedRectangle(cornerRadius: 8)) }
                 else { EmptyPanel(icon:"video.slash",title:"准备拍摄",detail:camera.issue ?? "正在检查相机…") }
                 if camera.available {
                     Picker("录制格式",selection:$camera.selectedFormat) { ForEach(camera.formats) { Text($0.label).tag($0.id) } }
@@ -73,5 +75,18 @@ struct CaptureView: View {
                 camera.issue=error is CancellationError ? "已取消保存，可重试。" : error.localizedDescription
             }
         }
+    }
+}
+
+
+/// Keep the player while other form controls publish updates.
+struct ReviewMovie: View {
+    let url: URL
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        VideoPlayer(player: player)
+            .task(id: url) { player?.pause(); player = AVPlayer(url: url) }
+            .onDisappear { player?.pause() }
     }
 }

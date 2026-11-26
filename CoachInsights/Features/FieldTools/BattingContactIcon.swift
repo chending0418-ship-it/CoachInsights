@@ -4,43 +4,40 @@ struct BattingContactIcon: View {
     let contact: BattingContact
 
     var body: some View {
-        Canvas { context, _ in
-            let ground = Path { path in
-                path.move(to: CGPoint(x: 2, y: 24))
-                path.addLine(to: CGPoint(x: 30, y: 24))
-            }
-            context.stroke(ground, with: .color(Theme.burgundy.opacity(0.32)), lineWidth: 1)
-            let destination: CGPoint
-            let control: CGPoint
+        Canvas { context, size in
+            let scale = min(size.width / 92, size.height / 56)
+            context.translateBy(x: (size.width - 92 * scale) / 2, y: (size.height - 56 * scale) / 2)
+            context.scaleBy(x: scale, y: scale)
+            var baseline = Path()
+            baseline.move(to: CGPoint(x: 4, y: 48))
+            baseline.addLine(to: CGPoint(x: 87, y: 48))
+            context.stroke(baseline, with: .color(Notebook.rule), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+
+            var path = Path()
+            path.move(to: contact == .miss ? CGPoint(x: 10, y: 45) : CGPoint(x: 7, y: 47))
+            let end: CGPoint
             switch contact {
             case .ground:
-                destination = CGPoint(x: 27, y: 21)
-                control = CGPoint(x: 12, y: 24)
+                path.addQuadCurve(to: CGPoint(x: 29, y: 45), control: CGPoint(x: 19, y: 21))
+                path.addQuadCurve(to: CGPoint(x: 46, y: 45), control: CGPoint(x: 38, y: 29))
+                path.addQuadCurve(to: CGPoint(x: 60, y: 46), control: CGPoint(x: 53, y: 37))
+                end = CGPoint(x: 82, y: 46)
+                path.addLine(to: end)
             case .line:
-                destination = CGPoint(x: 27, y: 12)
-                control = CGPoint(x: 15, y: 14)
+                end = CGPoint(x: 79, y: 15)
+                path.addQuadCurve(to: end, control: CGPoint(x: 30, y: 19))
             case .fly:
-                destination = CGPoint(x: 27, y: 10)
-                control = CGPoint(x: 13, y: -3)
+                end = CGPoint(x: 78, y: 39)
+                path.addQuadCurve(to: end, control: CGPoint(x: 43, y: -15))
             case .miss:
-                destination = CGPoint(x: 26, y: 18)
-                control = CGPoint(x: 15, y: 27)
+                end = CGPoint(x: 78, y: 16)
+                path.addQuadCurve(to: CGPoint(x: 57, y: 21), control: CGPoint(x: 31, y: 23))
             }
-            let trajectory = Path { path in
-                path.move(to: CGPoint(x: 3, y: 19))
-                path.addQuadCurve(to: destination, control: control)
-            }
-            context.stroke(trajectory, with: .foreground, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, dash: [2, 3]))
-            if contact == .miss {
-                let cross = Path { path in
-                    path.move(to: CGPoint(x: 22, y: 5)); path.addLine(to: CGPoint(x: 28, y: 11))
-                    path.move(to: CGPoint(x: 28, y: 5)); path.addLine(to: CGPoint(x: 22, y: 11))
-                }
-                context.stroke(cross, with: .foreground, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
-            } else {
-                let ball = CGRect(x: destination.x - 2.5, y: destination.y - 2.5, width: 5, height: 5)
-                context.fill(Path(ellipseIn: ball), with: .foreground)
-            }
-        }.frame(width: 32, height: 28).accessibilityHidden(true)
+            let ink: Color = contact == .fly || contact == .ground ? Notebook.fieldGreen : Theme.burgundy
+            context.stroke(path, with: .color(ink), style: StrokeStyle(lineWidth: 2.1, dash: contact == .miss ? [4, 4] : []))
+            let ball = Path(ellipseIn: CGRect(x: end.x - 3.3, y: end.y - 3.3, width: 6.6, height: 6.6))
+            if contact != .miss { context.fill(ball, with: .color(ink)) }
+            context.stroke(ball, with: .color(ink), lineWidth: 1.3)
+        }.aspectRatio(92.0 / 56, contentMode: .fit).accessibilityHidden(true)
     }
 }

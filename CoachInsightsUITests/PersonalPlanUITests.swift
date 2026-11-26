@@ -39,9 +39,10 @@ final class PersonalPlanUITests: XCTestCase {
         app.launch()
         app.buttons["recordsTab"].tap()
         app.segmentedControls["recordSceneFilter"].buttons["私教"].tap()
-        let record = app.staticTexts["Practice plan"]
+        let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Practice plan")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5))
         record.tap()
+        if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
         app.buttons["editPersonalPlan"].tap()
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
@@ -77,10 +78,14 @@ final class PersonalPlanUITests: XCTestCase {
 
         app.navigationBars["图片预览"].buttons.element(boundBy: 0).tap()
         app.navigationBars["计划详情"].buttons.element(boundBy: 0).tap()
-        let updated = app.staticTexts["Practice plan revised"]
+        let updated = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Practice plan revised")).firstMatch
         XCTAssertTrue(updated.waitForExistence(timeout: 5))
-        updated.swipeLeft()
-        app.buttons["删除"].tap()
+        if app.buttons["deleteInspectedRecord"].isHittable {
+            app.buttons["deleteInspectedRecord"].tap()
+        } else {
+            updated.swipeLeft()
+            app.buttons["删除"].tap()
+        }
         app.alerts.buttons["删除"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout: 5))
     }

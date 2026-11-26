@@ -1,14 +1,30 @@
 import XCTest
 
 final class TrainingMaterialUITests: XCTestCase {
+  @MainActor private func enter(_ app: XCUIApplication, scene: String, tool: String) {
+    let shortcut = app.buttons["sidebar_" + tool]
+    if shortcut.exists && shortcut.isHittable { shortcut.tap(); return }
+    let sceneButton = app.buttons["scene_" + scene]
+    let destination = app.buttons["tool_" + tool]
+    XCTAssertTrue(sceneButton.waitForExistence(timeout: 8))
+    for _ in 0..<2 {
+      if !sceneButton.isHittable { app.swipeUp() }
+      sceneButton.tap()
+      if destination.waitForExistence(timeout: 4) { break }
+      if !sceneButton.exists { app.swipeUp(); break }
+    }
+    XCTAssertTrue(destination.waitForExistence(timeout: 5))
+    destination.tap()
+  }
+
   @MainActor func testNotesAndHomeworkOpenTheirSavedShareCard() {
     continueAfterFailure = false
+    XCUIDevice.shared.orientation = .portrait
     let app = XCUIApplication()
     for (index, tool) in ["coachNotes", "homeworkCard"].enumerated() {
       app.launchArguments = index == 0 ? ["--ui-testing", "--reset-library"] : ["--ui-testing"]
       app.launch()
-      if app.buttons["sidebar_" + tool].isHittable { app.buttons["sidebar_" + tool].tap() }
-      else { app.buttons["scene_personal"].tap(); app.buttons["tool_" + tool].tap() }
+      enter(app, scene: "personal", tool: tool)
       app.buttons["newTraining"].tap()
       let title = app.textFields["trainingTitle"]
       title.tap(); title.typeText(tool)
@@ -29,18 +45,11 @@ final class TrainingMaterialUITests: XCTestCase {
 
   @MainActor func testTeamPlanStartsTimerAndRecoversAfterRelaunch() {
     continueAfterFailure = false
+    XCUIDevice.shared.orientation = .portrait
     let app = XCUIApplication()
     app.launchArguments = ["--ui-testing", "--reset-library"]
     app.launch()
-    func enter(_ tool: String) {
-      if app.buttons["sidebar_" + tool].isHittable {
-        app.buttons["sidebar_" + tool].tap()
-      } else {
-        app.buttons["scene_team"].tap()
-        app.buttons["tool_" + tool].tap()
-      }
-    }
-    enter("teamPlan")
+    enter(app, scene: "team", tool: "teamPlan")
     app.buttons["newTraining"].tap()
     let title = app.textFields["trainingTitle"]
     title.tap()
@@ -54,13 +63,13 @@ final class TrainingMaterialUITests: XCTestCase {
     app.terminate()
     app.launchArguments = ["--ui-testing"]
     app.launch()
-    enter("planTimer")
+    enter(app, scene: "team", tool: "planTimer")
     app.buttons["startPlanTimer"].tap()
     XCTAssertTrue(app.staticTexts["planRemaining"].waitForExistence(timeout: 5))
     app.buttons["暂停"].tap()
     app.terminate()
     app.launch()
-    enter("planTimer")
+    enter(app, scene: "team", tool: "planTimer")
     XCTAssertTrue(app.buttons["继续"].waitForExistence(timeout: 5))
   }
 }

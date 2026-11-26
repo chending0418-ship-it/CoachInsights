@@ -85,9 +85,7 @@ struct VideoLibraryView: View {
     private var libraryPanel: some View {
         List {
             VStack(alignment: .leading, spacing: 8) {
-                if mode == .comparison {
-                    Text("先选第一段视频，再添加第二段。").font(.footnote).foregroundStyle(.secondary)
-                }
+                NotebookHeading(title: mode == .comparison ? "对比选片" : "视频资料库", detail: mode == .comparison ? "选择第一段视频，再添加第二段。" : "导入素材，或继续已有分析。")
                 HStack(spacing: 8) {
                     Button { photoImport = true } label: {
                         HStack(spacing: 6) {
@@ -248,6 +246,7 @@ struct CreateSessionView: View {
                 }
                 Section { Label("只保存在当前设备", systemImage: "internaldrive").foregroundStyle(.secondary) }
             }
+            .notebookForm()
             .navigationTitle("新建分析").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -287,14 +286,14 @@ struct NewVideoImportView:View {
     var body:some View {
         NavigationStack {
             Form {
-                Section { Text(selection.url.deletingPathExtension().lastPathComponent).lineLimit(2)
+                Section("待导入素材") { Label(selection.url.deletingPathExtension().lastPathComponent, systemImage: "film").font(.headline).lineLimit(2)
                     Picker("运动类型",selection:$sport) { ForEach(Sport.allCases,id:\.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented).disabled(busy)
                     Text("导入后自动创建分析记录，可随时重命名。").font(.caption).foregroundStyle(.secondary)
                 }
                 if busy { ProgressView("复制到本机…",value:progress) }
                 if let issue { Text(issue).foregroundStyle(.red) }
                 Button(busy ? "正在导入…":"打开并分析") { start() }.disabled(busy).accessibilityIdentifier("confirmNewImport")
-            }.navigationTitle("导入视频").navigationBarTitleDisplayMode(.inline)
+            }.notebookForm().navigationTitle("导入视频").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("取消") { task?.cancel();if !busy { dismiss() } } }
             .interactiveDismissDisabled(busy)
             .onDisappear { task?.cancel() }

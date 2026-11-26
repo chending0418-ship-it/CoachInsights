@@ -94,7 +94,7 @@ private struct LaunchArtworkView: View {
                 Image(usesDefaultArtwork ? "LaunchIdentityLight" : "LaunchIdentity")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: max(0, min(264, geometry.size.width - 48)))
+                    .frame(width: min(geometry.size.width * 0.65, geometry.size.width >= 700 ? 340 : 264))
                     .accessibilityLabel(Text("棒球训练助手"))
                     .position(
                         x: geometry.size.width / 2,
@@ -107,7 +107,8 @@ private struct LaunchArtworkView: View {
             if !presentation.configuration.message.isEmpty {
                 Text(presentation.configuration.message)
                     .font(.footnote.weight(.medium))
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .frame(maxWidth: 580)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(foregroundColor)
                     .padding(.horizontal, 24)
