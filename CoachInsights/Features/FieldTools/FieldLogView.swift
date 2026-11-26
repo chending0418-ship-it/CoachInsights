@@ -530,7 +530,7 @@ private struct PitchReviewView: View {
                         }
                         LazyVStack(alignment: .leading, spacing: 0) {
                             Text("本轮球序").font(.headline)
-                            ForEach(pitches.indices, id: \.self) { i in
+                            ForEach(pitches.indices.reversed(), id: \.self) { i in
                                 Button { playing = false; index = i } label: {
                                     HStack {
                                         Text(String(format: "%02d", i + 1)).monospacedDigit()

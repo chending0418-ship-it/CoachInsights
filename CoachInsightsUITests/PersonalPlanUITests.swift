@@ -29,7 +29,7 @@ final class PersonalPlanUITests: XCTestCase {
 
         let toggle = app.buttons["documentPreviewToggle"]
         if toggle.exists { toggle.tap() }
-        XCTAssertEqual(app.staticTexts["personalPlanPreviewTitle"].label, "Practice plan")
+        XCTAssertEqual(app.scrollViews["personalPlanTextPreview"].staticTexts["personalPlanPreviewTitle"].label, "Practice plan")
         capture(app, named: "phase01-editor-preview")
         save.tap()
         XCTAssertTrue(app.staticTexts["Practice plan"].waitForExistence(timeout: 5))
@@ -38,7 +38,7 @@ final class PersonalPlanUITests: XCTestCase {
         app.launchArguments = ["--ui-testing"]
         app.launch()
         app.buttons["recordsTab"].tap()
-        app.segmentedControls["recordSceneFilter"].buttons["私教"].tap()
+        app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["私教"].tap()
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Practice plan")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5))
         record.tap()
@@ -50,7 +50,7 @@ final class PersonalPlanUITests: XCTestCase {
         app.buttons["cancelPersonalPlan"].tap()
         app.alerts.buttons["继续编辑"].tap()
         save.tap()
-        XCTAssertEqual(app.staticTexts["personalPlanPreviewTitle"].label, "Practice plan revised")
+        XCTAssertEqual(app.scrollViews["personalPlanTextPreview"].staticTexts["personalPlanPreviewTitle"].label, "Practice plan revised")
 
         app.buttons["personalPlanShare"].tap()
         let count = app.staticTexts["shareCardPageCount"]

@@ -115,11 +115,13 @@ struct VideoLibraryView: View {
             source("相册", "选择视频", "photo", "rootPhotos") { photoImport = true }
             source("文件", "选择文件", "folder", "rootFiles") { fileImport = true }
             if mode == .analysis { source("拍摄", "录制新动作", "video", "rootCapture") { showCapture = true } }
+            if mode == .analysis {
             NavigationLink { HelpView() } label: { Label("使用说明与隐私", systemImage: "questionmark.circle") }.font(.caption).frame(minHeight: 44)
             #if DEBUG
             NavigationLink { ProbeView() } label: { Label("媒体技术验证", systemImage: "waveform.path.ecg") }
                 .font(.caption).accessibilityIdentifier("openProbe")
             #endif
+            }
         }
     }
     private func source(_ title: String, _ detail: String, _ icon: String, _ id: String, action: @escaping () -> Void) -> some View {
@@ -137,7 +139,7 @@ struct VideoLibraryView: View {
     private func libraryPanel(wide: Bool) -> some View {
         List {
             VStack(alignment: .leading, spacing: 8) {
-                if mode == .comparison { SourceSelectionStrip(first: nil, second: nil, choosingLeft: true) }
+                if mode == .comparison { SourceSelectionStrip(first: nil, second: nil, choosingLeft: true) } else {
                 Picker("浏览方式", selection: $browseVideos) {
                     Text("视频").tag(true)
                     Text("分析记录").tag(false)
@@ -157,6 +159,7 @@ struct VideoLibraryView: View {
                         .accessibilityIdentifier("sportFilter")
                     Picker("日期", selection: $period) { ForEach(["全部日期", "最近 7 天", "最近 30 天"], id: \.self) { Text($0) } }
                 }.pickerStyle(.menu)
+                }
             }.listRowBackground(Theme.paper).listRowSeparator(.hidden)
             if let issue = library.issue {
                 Section {

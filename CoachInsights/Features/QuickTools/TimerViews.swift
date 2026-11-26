@@ -40,11 +40,11 @@ private struct TrainingClockDial: View {
             context.stroke(Path(ellipseIn: inner), with: .color(Notebook.rule.opacity(0.55)), lineWidth: 0.7)
             for index in 0..<60 {
                 let angle = Double(index) * .pi / 30 - .pi / 2
-                let length: CGFloat = index.isMultiple(of: 5) ? 6 : 3
+                let length: CGFloat = index.isMultiple(of: 5) ? 8 : 4
                 var tick = Path()
                 tick.move(to: CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius))
                 tick.addLine(to: CGPoint(x: center.x + cos(angle) * (radius - length), y: center.y + sin(angle) * (radius - length)))
-                context.stroke(tick, with: .color(Notebook.rule), lineWidth: 1)
+                context.stroke(tick, with: .color(Notebook.ink.opacity(index.isMultiple(of: 5) ? 0.55 : 0.28)), lineWidth: 1.2)
             }
             var arc = Path()
             arc.addArc(center: center, radius: radius, startAngle: .degrees(-90), endAngle: .degrees(-90 + min(1, max(0, fraction)) * 360), clockwise: false)
@@ -93,6 +93,7 @@ struct StopwatchView: View {
                     .lineLimit(1).minimumScaleFactor(0.45)
                     .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(elapsed))
                     .accessibilityIdentifier("stopwatchTime")
+                Text("分 · 秒 · 百分秒").font(.caption).foregroundStyle(.secondary)
             }.padding(.horizontal, 14)
         }.aspectRatio(1, contentMode: .fit).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -219,6 +220,7 @@ struct CountdownView: View {
                 Text(PocketTimeFormat.countdown(remaining))
                     .font(.system(size: UIDevice.current.userInterfaceIdiom == .pad ? 45 : 32, weight: .medium, design: .monospaced)).lineLimit(1).minimumScaleFactor(0.4)
                     .accessibilityIdentifier("countdownTime")
+                Text("剩余时间").font(.caption).foregroundStyle(.secondary)
                 if let end = countdown.deadline {
                     Label(end.formatted(date: .omitted, time: .shortened), systemImage: "bell").font(.caption)
                 }

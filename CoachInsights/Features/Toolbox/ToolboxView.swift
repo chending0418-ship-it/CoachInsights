@@ -112,7 +112,8 @@ struct RootView: View {
                 NavigationStack(path: $recordPath) {
                     PocketRecordsView(filter: $recordFilter, openRecord: { recordPath.append(.open($0)) },
                                       inspectRecord: { recordPath.append(.inspect($0)) },
-                                      closeInspection: { if !recordPath.isEmpty { _ = recordPath.popLast() } })
+                                      closeInspection: { if !recordPath.isEmpty { _ = recordPath.popLast() } },
+                                      returnHome: { section = .toolbox; toolboxPath = [] })
                 }
             }
         }
@@ -223,6 +224,13 @@ private struct ToolRouteHeader: ViewModifier {
     }
 }
 
+private func recentRecordRow(_ record: PocketRecord) -> some View {
+    NotebookToolRow(title: record.name, detail: record.tool.title, icon: record.tool.symbol)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Notebook.paper, in: RoundedRectangle(cornerRadius: 7))
+        .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(Notebook.rule) }
+}
+
 private enum PocketStyle {
     static let paper = Theme.paper
     static let wash = Notebook.inset
@@ -249,7 +257,7 @@ private struct ToolboxHomeView: View {
                     Text(Date.now.formatted(.dateTime.month().day().weekday(.wide))).font(.caption).foregroundStyle(.secondary)
                     Text("训练工具箱").font(.largeTitle.bold())
                 }
-                NotebookColumns(minimumWidth: 680, leadingFraction: 0.57) {
+                NotebookColumns(minimumWidth: 680, leadingFraction: 0.69) {
                     fieldSection
                     shortcuts(vertical: geometry.size.width >= 720 && geometry.size.height >= 500)
                 }
@@ -286,17 +294,26 @@ private struct ToolboxHomeView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("投球记录", systemImage: PocketTool.bullpenLog.symbol).font(.caption)
-                        Text(draft.flatMap { $0.name.isEmpty ? nil : $0.name } ?? "牛棚投球").font(.title2.bold()).foregroundStyle(.primary)
+                        Text(draft.flatMap { $0.name.isEmpty ? nil : $0.name } ?? "牛棚投球").lineLimit(2).font(.title2.bold()).foregroundStyle(.primary)
                         if let draft, !draft.pitches.isEmpty {
-                            Text("\(draft.pitches.count) 球 · 好球率 \(draft.strikeRateText)").font(.subheadline.monospacedDigit())
+                            Text("\(draft.pitches.count) 球 / \(draft.strikeCount) 好球").font(.subheadline.monospacedDigit())
                         }
                         Label(draft?.events.isEmpty == false ? "继续记球" : "开始记球", systemImage: "arrow.right").font(.subheadline.bold()).padding(.horizontal, 12).padding(.vertical, 8).foregroundStyle(.white).background(Theme.burgundy, in: RoundedRectangle(cornerRadius: 6))
                     }
-                    Spacer()
-                    PitchLocationMap(pitches: draft?.pitches ?? [], viewpoint: viewpoint, readOnly: true) { _ in }
-                        .frame(width: 100).allowsHitTesting(false).accessibilityHidden(true)
-                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                .background(PocketStyle.wash,in: RoundedRectangle(cornerRadius: 12))
+                    Spacer(minLength: 0)
+                }.padding(.leading, studio ? 20 : 14).padding(.vertical, 15)
+                .frame(maxWidth: .infinity, minHeight: studio ? 168 : 148, alignment: .leading)
+                .background(alignment: .trailing) {
+                    GeometryReader { card in
+                        let mapWidth = card.size.width * 0.425
+                        PitchLocationMap(pitches: draft?.pitches ?? [], viewpoint: viewpoint, readOnly: true,
+                                         ratio: mapWidth / max(1, card.size.height)) { _ in }
+                            .frame(width: mapWidth, height: card.size.height)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }.allowsHitTesting(false).accessibilityHidden(true)
+                }
+                .background(PocketStyle.wash).clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Notebook.rule) }
             }.buttonStyle(.plain).accessibilityIdentifier("bullpenShortcut")
         }
     }
@@ -307,11 +324,14 @@ private struct ToolboxHomeView: View {
             flow {
                 ForEach([PocketTool.battingLog, .tacticsBoard, .stopwatch]) { tool in
                     NavigationLink(value: ToolboxRoute.tool(tool)) {
-                        Label(tool.title,systemImage: tool.symbol).font(.subheadline)
-                            .frame(maxWidth: .infinity,minHeight: 46)
+                        Label(tool.title, systemImage: tool.symbol).font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 46, alignment: vertical ? .leading : .center)
+                            .padding(.horizontal, vertical ? 9 : 0)
                     }.buttonStyle(.plain).foregroundStyle(Theme.burgundy)
-                        .background(Notebook.paper, in: RoundedRectangle(cornerRadius: 7))
-                        .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(Notebook.rule) }
+                        .overlay(alignment: .bottom) {
+                            if vertical { Divider() }
+                            else { RoundedRectangle(cornerRadius: 7).strokeBorder(Notebook.rule) }
+                        }
                         .accessibilityIdentifier("shortcut_" + tool.rawValue)
                 }
             }
@@ -338,16 +358,8 @@ private struct ToolboxHomeView: View {
             if recent.isEmpty { Text("保存的训练会显示在这里。").font(.subheadline).foregroundStyle(.secondary) }
             ForEach(recent) { record in
                 Button { showRecords(record.id) } label: {
-                    HStack {
-                        Image(systemName: record.tool.symbol)
-                        VStack(alignment: .leading) {
-                            Text(record.name).font(.headline).foregroundStyle(.primary)
-                            Text(record.tool.title).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer(); Image(systemName: "chevron.right").font(.caption)
-                    }.padding(.vertical,6).contentShape(Rectangle())
-                }
-                Divider()
+                    recentRecordRow(record)
+                }.buttonStyle(.plain)
             }
         }
     }
@@ -412,9 +424,8 @@ private struct ToolSceneView: View {
                     if recent.isEmpty { Text("这个场景的训练记录将显示在这里。").font(.subheadline).foregroundStyle(.secondary) }
                     ForEach(recent) { record in
                         Button { openRecord(record.id) } label: {
-                            NotebookToolRow(title: record.name, detail: record.tool.title, icon: record.tool.symbol)
+                            recentRecordRow(record)
                         }.buttonStyle(.plain)
-                        Divider()
                     }
                 }
             }.padding(.horizontal, twoColumns ? 24 : 15).padding(.vertical, 17).frame(maxWidth: 1040).frame(maxWidth: .infinity)
@@ -458,6 +469,7 @@ private struct PocketRecordsView: View {
     let openRecord: (UUID) -> Void
     var inspectRecord: (UUID) -> Void = { _ in }
     var closeInspection: () -> Void = {}
+    var returnHome: () -> Void = {}
     @State private var pendingDelete: UUID?
     @State private var deletionIssue: String?
     @State private var search = ""
@@ -472,7 +484,9 @@ private struct PocketRecordsView: View {
             let wide = geometry.size.width >= 660
             let visibleRecords = records
             let selected = visibleRecords.first(where: { $0.id == inspection }) ?? visibleRecords.first
-            HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                filters.padding(.horizontal, wide ? 24 : 15).padding(.vertical, 12)
+                HStack(alignment: .top, spacing: 0) {
                 recordList(wide: wide, records: visibleRecords, selectedID: selected?.id)
                 if wide, let selected {
                     Divider()
@@ -480,33 +494,47 @@ private struct PocketRecordsView: View {
                         Button("打开详情", systemImage: "arrow.up.right") { inspectRecord(selected.id) }.padding(.horizontal, 16)
                         RecordInspection(record: selected, open: { openRecord(selected.id) },
                                      delete: { pendingDelete = selected.id })
-                    }.frame(maxWidth: 310)
+                    }.frame(width: geometry.size.width * 0.42)
+                }
                 }
             }
         }.background(PocketStyle.paper)
-        .navigationTitle("记录").navigationBarTitleDisplayMode(.inline)
+        .notebookPageTitle("训练记录", back: returnHome)
     }
 
-    private func recordList(wide: Bool, records: [PocketRecord], selectedID: UUID?) -> some View {
-        List {
+    private var filters: some View {
+        VStack(alignment: .leading, spacing: 10) {
             NotebookHeading(title: "训练记录", detail: "按名称、场景或工具查找已保存的训练。")
-                .listRowSeparator(.hidden).listRowBackground(Color.clear)
-            Section {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("搜索名称或工具", text: $search).submitLabel(.search)
                     if !search.isEmpty { Button("清除", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly) }
                 }
                     .padding(.horizontal, 10).frame(minHeight: 44).background(Notebook.inset, in: RoundedRectangle(cornerRadius: 6))
-                Picker("来源场景", selection: Binding(get: { filter.scene }, set: { filter.selectScene($0) })) {
-                    Text("全部").tag(PocketScene?.none)
-                    ForEach(PocketScene.allCases) { Text($0.title).tag(Optional($0)) }
-                }.pickerStyle(.segmented).accessibilityIdentifier("recordSceneFilter")
-                Picker("工具类型", selection: $filter.tool) {
-                    Text("全部工具").tag(PocketTool?.none)
-                    ForEach(filter.tools) { Text($0.title).tag(Optional($0)) }
-                }.accessibilityIdentifier("recordToolFilter")
-            }
+            HStack(spacing: 5) {
+                ForEach([nil] + PocketScene.allCases.map(Optional.some), id: \.self) { scene in
+                    let selected = filter.scene == scene
+                    Button(scene?.title ?? "全部") { filter.selectScene(scene) }
+                        .font(.subheadline.weight(.semibold)).padding(.horizontal, 10).frame(minHeight: 40)
+                        .foregroundStyle(selected ? Color.white : Notebook.ink)
+                        .background(selected ? Theme.burgundy : Notebook.paper, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? .clear : Notebook.rule) }
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+                Spacer(minLength: 0)
+                Menu {
+                    Picker("工具类型", selection: $filter.tool) {
+                        Text("全部工具").tag(PocketTool?.none)
+                        ForEach(filter.tools) { Text($0.title).tag(Optional($0)) }
+                    }
+                } label: { Image(systemName: "line.3.horizontal.decrease").frame(width: 42, height: 42) }
+                .accessibilityLabel(filter.tool?.title ?? "全部工具").accessibilityIdentifier("recordToolFilter")
+            }.accessibilityElement(children: .contain).accessibilityIdentifier("recordSceneFilter")
+        }
+    }
+
+    private func recordList(wide: Bool, records: [PocketRecord], selectedID: UUID?) -> some View {
+        List {
             if let issue = library.issue {
                 Section {
                     Text(issue).foregroundStyle(.red)

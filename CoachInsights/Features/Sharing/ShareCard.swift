@@ -29,7 +29,14 @@ struct ShareCardContent: Equatable {
             switch self { case .tooLong: return "内容超过单次 20 页图片范围，请拆分内容后生成。"; case .generation: return "图片未能生成，请重试。" }
         }
     }
+    struct Page {
+        let image: UIImage
+        let summary: String
+    }
     static func render(_ content: ShareCardContent) throws -> [UIImage] {
+        try pages(content).map(\.image)
+    }
+    static func pages(_ content: ShareCardContent) throws -> [Page] {
         let text = NSMutableAttributedString(string: "")
         func append(_ string: String, font: UIFont, spacing: CGFloat, heading: Bool = false) {
             let paragraph = NSMutableParagraphStyle(); paragraph.lineSpacing = 10; paragraph.paragraphSpacing = spacing
@@ -56,7 +63,7 @@ struct ShareCardContent: Equatable {
             guard range.length > 0, NSMaxRange(range) > end else { throw Failure.generation }
             end = NSMaxRange(range); containers.append(container); ranges.append(range)
         } while end < layout.numberOfGlyphs
-        var images: [UIImage] = []
+        var pages: [Page] = []
         let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
         for index in containers.indices {
             let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
@@ -74,9 +81,11 @@ struct ShareCardContent: Equatable {
                 brand.draw(at: CGPoint(x: 72, y: 1330))
                 ("\(index + 1) / \(containers.count)" as NSString).draw(at: CGPoint(x: 912, y: 1330), withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: 28, weight: .regular), .foregroundColor: UIColor.darkGray])
             }
-            images.append(image)
+            let range = layout.characterRange(forGlyphRange: ranges[index], actualGlyphRange: nil)
+            let summary = (text.string as NSString).substring(with: range).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            pages.append(Page(image: image, summary: String(summary.prefix(50))))
         }
-        return images
+        return pages
     }
     static func files(for images: [UIImage], directory: URL) throws -> [URL] {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -99,7 +108,8 @@ struct ShareCardContent: Equatable {
 
 struct ShareCardPreview: View {
     let content: ShareCardContent
-    @State private var images: [UIImage] = []
+    @State private var pages: [ShareCardRenderer.Page] = []
+    private var images: [UIImage] { pages.map(\.image) }
     @State private var page = 0
     @State private var wide = false
     @State private var issue: String?
@@ -129,8 +139,17 @@ struct ShareCardPreview: View {
                         Button {
                             page = i
                         } label: {
-                            Label("第 \(i + 1) 页", systemImage: page == i ? "checkmark.circle.fill" : "doc")
-                        }
+                            HStack(spacing: 10) {
+                                Image(systemName: page == i ? "checkmark.circle.fill" : "doc")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("第 \(i + 1) 页").font(.subheadline.bold())
+                                    Text(pages[i].summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                Spacer()
+                            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(page == i ? Theme.burgundy.opacity(0.09) : Notebook.paper)
+                                .overlay(alignment: .leading) { if page == i { Rectangle().fill(Theme.burgundy).frame(width: 3) } }
+                        }.buttonStyle(.plain)
                     }
                     Button("重新生成") { generate() }.buttonStyle(.bordered).accessibilityIdentifier("shareCardRegenerate")
                     if wide { actions }
@@ -159,7 +178,9 @@ struct ShareCardPreview: View {
                 Text("共 \(images.count) 页").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("shareCardPageCount")
                 if let issue { Text(issue).font(.callout).foregroundStyle(.red).accessibilityIdentifier("shareCardIssue") }
                 if let notice { Text(notice).font(.callout).foregroundStyle(Theme.burgundy).accessibilityIdentifier("shareCardNotice") }
-            HStack {
+            let layout = wide ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+            layout {
+                Button("系统分享", systemImage: "square.and.arrow.up") { shareImages() }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("shareCardShare")
                 Button(saving ? "正在保存…" : "保存全部图片") {
                     saving = true; notice = nil; issue = nil
                     let snapshot = images
@@ -169,14 +190,13 @@ struct ShareCardPreview: View {
                         catch { issue = error.localizedDescription }
                     }
                 }.buttonStyle(NotebookActionStyle()).accessibilityIdentifier("shareCardSave")
-                Button("系统分享", systemImage: "square.and.arrow.up") { shareImages() }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("shareCardShare")
             }
                 .disabled(images.isEmpty || saving)
             }.padding(12).frame(maxWidth: .infinity).background(Theme.paper)
         }
     private func generate() {
-        issue = nil; notice = nil; images = []; page = 0
-        do { images = try ShareCardRenderer.render(content) }
+        issue = nil; notice = nil; pages = []; page = 0
+        do { pages = try ShareCardRenderer.pages(content) }
         catch { issue = error.localizedDescription }
     }
     private func shareImages() {

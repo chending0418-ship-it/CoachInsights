@@ -67,7 +67,7 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
         tap(app, "fieldEnd"); app.buttons["保存并结束本轮"].tap()
         toRecords(app)
-        app.segmentedControls["recordSceneFilter"].buttons["随手工具"].tap()
+        app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["随手工具"].tap()
         let record = app.staticTexts["Batting round"].firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
@@ -204,7 +204,7 @@ final class FieldToolsUITests: XCTestCase {
         tap(app, "fieldUndo"); XCTAssertTrue(app.staticTexts["gameSides"].label.contains("0"))
         tap(app, "fieldSave"); shot("phase00-game")
         app.terminate(); app = launch(reset: false)
-        app.buttons["recordsTab"].tap(); app.segmentedControls["recordSceneFilter"].buttons["团训"].tap()
+        app.buttons["recordsTab"].tap(); app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["团训"].tap()
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Game round")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }

@@ -71,7 +71,7 @@ final class CoachInsightsUITests:XCTestCase {
         app.navigationBars.buttons.element(boundBy:0).tap()
         app.navigationBars.buttons.element(boundBy:0).tap()
         app.buttons["recordsTab"].tap()
-        let scene=app.segmentedControls["recordSceneFilter"]
+        let scene=app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch
         XCTAssertTrue(scene.waitForExistence(timeout:5));scene.buttons["团训"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout:5))
         scene.buttons["私教"].tap()

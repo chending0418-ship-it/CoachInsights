@@ -163,7 +163,7 @@ struct AnalysisEditor: View {
                                         playbackControls(compact: landscape).background(.black).foregroundStyle(.white)
                                         quickActions.padding(.top, 7)
                                     }
-                                    inspector.environment(\.colorScheme, .light)
+                                    inspector(wide: geometry.size.width - 30 >= 680).environment(\.colorScheme, .light)
                                 }
                             }.padding(.horizontal, 15).padding(.vertical, 12)
                         }.frame(maxWidth: .infinity).background(Theme.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
@@ -228,7 +228,7 @@ struct AnalysisEditor: View {
         }
     }
 
-    @ViewBuilder private var inspector: some View {
+    @ViewBuilder private func inspector(wide: Bool) -> some View {
         switch panel {
         case .drawing:
             VStack(alignment: .leading, spacing: 8) {
@@ -253,16 +253,31 @@ struct AnalysisEditor: View {
             PoseSettingsPanel(workspace: w, region: $poseRegion)
         case nil:
             VStack(alignment: .leading, spacing: 12) {
-                relatedActions
-                Rectangle().fill(Theme.burgundy).frame(height: 2)
-                Text("本次分析").font(.headline)
-                LabeledContent("绘图标注", value: "\(w.snapshot.annotations.filter { $0.videoID == w.selectedVideoID }.count) 处")
-                Divider()
-                LabeledContent("关键帧", value: "\(w.snapshot.keyframes.filter { $0.videoID == w.selectedVideoID }.count) 个")
-                Divider()
-                LabeledContent("片段时长", value: String(format: "%.2f s", w.clip.end.seconds - w.clip.start.seconds))
+                if wide {
+                    analysisSummary
+                    relatedActions
+                    Rectangle().fill(Theme.burgundy).frame(height: 2)
+                    Text("当前素材").font(.headline)
+                    Picker("当前素材", selection: Binding(get: { w.selectedVideoID }, set: { id in
+                        guard let id else { return }
+                        Task { w.save(); await w.select(id) }
+                    })) { ForEach(w.assets) { Text($0.originalName).tag(Optional($0.id)) } }.labelsHidden()
+                    Button("添加素材", systemImage: "plus") { w.pause(); showAdd = true }.buttonStyle(NotebookActionStyle())
+                } else {
+                    relatedActions
+                    analysisSummary
+                }
             }.font(.subheadline)
         }
+    }
+    @ViewBuilder private var analysisSummary: some View {
+        Rectangle().fill(Theme.burgundy).frame(height: 2)
+        Text("本次分析").font(.headline)
+        LabeledContent("绘图标注", value: "\(w.snapshot.annotations.filter { $0.videoID == w.selectedVideoID }.count) 处")
+        Divider()
+        LabeledContent("关键帧", value: "\(w.snapshot.keyframes.filter { $0.videoID == w.selectedVideoID }.count) 个")
+        Divider()
+        LabeledContent("片段时长", value: String(format: "%.2f s", w.clip.end.seconds - w.clip.start.seconds))
     }
     private var relatedActions: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -363,8 +378,8 @@ struct AnalysisEditor: View {
     private var canvas: some View {
         ZStack(alignment:.topLeading) {
             AnalysisCanvas(workspace:w)
-            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
-            if w.tool != "view" && w.frameReady { Text(w.rangeMode == "单帧" ? "在视频画面上绘图 · 当前帧":"在视频画面上绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
+            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).foregroundStyle(.white).tint(.white).padding(10).background(.black.opacity(0.75),in:Capsule()).padding(8).allowsHitTesting(false) }
+            if w.tool != "view" && w.frameReady { Text(w.rangeMode == "单帧" ? "在视频画面上绘图 · 当前帧":"在视频画面上绘图 · 整个片段").font(.caption).foregroundStyle(.white).padding(8).background(.black.opacity(0.75),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
         }
     }
     private func immersiveCanvas(_ size: CGSize) -> some View {

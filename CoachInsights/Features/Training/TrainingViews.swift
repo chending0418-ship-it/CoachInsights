@@ -66,22 +66,19 @@ struct TrainingDetail: View {
       }
   }
   @ViewBuilder private func actions(_ item: TrainingMaterial) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) { buttons(item) }
-      VStack(alignment: .leading, spacing: 8) { buttons(item) }
-    }
-  }
-  @ViewBuilder private func buttons(_ item: TrainingMaterial) -> some View {
-    if item.kind == .team {
-      NavigationLink { PlanRunView(preferred: item.id) } label: { Label("按计划计时", systemImage: "timer") }
-        .buttonStyle(DocumentButtonStyle(primary: true))
-    }
-    if item.kind != .team || !embedded {
-    NavigationLink { ShareCardPreview(content: item.card) } label: {
-      if item.kind == .team { Image(systemName: "square.and.arrow.up").accessibilityLabel("图片分享") }
-      else { Label("图片分享", systemImage: "square.and.arrow.up") }
-    }.buttonStyle(DocumentButtonStyle(primary: item.kind != .team))
-    }
+    DocumentActions {
+      if item.kind == .team {
+        NavigationLink { PlanRunView(preferred: item.id) } label: { Label("按计划计时", systemImage: "timer") }
+          .buttonStyle(DocumentButtonStyle(primary: true))
+      } else {
+        NavigationLink { ShareCardPreview(content: item.card) } label: { Label("预览分享图片", systemImage: "square.and.arrow.up") }
+          .buttonStyle(DocumentButtonStyle(primary: true)).accessibilityIdentifier("trainingShare")
+      }
+    } secondary: {
+      if item.kind == .team && !embedded {
+        NavigationLink { ShareCardPreview(content: item.card) } label: { Image(systemName: "square.and.arrow.up").accessibilityLabel("图片分享") }
+          .buttonStyle(DocumentButtonStyle())
+      }
     Button { editing = item } label: { Label("编辑", systemImage: "pencil") }.buttonStyle(DocumentButtonStyle())
     if embedded {
       NavigationLink { TrainingDetail(id: id) } label: { Label("打开", systemImage: "arrow.up.right") }
@@ -89,6 +86,7 @@ struct TrainingDetail: View {
     } else {
       Button(role: .destructive) { deleting = true } label: { Image(systemName: "trash").accessibilityLabel("删除") }
         .buttonStyle(DocumentButtonStyle())
+    }
     }
   }
 
@@ -214,9 +212,11 @@ struct TrainingSummary: View {
         Text(item.date, style: .date); Text(item.audience)
       }.font(.subheadline).foregroundStyle(.secondary)
       if item.kind == .homework {
-        HStack { Text("练习量"); Spacer(); Text(item.focus).bold() }
-          .padding(12).background(Notebook.fieldGreen.opacity(0.09), in: RoundedRectangle(cornerRadius: 5))
-          .foregroundStyle(Notebook.fieldGreen).id("练习量")
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 12) { Text("练习量").font(.subheadline).foregroundStyle(.secondary); Spacer(); Text(item.focus).font(.title2.bold()) }
+          VStack(alignment: .leading) { Text("练习量").font(.subheadline); Text(item.focus).font(.title2.bold()) }
+        }.padding(12).background(Notebook.inset, in: RoundedRectangle(cornerRadius: 5))
+          .foregroundStyle(Notebook.ink).id("练习量")
       }
       if !item.body.isEmpty {
         Divider(); Text(item.kind.bodyLabel).font(.headline).foregroundStyle(Theme.burgundy).id(item.kind.bodyLabel)

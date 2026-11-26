@@ -131,14 +131,14 @@ final class QuickToolsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tool_tacticsBoard"].waitForExistence(timeout: 5))
         XCUIDevice.shared.orientation = .portrait
         app.navigationBars.buttons.element(boundBy: 0).tap(); app.buttons["recordsTab"].tap()
-        app.segmentedControls["recordSceneFilter"].buttons["团训"].tap()
+        app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["团训"].tap()
         let record = app.staticTexts["战术白板"].firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         XCTAssertTrue(app.buttons["boardPlayer_跑1"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["boardBack"].exists)
         app.buttons["boardBack"].tap()
         XCTAssertTrue(record.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.segmentedControls["recordSceneFilter"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.waitForExistence(timeout: 5))
         record.swipeLeft(); app.buttons["删除"].firstMatch.tap(); app.alerts.buttons["删除"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout: 5))
     }

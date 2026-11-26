@@ -54,14 +54,10 @@ struct PersonalPlanDetailView: View {
         } message: { Text(issue ?? "") }
     }
     private func actions(_ plan: PersonalPlan) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) { buttons(plan) }
-            VStack(alignment: .leading, spacing: 8) { buttons(plan) }
-        }
-    }
-    @ViewBuilder private func buttons(_ plan: PersonalPlan) -> some View {
+        DocumentActions {
         NavigationLink { ShareCardPreview(content: plan.card) } label: { Label("预览与分享图片", systemImage: "square.and.arrow.up") }
             .buttonStyle(DocumentButtonStyle(primary: true)).accessibilityIdentifier("personalPlanShare")
+        } secondary: {
         Button { editing = plan } label: { Label("编辑", systemImage: "pencil") }
             .buttonStyle(DocumentButtonStyle()).accessibilityIdentifier("editPersonalPlan")
         if embedded {
@@ -70,6 +66,7 @@ struct PersonalPlanDetailView: View {
         } else {
             Button(role: .destructive) { confirmingDeletion = true } label: { Image(systemName: "trash").accessibilityLabel("删除计划") }
                 .buttonStyle(DocumentButtonStyle()).accessibilityIdentifier("deletePersonalPlan")
+        }
         }
     }
 

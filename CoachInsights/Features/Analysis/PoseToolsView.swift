@@ -8,11 +8,9 @@ struct PoseSettingsPanel: View {
     var body: some View {
                 VStack(alignment: .leading, spacing: 14) {
             Section("指定分析区域") {
-                Text(PoseGuidance.limitations)
-                    .font(.callout).accessibilityIdentifier("poseLimitations")
-                Text("用画面百分比框住一个完整人体。区域内出现多人或主体明显跳变时，该帧留空。")
-                    .font(.caption).foregroundStyle(.secondary)
-                if advanced {
+                Text("当前框选 · 宽 \(Int(region[2] * 100))% × 高 \(Int(region[3] * 100))%")
+                    .font(.subheadline.weight(.semibold))
+                DisclosureGroup("精调区域", isExpanded: $advanced) {
                 ForEach(0..<4,id:\.self) { i in
                     VStack(alignment:.leading) {
                         Text("\(["左边距","上边距","宽度","高度"][i]) \(Int(region[i]*100))%")
@@ -32,7 +30,6 @@ struct PoseSettingsPanel: View {
                     if value { workspace.overlaysVisible=true }
                     workspace.save()
                 }))
-                DisclosureGroup("高级设置",isExpanded:$advanced) {
                 Picker("识别引擎",selection:$workspace.poseSettings.engine) {
                     Text("Apple Vision（不可用时自动切换）").tag("Apple Vision")
                     Text("MediaPipe Full · 本机模型").tag(MediaPipePoseEngine.identity)
@@ -41,7 +38,6 @@ struct PoseSettingsPanel: View {
                     Text("关节最低置信度 \(workspace.poseSettings.minimumConfidence, specifier:"%.2f")")
                     Slider(value:$workspace.poseSettings.minimumConfidence,in:0.3...0.9)
                 }.disabled(workspace.poseBusy)
-                }
             }
             VStack(alignment:.leading,spacing:8) {
                 if workspace.poseBusy {
@@ -53,6 +49,7 @@ struct PoseSettingsPanel: View {
                         Button("重新分析") { workspace.analyzePose(force:true) }.buttonStyle(.bordered)
                     }
                 }
+                Text(PoseGuidance.limitations).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("poseLimitations")
                 Text(statusMessage)
                     .font(.caption).accessibilityElement(children:.ignore).accessibilityLabel(statusMessage).accessibilityIdentifier("poseStatus")
             }.frame(maxWidth:.infinity,alignment:.leading)

@@ -86,7 +86,7 @@ struct DocumentLibrary<Detail: View>: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(title).font(.system(size: headingSize, weight: .bold)).accessibilityAddTraits(.isHeader)
+                            Text(title).font(.system(size: wide ? headingSize * 34 / 25 : headingSize, weight: .bold)).accessibilityAddTraits(.isHeader)
                             Text("本机保存 · \(documents.count) 份" + noun).font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -272,6 +272,25 @@ struct NotebookActionStyle: ButtonStyle {
     }
 }
 
+struct DocumentActions<Primary: View, Secondary: View>: View {
+    @ViewBuilder var primary: () -> Primary
+    @ViewBuilder var secondary: () -> Secondary
+    @Environment(\.readerSidebar) private var sidebar
+    var body: some View {
+        if sidebar {
+            VStack(alignment: .leading, spacing: 8) {
+                primary().environment(\.readerActionsExpanded, true)
+                HStack(spacing: 8) { secondary() }
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { primary(); secondary() }
+                VStack(alignment: .leading, spacing: 8) { primary(); secondary() }
+            }
+        }
+    }
+}
+
 struct DocumentReader<Paper: View, Actions: View>: View {
     var sections: [String] = []
     @ViewBuilder var paper: () -> Paper
@@ -286,7 +305,7 @@ struct DocumentReader<Paper: View, Actions: View>: View {
                             paper().overlay(alignment: .top) { Rectangle().fill(Theme.burgundy).frame(height: 2) }
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("本页动作").font(.headline)
-                                actions()
+                                actions().environment(\.readerSidebar, true)
                                 if !sections.isEmpty {
                                     Divider()
                                     Text("内容目录").font(.headline)
@@ -373,6 +392,14 @@ struct DocumentEditorLayout<Form: View, Preview: View>: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }.background(Notebook.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
             .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private struct ReaderSidebarKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var readerSidebar: Bool {
+        get { self[ReaderSidebarKey.self] }
+        set { self[ReaderSidebarKey.self] = newValue }
     }
 }
 
