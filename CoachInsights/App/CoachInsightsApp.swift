@@ -22,6 +22,7 @@ import SwiftUI
             .environmentObject(fieldTools)
             .environmentObject(personalPlans)
             .environmentObject(training)
+            .preferredColorScheme(.light)
             .tint(Theme.burgundy)
         }
     }

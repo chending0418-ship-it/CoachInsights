@@ -138,14 +138,14 @@ private struct TrainingEditor: View {
       GeometryReader { geometry in
         if geometry.size.width >= 700 {
           HStack(spacing: 0) {
-            fields
+            fields(showsPreviewButton: false)
             Divider()
             summary.frame(maxWidth: .infinity)
           }
         } else if preview {
           summary
         } else {
-          fields
+          fields(showsPreviewButton: true)
         }
       }.background(Theme.paper)
         .navigationTitle(draft.kind.tool.title).navigationBarTitleDisplayMode(.inline)
@@ -177,7 +177,7 @@ private struct TrainingEditor: View {
       }.padding()
     }.frame(maxWidth: .infinity)
   }
-  private var fields: some View {
+  private func fields(showsPreviewButton: Bool) -> some View {
     Form {
       Section {
         TextField("标题", text: $draft.title).accessibilityIdentifier("trainingTitle")
@@ -216,7 +216,7 @@ private struct TrainingEditor: View {
         }
       }
       TextField("教练署名", text: $draft.author)
-      Button("预览内容") { preview = true }.disabled(!draft.valid)
+      if showsPreviewButton { Button("预览内容") { preview = true }.disabled(!draft.valid) }
     }.scrollDismissesKeyboard(.interactively)
   }
 }
