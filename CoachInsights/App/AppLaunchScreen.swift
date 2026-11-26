@@ -94,7 +94,7 @@ private struct LaunchArtworkView: View {
                 Image(usesDefaultArtwork ? "LaunchIdentityLight" : "LaunchIdentity")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: min(geometry.size.width * 0.65, geometry.size.width >= 700 ? 340 : 264))
+                    .frame(width: min(geometry.size.width * 0.70, 270))
                     .accessibilityLabel(Text("棒球训练助手"))
                     .position(
                         x: geometry.size.width / 2,
@@ -117,12 +117,13 @@ private struct LaunchArtworkView: View {
         }
         .overlay(alignment: .topTrailing) {
             Button(action: skip) {
-                Text(Locale.preferredLanguages.first?.hasPrefix("zh") == true ? "跳过" : "Skip")
+                Label(Locale.preferredLanguages.first?.hasPrefix("zh") == true ? "进入工具箱" : "Open toolbox", systemImage: "arrow.right")
                     .font(.footnote)
                     .foregroundStyle(foregroundColor)
                     .padding(.horizontal, 16)
                     .frame(minHeight: 44)
-                    .background(.black.opacity(usesDefaultArtwork ? 0.06 : 0.24), in: Capsule())
+                    .background(usesDefaultArtwork ? Notebook.paper : .black.opacity(0.24), in: Capsule())
+                    .overlay { Capsule().strokeBorder(Notebook.rule) }
             }
             .padding(.trailing, 20)
             .accessibilityIdentifier("skip-launch-screen")

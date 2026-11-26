@@ -74,9 +74,11 @@ struct DistanceView: View {
     private var measurement: some View {
         GeometryReader { geometry in
             ScrollView {
-                NotebookColumns {
+                VStack(alignment: .leading, spacing: 14) {
+                    NotebookHeading(title: "场地测距", detail: model.instruction)
+                    NotebookColumns {
                     VStack(alignment: .leading, spacing: 12) {
-                        NotebookHeading(title: model.result != nil ? "两点距离" : model.hasStart ? "放置终点" : "放置起点", detail: model.instruction)
+                        Text(model.result != nil ? "两点距离" : model.hasStart ? "放置终点" : "放置起点").font(.headline)
                         ZStack {
                             ARDistanceCamera(model: model, active: phase == .active)
                             Image(systemName: "plus").font(.system(size: 30, weight: .light))
@@ -96,10 +98,10 @@ struct DistanceView: View {
                             Spacer()
                             if let result = model.result {
                                 Button(saved ? "已保存到记录" : "保存测距记录") { tools.saveDistance(result); saved = tools.issue == nil }
-                                    .buttonStyle(.borderedProminent).disabled(saved).accessibilityIdentifier("distanceSave")
+                                    .buttonStyle(NotebookActionStyle(prominent: true)).disabled(saved).accessibilityIdentifier("distanceSave")
                             } else {
                                 Button(model.hasStart ? "确定终点" : "确定起点") { model.command += 1 }
-                                    .buttonStyle(.borderedProminent).disabled(!model.canPlace).accessibilityIdentifier("distancePlace")
+                                    .buttonStyle(NotebookActionStyle(prominent: true)).disabled(!model.canPlace).accessibilityIdentifier("distancePlace")
                             }
                         }
                     }
@@ -108,6 +110,7 @@ struct DistanceView: View {
                         Picker("距离单位", selection: $centimeters) { Text("米").tag(false); Text("厘米").tag(true) }.pickerStyle(.segmented)
                         Text("AR 估算距离 · 请复核").font(.caption).foregroundStyle(.secondary)
                     }.notebookPanel()
+                    }
                 }.padding()
             }
         }.background(Theme.paper).preferredColorScheme(.light).environment(\.colorScheme, .light)

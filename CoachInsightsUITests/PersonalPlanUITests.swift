@@ -27,8 +27,8 @@ final class PersonalPlanUITests: XCTestCase {
         drills.typeText("Warm up\nThrow 10 balls")
         XCTAssertTrue(save.isEnabled)
 
-        let modes = app.segmentedControls["personalPlanEditorMode"]
-        if modes.exists { modes.buttons["预览"].tap() }
+        let toggle = app.buttons["documentPreviewToggle"]
+        if toggle.exists { toggle.tap() }
         XCTAssertEqual(app.staticTexts["personalPlanPreviewTitle"].label, "Practice plan")
         capture(app, named: "phase01-editor-preview")
         save.tap()
@@ -76,8 +76,8 @@ final class PersonalPlanUITests: XCTestCase {
                                               object: app.staticTexts["shareCardNotice"])
         XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 10), .completed)
 
-        app.navigationBars["图片预览"].buttons.element(boundBy: 0).tap()
-        app.navigationBars["计划详情"].buttons.element(boundBy: 0).tap()
+        app.buttons["notebookBack"].tap()
+        app.buttons["notebookBack"].tap()
         let updated = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Practice plan revised")).firstMatch
         XCTAssertTrue(updated.waitForExistence(timeout: 5))
         if app.buttons["deleteInspectedRecord"].isHittable {

@@ -1,27 +1,11 @@
 import SwiftUI
 
-struct PoseToolsView: View {
+struct PoseSettingsPanel: View {
     @ObservedObject var workspace: AnalysisWorkspace
-    @Environment(\.dismiss) private var dismiss
+    @Binding var region: [Double]
     @State private var advanced=false
-    @State private var region = [0.0,0.0,1.0,1.0]
     private var statusMessage:String { workspace.poseBusy ? "正在本机逐帧分析…" : workspace.issue ?? workspace.notice ?? "选定片段与主体区域后开始分析。" }
     var body: some View {
-        ScrollView {
-            NotebookColumns {
-                VStack(alignment: .leading) {
-                    if let frame = workspace.frame {
-                        PoseRegionPicker(
-                            image: UIImage(cgImage: frame.image), pose: workspace.currentPose,
-                            confidence: workspace.poseSettings.minimumConfidence, region: $region
-                        )
-                        .aspectRatio(CGFloat(frame.image.width) / CGFloat(max(1, frame.image.height)), contentMode: .fit)
-                        .disabled(workspace.poseBusy)
-                    } else {
-                        AnalysisCanvas(workspace: workspace).aspectRatio(16 / 9, contentMode: .fit)
-                    }
-                    Text("在画面上拖出矩形，再点应用区域。").font(.caption)
-                }
                 VStack(alignment: .leading, spacing: 14) {
             Section("指定分析区域") {
                 Text(PoseGuidance.limitations)
@@ -59,54 +43,45 @@ struct PoseToolsView: View {
                 }.disabled(workspace.poseBusy)
                 }
             }
-                }.notebookPanel()
-            }.padding()
-        }.background(Notebook.paper).safeAreaInset(edge: .bottom) {
             VStack(alignment:.leading,spacing:8) {
                 if workspace.poseBusy {
                     ProgressView(value:workspace.poseProgress)
                     Button("取消分析") { workspace.poseTask?.cancel() }.accessibilityIdentifier("cancelPose")
                 } else {
                     HStack {
-                        Button("分析选定片段 · 无需订阅") { workspace.analyzePose() }.buttonStyle(.borderedProminent).accessibilityIdentifier("runPose")
+                        Button("分析选定片段 · 无需订阅") { workspace.analyzePose() }.buttonStyle(DocumentButtonStyle(primary: true)).accessibilityIdentifier("runPose")
                         Button("重新分析") { workspace.analyzePose(force:true) }.buttonStyle(.bordered)
                     }
                 }
                 Text(statusMessage)
                     .font(.caption).accessibilityElement(children:.ignore).accessibilityLabel(statusMessage).accessibilityIdentifier("poseStatus")
-            }.frame(maxWidth:.infinity,alignment:.leading).padding().background(.regularMaterial)
-        }.navigationTitle("人体分析").navigationBarTitleDisplayMode(.inline).toolbar {
-            Button("完成") {
-                workspace.save(); dismiss()
-            }
-        }
-        .onAppear { region=workspace.poseSettings.region }
-        .onDisappear { workspace.save() }
+            }.frame(maxWidth:.infinity,alignment:.leading)
+        }.notebookPanel()
     }
 }
 
-private struct PoseRegionPicker:View {
-    let image:UIImage
+struct PoseRegionPicker:View {
+    let image: CGImage
+    let settings: ViewSettings
+    let annotations: [Annotation]
     let pose: PoseFrame?
     let confidence: Float
     @Binding var region:[Double]
     @State private var start:CGPoint?
     var body:some View {
         GeometryReader { proxy in
-            let geometry=VideoGeometry(imageSize:image.size,viewportSize:proxy.size)
+            let geometry = settings.geometry(image: CGSize(width: image.width, height: image.height), viewport: proxy.size)
             ZStack {
                 Color.black
-                Image(uiImage:image).resizable().scaledToFit()
                 Canvas { context, size in
-                    if let pose {
-                        context.withCGContext { graphics in
-                            AnalysisRenderer.drawPose(pose, context: graphics, geometry: geometry, confidence: confidence, showAngles: true)
-                            AnalysisRenderer.drawPoseNotice(pose, context: graphics, size: size, confidence: confidence)
-                        }
+                    context.withCGContext { graphics in
+                        AnalysisRenderer.draw(image: image, in: graphics, size: size, settings: settings,
+                                              annotations: annotations, pose: pose, confidence: confidence)
+                        AnalysisRenderer.drawPoseNotice(pose, context: graphics, size: size, confidence: confidence)
                     }
                     let a=geometry.viewPoint(from:CGPoint(x:region[0],y:region[1]))
                     let b=geometry.viewPoint(from:CGPoint(x:region[0]+region[2],y:region[1]+region[3]))
-                    context.stroke(Path(CGRect(x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y)),with:.color(.cyan),lineWidth:2)
+                    context.stroke(Path(CGRect(x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y).standardized),with:.color(.cyan),lineWidth:2)
                 }
             }.contentShape(Rectangle()).gesture(DragGesture(minimumDistance:5).onChanged { value in
                 if start==nil { start=geometry.normalizedPoint(from:value.startLocation) }

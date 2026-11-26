@@ -13,7 +13,7 @@ final class NotebookPageUITests: XCTestCase {
         let privacy = app.buttons["隐私与本机数据"]
         for _ in 0..<3 where !privacy.isHittable { app.swipeUp() }
         privacy.tap()
-        XCTAssertTrue(app.navigationBars["隐私与本机数据"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["资料保存在本机"].waitForExistence(timeout: 5))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "notebook-privacy"
         screenshot.lifetime = .keepAlways

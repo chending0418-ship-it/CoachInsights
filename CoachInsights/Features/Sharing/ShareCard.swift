@@ -31,14 +31,14 @@ struct ShareCardContent: Equatable {
     }
     static func render(_ content: ShareCardContent) throws -> [UIImage] {
         let text = NSMutableAttributedString(string: "")
-        func append(_ string: String, font: UIFont, spacing: CGFloat) {
+        func append(_ string: String, font: UIFont, spacing: CGFloat, heading: Bool = false) {
             let paragraph = NSMutableParagraphStyle(); paragraph.lineSpacing = 10; paragraph.paragraphSpacing = spacing
             paragraph.lineBreakMode = .byWordWrapping
-            text.append(NSAttributedString(string: string + "\n", attributes: [.font: font, .foregroundColor: UIColor(red: 11/255, green: 25/255, blue: 51/255, alpha: 1), .paragraphStyle: paragraph]))
+            text.append(NSAttributedString(string: string + "\n", attributes: [.font: font, .foregroundColor: heading ? UIColor(Theme.burgundy) : UIColor(Notebook.ink), .paragraphStyle: paragraph]))
         }
         append(content.title, font: .systemFont(ofSize: 54, weight: .bold), spacing: 28)
         for section in content.sections {
-            if !section.heading.isEmpty { append(section.heading, font: .systemFont(ofSize: 38, weight: .semibold), spacing: 12) }
+            if !section.heading.isEmpty { append(section.heading, font: .systemFont(ofSize: 38, weight: .semibold), spacing: 12, heading: true) }
             append(section.body, font: .systemFont(ofSize: 36), spacing: 32)
         }
         append("署名：" + (content.author.isEmpty ? "未填写" : content.author), font: .systemFont(ofSize: 30), spacing: 0)
@@ -60,9 +60,9 @@ struct ShareCardContent: Equatable {
         let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
         for index in containers.indices {
             let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
-                UIColor(red: 0.98, green: 0.973, blue: 0.961, alpha: 1).setFill(); context.fill(CGRect(origin: .zero, size: size))
+                UIColor(Notebook.paper).setFill(); context.fill(CGRect(origin: .zero, size: size))
                 let burgundy = UIColor(red: 114/255, green: 47/255, blue: 55/255, alpha: 1)
-                burgundy.setFill(); context.fill(CGRect(x: 72, y: 174, width: 54, height: 6))
+                UIColor(Notebook.rule).setFill(); context.fill(CGRect(x: 72, y: 174, width: 936, height: 3)); context.fill(CGRect(x: 72, y: 1302, width: 936, height: 3))
                 ("棒球训练助手 · Drill Buddy" as NSString).draw(at: CGPoint(x: 72, y: 58), withAttributes: [.font: UIFont.systemFont(ofSize: 32, weight: .bold), .foregroundColor: burgundy])
                 let label = (content.isExample ? "示例内容 · " : "") + content.date.formatted(date: .numeric, time: .omitted)
                 (label as NSString).draw(at: CGPoint(x: 72, y: 116), withAttributes: [.font: UIFont.systemFont(ofSize: 27), .foregroundColor: UIColor.darkGray])
@@ -112,9 +112,9 @@ struct ShareCardPreview: View {
         ScrollView {
             NotebookColumns {
                 VStack(alignment: .leading, spacing: 10) {
-                    NotebookHeading(title: content.title, detail: "图片预览")
+                    NotebookHeading(title: "图片预览", detail: content.title)
                     if images.indices.contains(page) {
-                        Image(uiImage: images[page]).resizable().scaledToFit().frame(maxHeight: 600)
+                        Image(uiImage: images[page]).resizable().scaledToFit().frame(maxHeight: 600).padding(12).background(Notebook.inset, in: RoundedRectangle(cornerRadius: 8))
                             .accessibilityLabel("图片第 \(page + 1) 页，共 \(images.count) 页").accessibilityIdentifier("shareCardPage_\(page)")
                     }
                     HStack {
@@ -136,7 +136,7 @@ struct ShareCardPreview: View {
                     if wide { actions }
                 }.notebookPanel()
             }.padding()
-        }.background(Notebook.inset).navigationTitle("图片预览").navigationBarTitleDisplayMode(.inline)
+        }.background(Notebook.paper).notebookPageTitle("图片预览")
             .onGeometryChange(for: Bool.self) {
                 $0.size.width >= 752
             } action: {
@@ -168,9 +168,9 @@ struct ShareCardPreview: View {
                         do { try await ShareCardRenderer.saveToPhotos(snapshot); notice = "已保存 \(snapshot.count) 张图片到相册" }
                         catch { issue = error.localizedDescription }
                     }
-                }.accessibilityIdentifier("shareCardSave")
-                Button("系统分享", systemImage: "square.and.arrow.up") { shareImages() }.accessibilityIdentifier("shareCardShare")
-            }.buttonStyle(.borderedProminent).controlSize(.large)
+                }.buttonStyle(NotebookActionStyle()).accessibilityIdentifier("shareCardSave")
+                Button("系统分享", systemImage: "square.and.arrow.up") { shareImages() }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("shareCardShare")
+            }
                 .disabled(images.isEmpty || saving)
             }.padding(12).frame(maxWidth: .infinity).background(Theme.paper)
         }

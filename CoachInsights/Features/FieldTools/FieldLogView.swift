@@ -84,10 +84,10 @@ struct FieldLogView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $reviewingPitches) {
-            if let log { PitchReviewView(pitches: log.pitches, viewpoint: $viewpoint) }
+        .navigationDestination(isPresented: $reviewingPitches) {
+            if let log { PitchReviewView(pitches: log.pitches, viewpoint: $viewpoint, roundName: log.name, ended: log.ended) }
         }
-        .fullScreenCover(item: $correction) { selection in
+        .notebookDestination(item: $correction) { selection in
             PitchCorrectionView(mark: selection.mark, context: log?.pitches ?? [], number: selection.number, viewpoint: $viewpoint) { mark in
                 change { $0.correctPitch(at: selection.id, zone: mark.zone, isStrike: mark.isStrike, location: mark.location) }
             }
@@ -101,7 +101,7 @@ struct FieldLogView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     let placeholder = kind == .game ? "队内模拟赛" : kind == .bullpen ? "牛棚投球" : "前抛打击练习"
                     TextField(placeholder, text: $name, prompt: Text(placeholder).foregroundStyle(Notebook.ink))
-                        .font(.system(size: wide ? 36 : 30, weight: .bold)).textFieldStyle(.plain)
+                        .font(.system(size: wide ? 32 : 25, weight: .bold)).textFieldStyle(.plain)
                         .focused($editingName).submitLabel(.done).onSubmit { editingName = false }
                         .disabled(log.ended).accessibilityIdentifier("fieldName")
                     Text(log.createdAt.formatted(.dateTime.month().day()) + " · 本机记录")
@@ -214,10 +214,10 @@ struct FieldLogView: View {
     private func pitchControls(_ log: FieldLog, height: CGFloat, wide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading("投球落点", detail: log.ended ? "本轮已结束" : "点图记一球")
-            PitchLocationMap(pitches: log.pitches, viewpoint: viewpoint, ratio: wide ? 1.65 : 1.04) { point in
+            PitchLocationMap(pitches: log.pitches, viewpoint: viewpoint, ratio: wide ? 1.18 : 1.23) { point in
                 change { $0.append(.pitch(PitchMark(point: point))) }
             }
-            .frame(maxWidth: wide ? .infinity : min(440, max(165, height * 0.39)))
+            .frame(maxWidth: wide ? 520 : 440)
             .frame(maxWidth: .infinity)
             .disabled(log.ended || log.events.count >= FieldLog.eventLimit)
             HStack(spacing: 12) {
@@ -327,7 +327,7 @@ struct FieldLogView: View {
                 HStack(alignment: .bottom, spacing: 2) {
                     VStack(spacing: 2) {
                         Text(title).font(.subheadline)
-                        Text(String(format: "%02ld", value)).font(.system(size: 50, weight: .semibold, design: .monospaced))
+                        Text(String(format: "%02ld", value)).font(.system(size: 51, weight: .medium, design: .monospaced))
                             .minimumScaleFactor(0.4).lineLimit(1)
                     }.frame(maxWidth: .infinity)
                     Image(systemName: "plus.circle").font(.body).padding(.bottom, 5)
@@ -438,7 +438,7 @@ private struct PitchCorrectionView: View {
         return result
     }
     var body: some View {
-        NavigationStack {
+        Group {
             ScrollView {
                 VStack(spacing: 20) {
                     NotebookHeading(title: "修正第 \(number) 球", detail: "本轮共 \(displayed.count) 球")
@@ -470,7 +470,7 @@ private struct PitchCorrectionView: View {
                     if let issue { Text(issue).font(.callout).foregroundStyle(.red) }
                 }.padding(20).frame(maxWidth: 1000).frame(maxWidth: .infinity)
             }.accessibilityIdentifier("pitchCorrectionSheet")
-                .background(Theme.paper).navigationTitle("修正投球").navigationBarTitleDisplayMode(.inline)
+                .background(Theme.paper).notebookPageTitle("修正投球")
         }
     }
 }
@@ -487,26 +487,43 @@ private struct PitchViewpointPicker: View {
 private struct PitchReviewView: View {
     let pitches: [PitchMark]
     @Binding var viewpoint: PitchViewpoint
-    @Environment(\.dismiss) private var dismiss
+    var roundName = ""
+    var ended = false
     @State private var index = 0
     @State private var playing = false
     var body: some View {
-        NavigationStack {
+        Group {
             ScrollView {
                 if pitches.indices.contains(index) {
-                    NotebookColumns {
-                        VStack(spacing: 12) {
-                            PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("replayViewpoint")
+                    VStack(alignment: .leading, spacing: 15) {
+                        HStack {
+                            NotebookHeading(title: "逐球回看", detail: roundName)
+                            Spacer()
+                            Text(ended ? "本轮已结束" : "本轮记录").font(.caption).foregroundStyle(Notebook.fieldGreen)
+                        }
+                        NotebookColumns {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("投球落点").font(.headline)
+                                Spacer()
+                                Text("第 \(index + 1) / \(pitches.count) 球").font(.caption).foregroundStyle(.secondary)
+                            }
                             PitchLocationMap(pitches: Array(pitches.prefix(index + 1)), viewpoint: viewpoint, readOnly: true, selectedIndex: index, ratio: 1.25) { _ in }
                             let mark = pitches[index]
-                            Text("第 \(index + 1) / \(pitches.count) 球 · \(mark.isStrike ? "好球" : "坏球") · \(viewpoint.title(for: mark.zone))").font(.headline)
+                            HStack {
+                                Label("好球", systemImage: "circle.fill").foregroundStyle(Notebook.fieldGreen)
+                                Label("坏球", systemImage: "circle").foregroundStyle(Theme.burgundy)
+                                Spacer()
+                                Text("第 \(index + 1) 球 · \(viewpoint.title(for: mark.zone))")
+                            }.font(.caption)
+                            PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("replayViewpoint")
                             HStack {
                                 Button("上一球") { playing = false; index -= 1 }.disabled(index == 0)
                                 Spacer()
                                 Button(playing ? "暂停" : "播放") {
                                     if !playing && index == pitches.count - 1 { index = 0 }
                                     playing.toggle()
-                                }.disabled(pitches.count < 2)
+                                }.disabled(pitches.count < 2).buttonStyle(NotebookActionStyle(prominent: true))
                                 Spacer()
                                 Button("下一球") { playing = false; index += 1 }.disabled(index + 1 >= pitches.count)
                             }.buttonStyle(NotebookActionStyle())
@@ -525,11 +542,11 @@ private struct PitchReviewView: View {
                                 Divider()
                             }
                         }
-                    }.padding().frame(maxWidth: 1000)
+                        }
+                    }.padding(15).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }.frame(maxWidth: .infinity).background(Theme.paper)
-            .navigationTitle("逐球回看").navigationBarTitleDisplayMode(.inline)
-            .toolbar { Button("完成") { dismiss() } }
+            .notebookPageTitle("逐球回看")
             .task(id: playing) {
                 guard playing else { return }
                 while index + 1 < pitches.count {

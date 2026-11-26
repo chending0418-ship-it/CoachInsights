@@ -3,6 +3,23 @@ import Vision
 @testable import CoachInsights
 
 @MainActor final class FieldToolsTests: XCTestCase {
+    func testPitchChartPresentationPreservesStoredZonesAndCoordinates() {
+        for viewpoint in PitchViewpoint.allCases {
+            for x in [0.0, 0.14, 0.28, 0.50, 0.72, 0.90, 1.0] {
+                for y in [0.0, 0.12, 0.23, 0.5, 0.75, 0.85, 1.0] {
+                    let canonical = FieldPoint(x: x, y: y)
+                    let drawn = PitchLocationMap.project(viewpoint.transform(canonical))
+                    let restored = viewpoint.transform(PitchLocationMap.project(drawn, inverse: true))
+                    XCTAssertEqual(restored.x, canonical.x, accuracy: 1e-9)
+                    XCTAssertEqual(restored.y, canonical.y, accuracy: 1e-9)
+                }
+            }
+        }
+        let corner = PitchLocationMap.project(FieldPoint(x: 0.28, y: 0.23))
+        XCTAssertEqual(corner.x, 0.23, accuracy: 1e-9)
+        XCTAssertEqual(corner.y, 0.18, accuracy: 1e-9)
+    }
+
     private func temporary() -> URL { URL.temporaryDirectory.appendingPathComponent(UUID().uuidString) }
 
     func testBattingCategoriesUndoAndRejectCrossToolEvents() {

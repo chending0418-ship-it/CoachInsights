@@ -17,10 +17,7 @@ struct ComparisonView:View {
         }.background(.black).foregroundStyle(.white).tint(Theme.rose)
             .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: false)
         .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: false)
-        .navigationTitle("双视频对比").navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Notebook.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).toolbarColorScheme(
-                .light, for: .navigationBar
-            )
+        .notebookPageTitle("双视频对比")
         .task {
             guard workspace == nil,let repository=library.repository else { return }
             let w=ComparisonWorkspace(session:session,repository:repository);workspace=w
@@ -32,7 +29,7 @@ struct ComparisonView:View {
             }
             if w.setup == nil { choosingLeft=false;choosing=true }
         }
-            .fullScreenCover(isPresented: $choosing) {
+            .navigationDestination(isPresented: $choosing) {
             if let repository=library.repository {
                     VideoSourcePicker(
                         repository: repository, targetSession: session, choosingLeft: choosingLeft,
@@ -105,7 +102,7 @@ struct ComparisonEditor:View {
                                 NavigationLink("导出同屏视频") { ExportView(session: workspace.session, initialComparison: true) }
                                     .buttonStyle(NotebookActionStyle(prominent: true))
                             }.notebookPanel()
-                        }.padding(12)
+                        }.padding(15)
                     }.frame(maxWidth: .infinity).background(Notebook.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
                         .environment(\.colorScheme, .light)
 
@@ -164,7 +161,7 @@ struct ComparisonSide:View {
     }
     private var sideHeader: some View {
         HStack {
-                Text(isLeft ? "A":"B").font(.caption.bold())
+                Text(isLeft ? "A":"B").font(.caption.bold()).frame(width: 22, height: 22).background(isLeft ? Theme.burgundy : Notebook.fieldGreen, in: RoundedRectangle(cornerRadius: 3))
                 Text(workspace.selectedAsset?.originalName ?? "视频").font(.caption).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength:0)
                 Menu {
