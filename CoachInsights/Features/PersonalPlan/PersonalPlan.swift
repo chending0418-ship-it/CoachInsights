@@ -3,6 +3,7 @@ import SwiftUI
 struct PersonalPlan: Codable, Identifiable, Equatable {
     let id: UUID
     let createdAt: Date
+    var updatedAt: Date?
     var date: Date
     var title = ""
     var athlete = ""
@@ -42,7 +43,7 @@ struct PersonalPlan: Codable, Identifiable, Equatable {
     }
 
     var record: PocketRecord {
-        PocketRecord(id: id, name: title, sport: nil, createdAt: createdAt,
+        PocketRecord(id: id, name: title, sport: nil, createdAt: updatedAt ?? createdAt,
                      tool: .personalPlan, summary: athlete.isEmpty ? nil : athlete)
     }
 }
@@ -106,7 +107,9 @@ struct PersonalPlan: Codable, Identifiable, Equatable {
         guard plan(draft.id) == original else { throw Failure.changed }
         var next = plans
         if let index = next.firstIndex(where: { $0.id == draft.id }) {
-            next[index] = draft.cleaned
+            var updated = draft.cleaned
+            updated.updatedAt = Date()
+            next[index] = updated
         } else {
             next.insert(draft.cleaned, at: 0)
         }

@@ -66,8 +66,8 @@ struct RootView: View {
                                 switch route {
                                 case .scene(let scene):
                                     ToolSceneView(scene: scene) { id in
-                                        recordFilter.selectScene(scene)
-                                        recordPath = [id]
+                                        recordFilter = PocketRecordFilter(scene: scene)
+                                        recordPath = id.map { [$0] } ?? []
                                         section = .records
                                     }
                                 case .tool(let tool): ToolDestinationView(tool: tool)
@@ -107,20 +107,14 @@ struct RootView: View {
                 Button { section = .records } label: { Label("记录", systemImage: "folder") }
                     .accessibilityIdentifier("recordsTab")
             }
-            ForEach(PocketScene.allCases) { scene in
-                SwiftUI.Section(scene.title) {
-                    ForEach(scene.tools) { tool in
-                        Button {
-                            section = .toolbox
-                            toolboxPath = [.scene(scene), .tool(tool)]
-                        } label: {
-                            HStack {
-                                Label(tool.title, systemImage: tool.symbol)
-                                Spacer(minLength: 0)
-                            }
-                            .foregroundStyle(toolboxPath.last == .tool(tool) && section == .toolbox ? Theme.burgundy : .primary)
-                        }.accessibilityIdentifier("sidebar_" + tool.rawValue)
-                    }
+            SwiftUI.Section("训练场景") {
+                ForEach(PocketScene.allCases) { scene in
+                    Button {
+                        section = .toolbox
+                        toolboxPath = [.scene(scene)]
+                    } label: {
+                        Label(scene.title, systemImage: scene.symbol)
+                    }.accessibilityIdentifier("sidebarScene_" + scene.rawValue)
                 }
             }
         }
@@ -178,23 +172,19 @@ private struct ToolboxHomeView: View {
                     Text(Date.now.formatted(.dateTime.month().day().weekday(.wide))).font(.caption).foregroundStyle(.secondary)
                     Text("训练工具箱").font(.largeTitle.bold())
                 }
-                if geometry.size.width >= 710 {
-                    HStack(alignment: .top, spacing: 26) {
-                        VStack(alignment: .leading, spacing: 24) { fieldSection; scenes }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        recentSection.frame(width: min(310, geometry.size.width * 0.33))
-                    }
-                } else {
+                NotebookColumns(minimumWidth: 680, leadingFraction: 0.57) {
                     fieldSection
-                    scenes
-                    recentSection
+                    shortcuts(vertical: geometry.size.width >= 720 && geometry.size.height >= 500)
                 }
+                scenes
+                recentSection
                 #if DEBUG
                 NavigationLink("图片分享卡片 · 示例",value: ToolboxRoute.shareExample).font(.footnote).accessibilityIdentifier("shareCardExample")
                 #endif
             }.padding(.horizontal,20).padding(.bottom,20).frame(maxWidth: 1120).frame(maxWidth:.infinity)
             }
-        }.background(PocketStyle.paper).toolbar(.hidden,for:.navigationBar)
+        }
+        .background(PocketStyle.paper).toolbar(.hidden,for:.navigationBar)
         .sheet(isPresented: $showHelp) { NavigationStack { HelpView().toolbar { Button("完成") { showHelp = false } } } }
     }
 
@@ -217,8 +207,13 @@ private struct ToolboxHomeView: View {
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(PocketStyle.wash,in: RoundedRectangle(cornerRadius: 12))
             }.buttonStyle(.plain).accessibilityIdentifier("bullpenShortcut")
+        }
+    }
+    private func shortcuts(vertical: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text("场边常用").font(.headline)
-            HStack {
+            let flow = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 5))
+            flow {
                 ForEach([PocketTool.battingLog, .tacticsBoard, .stopwatch]) { tool in
                     NavigationLink(value: ToolboxRoute.tool(tool)) {
                         Label(tool.title,systemImage: tool.symbol).font(.subheadline)
@@ -292,13 +287,14 @@ private struct ToolSceneView: View {
     @EnvironmentObject private var plans: PersonalPlanStore
     @EnvironmentObject private var training: TrainingStore
     let scene: PocketScene
-    let openRecord: (UUID) -> Void
+    let openRecord: (UUID?) -> Void
+    @State private var twoColumns = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 NotebookHeading(title: scene.title, detail: scene.summary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 290), spacing: 16)], alignment: .leading, spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: twoColumns ? 2 : 1), alignment: .leading, spacing: 10) {
                     ForEach(scene.tools) { tool in
                         NavigationLink(value: ToolboxRoute.tool(tool)) {
                             NotebookToolRow(title: tool.title, detail: tool.summary, icon: tool.symbol)
@@ -309,7 +305,7 @@ private struct ToolSceneView: View {
                 let recent = PocketRecord.timeline(library: library, quick: quick, fields: fields, plans: plans, training: training)
                     .filter { $0.scene == scene }.prefix(3)
                 if !recent.isEmpty {
-                    Text("相关记录").font(.headline)
+                    HStack { Text("相关记录").font(.headline); Spacer(); Button("查看全部") { openRecord(nil) } }
                     ForEach(recent) { record in
                         Button { openRecord(record.id) } label: {
                             NotebookToolRow(title: record.name, detail: record.tool.title, icon: record.tool.symbol)
@@ -320,6 +316,7 @@ private struct ToolSceneView: View {
             }.padding(20).frame(maxWidth: 960).frame(maxWidth: .infinity)
         }
         .background(Theme.paper)
+        .onGeometryChange(for: Bool.self) { $0.size.width >= 620 } action: { twoColumns = $0 }
         .navigationTitle(scene.title).navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -384,7 +381,7 @@ private struct PocketRecordsView: View {
                 }
             }
         }.background(PocketStyle.paper)
-        .navigationTitle("记录")
+        .navigationTitle("记录").navigationBarTitleDisplayMode(.inline)
         .sheet(item: $compactDetail, onDismiss: {
             switch detailAction {
             case .open(let id): openRecord(id)
@@ -412,6 +409,11 @@ private struct PocketRecordsView: View {
             NotebookHeading(title: "训练记录", detail: "按名称、场景或工具查找已保存的训练。")
                 .listRowSeparator(.hidden).listRowBackground(Color.clear)
             Section {
+                HStack {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("搜索名称或工具", text: $search).submitLabel(.search)
+                    if !search.isEmpty { Button("清除", systemImage: "xmark.circle.fill") { search = "" }.labelStyle(.iconOnly) }
+                }
                 Picker("来源场景", selection: Binding(get: { filter.scene }, set: { filter.selectScene($0) })) {
                     Text("全部").tag(PocketScene?.none)
                     ForEach(PocketScene.allCases) { Text($0.title).tag(Optional($0)) }
@@ -484,7 +486,6 @@ private struct PocketRecordsView: View {
                 Text("\(filter.scene?.title ?? "全部")记录 · \(records.count)")
             }
         }
-        .searchable(text: $search,prompt:"搜索名称或工具")
         .scrollContentBackground(.hidden).background(PocketStyle.paper)
         .navigationDestination(for: UUID.self) { id in
             if let session = library.sessions.first(where: { $0.id == id }) {
@@ -528,6 +529,7 @@ private struct PocketRecordsView: View {
 }
 
 struct RecordInspection: View {
+    @EnvironmentObject private var library: LibraryStore
     let record: PocketRecord
     let open: () -> Void
     let delete: () -> Void
@@ -536,8 +538,14 @@ struct RecordInspection: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 NotebookHeading(title: record.name, detail: record.scene.title + " · " + record.tool.title)
-                LabeledContent("保存日期") { Text(record.createdAt, style: .date) }
-                if let summary = record.summary, !summary.isEmpty { Text(summary) }
+                let session = library.sessions.first { $0.id == record.id }
+                if let session, let repository = library.repository, let ids = try? session.snapshot().videoIDs,
+                   let asset = try? repository.assets().first(where: { ids.contains($0.id) }) {
+                    VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
+                }
+                LabeledContent("训练内容", value: record.summary ?? session?.sportValue ?? record.tool.title)
+                LabeledContent("最近更新") { Text((session?.updatedAt ?? record.createdAt).formatted(date: .abbreviated, time: .shortened)) }
+                LabeledContent("保存位置", value: "本机记录")
                 Button("打开记录", action: open).buttonStyle(.borderedProminent)
                 Button("删除记录", role: .destructive, action: delete)
                     .frame(minHeight: 44).accessibilityIdentifier("deleteInspectedRecord")

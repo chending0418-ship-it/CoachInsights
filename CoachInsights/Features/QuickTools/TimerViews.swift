@@ -54,7 +54,7 @@ struct StopwatchView: View {
                 Group {
                     if wide {
                         HStack(spacing: 36) {
-                            VStack { readout(context.date); controls }.frame(maxWidth: .infinity)
+                            VStack { readout(context.date).frame(maxHeight: 360); controls }.notebookPanel().frame(maxWidth: .infinity)
                             laps(context.date).frame(maxWidth: .infinity)
                         }
                     } else {
@@ -111,27 +111,29 @@ struct StopwatchView: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 HStack { Text("分段记录").font(.headline); Spacer(); Text("\(watch.laps.count) 段").font(.caption.monospacedDigit()) }
                     .padding(.vertical, 10)
+                HStack { Text("分段"); Spacer(); Text("本段用时"); Text("累计时间").frame(width: 98, alignment: .trailing) }.font(.caption).foregroundStyle(.secondary)
                 if watch.laps.isEmpty && !watch.isRunning {
                     Text("开始计时后，可在每个训练环节结束时记一段。").font(.subheadline).foregroundStyle(.secondary)
                 }
                 if watch.isRunning {
                     lapRow(number: watch.laps.count + 1,
-                        value: watch.elapsed(at: now) - (watch.laps.last?.total ?? 0), color: .primary)
+                        value: watch.elapsed(at: now) - (watch.laps.last?.total ?? 0), total: watch.elapsed(at: now), color: .primary)
                 }
                 ForEach(watch.laps.reversed()) { lap in
-                    lapRow(number: lap.number, value: lap.duration, color: lapColor(lap))
+                    lapRow(number: lap.number, value: lap.duration, total: lap.total, color: lapColor(lap))
                 }
             }
         }.frame(maxWidth: 720).frame(maxWidth: .infinity).accessibilityIdentifier("stopwatchLaps")
     }
 
-    private func lapRow(number: Int, value: TimeInterval, color: Color) -> some View {
+    private func lapRow(number: Int, value: TimeInterval, total: TimeInterval, color: Color) -> some View {
         VStack(spacing: 0) {
             Divider().overlay(Theme.burgundy.opacity(0.08))
             HStack {
                 Text("分段 \(number)")
                 Spacer()
                 Text(PocketTimeFormat.stopwatch(value)).monospacedDigit()
+                Text(PocketTimeFormat.stopwatch(total)).monospacedDigit().frame(width: 98, alignment: .trailing)
             }.font(.system(size: 18)).foregroundStyle(color).padding(.vertical, 13)
         }
     }
@@ -159,8 +161,8 @@ struct CountdownView: View {
                 Group {
                     if wide {
                         HStack(spacing: 28) {
-                            face(context.date).frame(maxWidth: .infinity)
-                            VStack(spacing: 20) { controls(context.date); details }.frame(maxWidth: 340)
+                            VStack { face(context.date).frame(maxHeight: 360); controls(context.date) }.notebookPanel().frame(maxWidth: .infinity)
+                            details.frame(maxWidth: 340)
                         }
                     } else {
                         VStack(spacing: 22) {
@@ -235,7 +237,7 @@ struct CountdownView: View {
     private func preset(_ title: String, value: Int) -> some View {
         Button(title) {
             hours = value / 3600; minutes = (value / 60) % 60; seconds = value % 60
-        }.font(.subheadline).buttonStyle(.bordered).tint(Theme.burgundy)
+        }.buttonStyle(NotebookActionStyle()).overlay { if Int(countdown.duration) == value { RoundedRectangle(cornerRadius: 7).stroke(Theme.burgundy) } }
     }
     private func controls(_ now: Date) -> some View {
         HStack {

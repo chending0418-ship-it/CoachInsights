@@ -8,6 +8,8 @@ struct PitchLocationMap: View {
     var readOnly = false
     var correcting = false
     var sequence = 1
+    var selectedIndex: Int?
+    var ratio: CGFloat = 1.04
     let select: (FieldPoint) -> Void
     static let strikeRect = PitchZone.strikeRect
     static let strikeColor = Theme.burgundy
@@ -48,16 +50,23 @@ struct PitchLocationMap: View {
                     grid.move(to: CGPoint(x: rect.minX, y: y)); grid.addLine(to: CGPoint(x: rect.maxX, y: y))
                 }
                 context.stroke(grid, with: .color(Color(red: 0.18, green: 0.25, blue: 0.23).opacity(0.42)), lineWidth: 1)
-                for index in pitches.indices.suffix(30) {
+                let visible = Array(pitches.indices.suffix(30)).filter { $0 != selectedIndex }
+                let highlighted = selectedIndex.flatMap { pitches.indices.contains($0) ? [$0] : nil } ?? []
+                for index in visible + highlighted {
                     let mark = pitches[index], point = viewpoint.transform(mark.point)
                     let radius: CGFloat = min(15, max(11, size.width * 0.032))
                     let center = CGPoint(x: point.x * size.width, y: point.y * size.height)
                     let circle = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-                    context.fill(circle, with: .color(mark.isStrike ? Theme.burgundy : .white))
-                    context.stroke(circle, with: .color(mark.isStrike ? .white : Self.ballColor), lineWidth: 1.8)
-                    let number = correcting ? sequence : index + 1
+                    var markerContext = context
+                    if selectedIndex != nil && index != selectedIndex { markerContext.opacity = 0.55 }
+                    markerContext.fill(circle, with: .color(mark.isStrike ? Theme.burgundy : .white))
+                    markerContext.stroke(circle, with: .color(mark.isStrike ? .white : Self.ballColor), lineWidth: 1.8)
+                    if index == selectedIndex {
+                        context.stroke(Path(ellipseIn: circle.boundingRect.insetBy(dx: -3, dy: -3)), with: .color(Notebook.ink), lineWidth: 2)
+                    }
+                    let number = correcting && pitches.count == 1 ? sequence : index + 1
                     let textSize = min(radius * 0.88, radius * 3.3 / CGFloat(String(number).count))
-                    context.draw(Text("\(number)").font(.system(size: textSize, weight: .bold)).foregroundColor(mark.isStrike ? .white : Self.ballColor), at: center)
+                    markerContext.draw(Text("\(number)").font(.system(size: textSize, weight: .bold)).foregroundColor(mark.isStrike ? .white : Self.ballColor), at: center)
                 }
             }
             .contentShape(Rectangle())
@@ -76,7 +85,7 @@ struct PitchLocationMap: View {
                 }
             }
         }
-        .aspectRatio(1.04, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .aspectRatio(ratio, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -1,9 +1,13 @@
 import SwiftUI
 
 struct HelpView: View {
+    @State private var showViewpoint = true
     var body: some View {
         List {
             Section("场边操作") {
+                DisclosureGroup("投手身后怎样记录？", isExpanded: $showViewpoint) {
+                    Text("在落点图旁选「投手后方」，本垒板在画面上方。切回捕手后方时，同一球左右镜像，高低、序号和好坏判定保持一致。")
+                }
                 DisclosureGroup("怎样记球、修正或回看一轮训练？") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("打击记录按单轮累计滚地、平飞、高飞和挥空。投球记录可按教练站位选择捕手后方或投手后方。从投手后方看，本垒板在图的上方。切换视角时，已有落点按新站位显示。点击落点图记一球，细线九宫格内默认好球、外围默认坏球；落点按球序编号，点击球序可独立修正位置和好坏球，修正不增加总球数。好球率显示好球数占总投球数的百分比，出局单独计数。点「逐球回看」可按顺序复盘。")
@@ -59,7 +63,7 @@ struct HelpView: View {
                 Text("MediaPipe Tasks 1.1.1 / Pose Landmarker Full v1，Apache License 2.0。模型随应用离线提供。")
                 NavigationLink("开源许可") { ScrollView { Text(license).font(.caption.monospaced()).padding() }.navigationTitle("Apache 2.0") }
             }
-        }.notebookForm().navigationTitle("使用帮助").navigationBarTitleDisplayMode(.inline)
+        }.listStyle(.plain).scrollContentBackground(.hidden).background(Notebook.paper).navigationTitle("使用帮助").navigationBarTitleDisplayMode(.inline)
     }
     private var license:String {
         guard let url=Bundle.main.url(forResource:"MediaPipe-LICENSE",withExtension:"txt"),let text=try? String(contentsOf:url,encoding:.utf8) else { return "Apache License, Version 2.0 — https://www.apache.org/licenses/LICENSE-2.0" };return text
@@ -75,6 +79,9 @@ private struct LocalDataHelp: View {
             Section("相机、麦克风与相册") {
                 Text("相机用于拍摄或 AR 测距；录音可选，拒绝麦克风仍可无声拍摄。相册仅用于所选素材导入或用户主动保存分析结果及白板图片。系统相册可能由你的系统设置进行同步，这不等于 App 同步。")
             }
-        }.notebookForm().navigationTitle("隐私与本机数据")
+            Section("主动分享") {
+                Text("导出前可核对视频片段、球员姓名与教练署名。选择系统分享后，资料会发送到你选的 App 或联系人；选择保存到相册后，图片或视频会写入系统相册。")
+            }
+        }.listStyle(.plain).scrollContentBackground(.hidden).background(Notebook.paper).navigationTitle("隐私与本机数据").navigationBarTitleDisplayMode(.inline)
     }
 }

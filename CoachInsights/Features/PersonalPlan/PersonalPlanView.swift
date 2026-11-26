@@ -9,7 +9,7 @@ struct PersonalPlanListView: View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= 720
             HStack(spacing: 0) {
-                list(wide: wide)
+                list(wide: wide).frame(width: wide && !store.plans.isEmpty ? max(265, geometry.size.width * 0.34) : geometry.size.width)
                 if wide, let plan = selection.flatMap({ store.plan($0) }) ?? store.plans.first {
                     Divider()
                     PersonalPlanDetailView(id: plan.id, embedded: true).id(plan.id)
@@ -79,38 +79,25 @@ struct PersonalPlanDetailView: View {
     var body: some View {
         Group {
             if let plan = store.plan(id) {
-                ScrollView { PersonalPlanSummary(content: plan.card).padding(24) }
-                    .safeAreaInset(edge: .bottom) {
-                        NavigationLink {
-                            ShareCardPreview(content: plan.card)
-                        } label: {
-                            Label("预览与分享图片", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .accessibilityIdentifier("personalPlanShare")
-                        .padding(12)
-                        .frame(maxWidth: .infinity)
-                        .background(.bar)
-                    }
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button("编辑") { editing = plan }
-                                .accessibilityIdentifier("editPersonalPlan")
-                        }
-                        ToolbarItem(placement: .secondaryAction) {
-                            Button("删除计划", systemImage: "trash", role: .destructive) {
-                                confirmingDeletion = true
-                            }
-                            .accessibilityIdentifier("deletePersonalPlan")
-                        }
-                    }
+                ScrollView {
+                    NotebookColumns {
+                        PersonalPlanSummary(content: plan.card)
+                        VStack(alignment: .leading, spacing: 16) {
+                            NavigationLink { ShareCardPreview(content: plan.card) } label: {
+                                Label("预览与分享图片", systemImage: "square.and.arrow.up")
+                            }.buttonStyle(.borderedProminent).accessibilityIdentifier("personalPlanShare")
+                            Button("编辑") { editing = plan }.accessibilityIdentifier("editPersonalPlan")
+                            Button("删除计划", systemImage: "trash", role: .destructive) { confirmingDeletion = true }
+                                .accessibilityIdentifier("deletePersonalPlan")
+                        }.notebookPanel()
+                    }.padding(20)
+                }
             } else {
                 ContentUnavailableView("计划已不存在", systemImage: "list.bullet.clipboard")
             }
         }
         .background(Theme.paper)
-        .navigationTitle("计划详情")
+        .navigationTitle(embedded ? "个人训练计划" : "计划详情")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $editing) { PersonalPlanEditor(original: $0) }
         .alert("删除这份计划？", isPresented: $confirmingDeletion) {
@@ -200,36 +187,16 @@ private struct PersonalPlanEditor: View {
     }
 
     private var fields: some View {
-        Form {
-            Section {
-                TextField("计划标题（必填）", text: $draft.title)
-                    .accessibilityIdentifier("personalPlanTitle")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                NotebookInput(title: "计划标题 · 必填") { TextField("计划标题", text: $draft.title).accessibilityIdentifier("personalPlanTitle") }
+                NotebookInput(title: "球员姓名") { TextField("球员姓名", text: $draft.athlete).accessibilityIdentifier("personalPlanAthlete") }
+                NotebookInput(title: "训练目标") { TextField("这次训练希望达到什么？", text: $draft.goal, axis: .vertical).lineLimit(2...6).accessibilityIdentifier("personalPlanGoal") }
+                NotebookInput(title: "训练项目 · 必填") { TextField("逐行填写项目、组数或时长", text: $draft.drills, axis: .vertical).lineLimit(3...10).accessibilityIdentifier("personalPlanDrills") }
                 DatePicker("训练日期", selection: $draft.date, displayedComponents: .date)
-                TextField("球员姓名（选填）", text: $draft.athlete)
-                    .accessibilityIdentifier("personalPlanAthlete")
-                TextField("教练署名（选填）", text: $draft.author)
-                    .accessibilityIdentifier("personalPlanAuthor")
-            } header: {
-                Text("单次训练")
-            } footer: {
-                Text("图片会包含填写的姓名与署名，分享前可在图片预览中核对。")
-            }
-            Section("训练目标") {
-                TextField("这次训练希望达到什么？（选填）", text: $draft.goal, axis: .vertical)
-                    .lineLimit(2...6)
-                    .accessibilityIdentifier("personalPlanGoal")
-            }
-            Section {
-                TextField("填写训练项目（必填）", text: $draft.drills, axis: .vertical)
-                    .lineLimit(4...10)
-                    .accessibilityIdentifier("personalPlanDrills")
-            } header: {
-                Text("训练项目")
-            } footer: {
-                Text("可按顺序逐行填写，附上组数、次数或时长。")
-            }
-        }
-        .notebookForm()
+                NotebookInput(title: "教练署名") { TextField("署名", text: $draft.author).accessibilityIdentifier("personalPlanAuthor") }
+            }.padding(20)
+        }.scrollDismissesKeyboard(.interactively)
     }
 
     private var preview: some View {
@@ -251,7 +218,7 @@ private struct PersonalPlanSummary: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Divider()
                     Text(section.heading).font(.headline).foregroundStyle(Theme.burgundy)
-                    Text(section.body).textSelection(.enabled)
+                    if section.heading == "训练项目" { NumberedInstructions(text: section.body) } else { Text(section.body).textSelection(.enabled) }
                 }
             }
             if !content.author.isEmpty {

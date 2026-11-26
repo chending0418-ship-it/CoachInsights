@@ -78,3 +78,73 @@ struct LatestTrainingCard: View {
             .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }
     }
 }
+
+/// Two reading regions stay in document order when the window becomes narrow.
+struct NotebookColumns: Layout {
+    var minimumWidth: CGFloat = 720
+    var leadingFraction: CGFloat = 0.64
+    var spacing: CGFloat = 20
+
+    private func regions(width: CGFloat, subviews: Subviews) -> [CGRect] {
+        let wide = width >= minimumWidth && subviews.count == 2
+        var y: CGFloat = 0
+        return subviews.enumerated().map { index, view in
+            let firstWidth = (width - spacing) * leadingFraction
+            let column = wide ? (index == 0 ? firstWidth : width - spacing - firstWidth) : width
+            let size = view.sizeThatFits(ProposedViewSize(width: column, height: nil))
+            let rect = CGRect(x: wide && index == 1 ? firstWidth + spacing : 0,
+                              y: wide ? 0 : y, width: column, height: size.height)
+            y = rect.maxY + spacing
+            return rect
+        }
+    }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 360
+        return CGSize(width: width, height: regions(width: width, subviews: subviews).map(\.maxY).max() ?? 0)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (view, region) in zip(subviews, regions(width: bounds.width, subviews: subviews)) {
+            view.place(at: CGPoint(x: bounds.minX + region.minX, y: bounds.minY + region.minY),
+                       anchor: .topLeading, proposal: ProposedViewSize(region.size))
+        }
+    }
+}
+
+struct NotebookInput<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline.weight(.semibold))
+            content().padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Notebook.paper, in: RoundedRectangle(cornerRadius: 7))
+                .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(Notebook.rule) }
+        }
+    }
+}
+
+struct NumberedInstructions: View {
+    let text: String
+    var body: some View {
+        let lines = text.split(whereSeparator: \.isNewline)
+        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(String(format: "%02d", index + 1)).font(.caption.monospacedDigit()).foregroundStyle(Notebook.fieldGreen)
+                Text(String(line)).textSelection(.enabled)
+            }
+        }
+    }
+}
+
+struct NotebookActionStyle: ButtonStyle {
+    var prominent = false
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .foregroundStyle(prominent ? Color.white : Theme.burgundy)
+            .background(prominent ? Theme.burgundy : Notebook.paper, in: RoundedRectangle(cornerRadius: 7))
+            .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(prominent ? .clear : Notebook.rule) }
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
+    }
+}

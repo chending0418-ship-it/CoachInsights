@@ -84,11 +84,11 @@ struct FieldLogView: View {
                 }
             }
         }
-        .sheet(isPresented: $reviewingPitches) {
+        .fullScreenCover(isPresented: $reviewingPitches) {
             if let log { PitchReviewView(pitches: log.pitches, viewpoint: $viewpoint) }
         }
-        .sheet(item: $correction) { selection in
-            PitchCorrectionView(mark: selection.mark, number: selection.number, viewpoint: $viewpoint) { mark in
+        .fullScreenCover(item: $correction) { selection in
+            PitchCorrectionView(mark: selection.mark, context: log?.pitches ?? [], number: selection.number, viewpoint: $viewpoint) { mark in
                 change { $0.correctPitch(at: selection.id, zone: mark.zone, isStrike: mark.isStrike, location: mark.location) }
             }
         }
@@ -111,6 +111,7 @@ struct FieldLogView: View {
                     Circle().fill(Notebook.fieldGreen).frame(width: 6, height: 6)
                     Text(log.ended ? "已结束" : store.state.records.contains(where: { $0.id == log.id }) ? "已加入记录" : log.events.isEmpty && name.isEmpty ? "新一轮" : "草稿已保存")
                 }.font(.caption).foregroundStyle(Notebook.fieldGreen).padding(.top, 10)
+                if kind == .bullpen && wide { metrics(log).frame(width: min(480, width * 0.46)) }
                 Menu {
                     Button("修改名称", systemImage: "pencil") { editingName = true }.disabled(log.ended)
                     Button("清零本轮", systemImage: "arrow.counterclockwise", role: .destructive) { reset = true }.disabled(log.ended || log.events.isEmpty)
@@ -119,15 +120,7 @@ struct FieldLogView: View {
                         .overlay { Circle().strokeBorder(Notebook.rule) }.frame(width: 44, height: 44)
                 }.accessibilityLabel("本轮选项").accessibilityIdentifier("fieldOptions")
             }
-            if kind == .bullpen {
-                HStack(spacing: 0) {
-                    pitchMetric("总球数", value: "\(log.pitches.count)", color: Notebook.ink, total: true)
-                    pitchMetric("好球", value: "\(log.strikeCount)", color: Theme.burgundy)
-                    pitchMetric("坏球", value: "\(log.pitches.count - log.strikeCount)", color: Notebook.fieldGreen)
-                    pitchMetric("好球率", value: log.strikeRateText, color: Theme.burgundy)
-                    pitchMetric("出局", value: "\(log.outCount)", color: Notebook.ink)
-                }.padding(.vertical, 8).overlay(alignment: .top) { Divider() }.overlay(alignment: .bottom) { Divider() }
-            }
+            if kind == .bullpen && !wide { metrics(log) }
             if wide {
                 HStack(alignment: .top, spacing: 22) {
                     playArea(log, wide: true, height: height).frame(maxWidth: .infinity)
@@ -141,12 +134,22 @@ struct FieldLogView: View {
             .frame(maxWidth: 1120).frame(maxWidth: .infinity).foregroundStyle(Notebook.ink)
     }
 
+    private func metrics(_ log: FieldLog) -> some View {
+                HStack(spacing: 0) {
+                    pitchMetric("总球数", value: "\(log.pitches.count)", color: Notebook.ink, total: true)
+                    pitchMetric("好球", value: "\(log.strikeCount)", color: Theme.burgundy)
+                    pitchMetric("坏球", value: "\(log.pitches.count - log.strikeCount)", color: Notebook.fieldGreen)
+                    pitchMetric("好球率", value: log.strikeRateText, color: Theme.burgundy)
+                    pitchMetric("出局", value: "\(log.outCount)", color: Notebook.ink)
+                }.padding(.vertical, 8).overlay(alignment: .top) { Divider() }.overlay(alignment: .bottom) { Divider() }
+    }
+
     private func playArea(_ log: FieldLog, wide: Bool, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             switch kind {
             case .batting: battingControls(log, wide: wide)
             case .game: gameControls(log)
-            case .bullpen: pitchControls(log, height: height)
+            case .bullpen: pitchControls(log, height: height, wide: wide)
             }
             if log.ended {
                 Button("继续编辑") {
@@ -208,13 +211,13 @@ struct FieldLogView: View {
         }
     }
 
-    private func pitchControls(_ log: FieldLog, height: CGFloat) -> some View {
+    private func pitchControls(_ log: FieldLog, height: CGFloat, wide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading("投球落点", detail: log.ended ? "本轮已结束" : "点图记一球")
-            PitchLocationMap(pitches: log.pitches, viewpoint: viewpoint) { point in
+            PitchLocationMap(pitches: log.pitches, viewpoint: viewpoint, ratio: wide ? 1.65 : 1.04) { point in
                 change { $0.append(.pitch(PitchMark(point: point))) }
             }
-            .frame(maxWidth: min(440, max(165, height * 0.39)))
+            .frame(maxWidth: wide ? .infinity : min(440, max(165, height * 0.39)))
             .frame(maxWidth: .infinity)
             .disabled(log.ended || log.events.count >= FieldLog.eventLimit)
             HStack(spacing: 12) {
@@ -424,38 +427,50 @@ private struct PitchCorrectionView: View {
     @Environment(\.dismiss) private var dismiss
     @State var mark: PitchMark
     @State private var issue: String?
+    var context: [PitchMark] = []
     let number: Int
     @Binding var viewpoint: PitchViewpoint
     let save: (PitchMark) -> Bool
+    private var displayed: [PitchMark] {
+        var result = context
+        guard result.indices.contains(number - 1) else { return [mark] }
+        result[number - 1] = mark
+        return result
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    NotebookHeading(title: "第 "+String(number)+" 球", detail: "移动落点或调整判定，球数保持不变。")
-                    PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("correctionViewpoint")
-                    PitchLocationMap(pitches: [mark], viewpoint: viewpoint, correcting: true, sequence: number) { point in
-                        mark.location = point; mark.zone = .at(point)
-                    }.frame(maxWidth: 360)
-                    HStack {
-                        Text("落点：" + viewpoint.title(for: mark.zone))
-                        Spacer()
-                        Toggle("好球", isOn: $mark.isStrike).labelsHidden().accessibilityIdentifier("pitchStrikeToggle")
-                        Text(mark.isStrike ? "好球" : "坏球").foregroundStyle(mark.isStrike ? PitchLocationMap.strikeColor : PitchLocationMap.ballColor)
+                    NotebookHeading(title: "修正第 \(number) 球", detail: "本轮共 \(displayed.count) 球")
+                    NotebookColumns {
+                        VStack(alignment: .leading, spacing: 8) {
+                            LabeledContent("投球落点", value: "点图移动此球")
+                            PitchLocationMap(pitches: displayed, viewpoint: viewpoint, correcting: true, sequence: number, selectedIndex: displayed.count == 1 ? 0 : number - 1, ratio: 1.25) { point in
+                                mark.location = point; mark.zone = .at(point)
+                            }
+                            PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("correctionViewpoint")
+                        }
+                        VStack(alignment: .leading, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                LabeledContent("本球判定", value: viewpoint.title(for: mark.zone))
+                                Picker("判定", selection: $mark.isStrike) {
+                                    Text("好球").tag(true); Text("坏球").tag(false)
+                                }.pickerStyle(.segmented).accessibilityIdentifier("pitchStrikeToggle")
+                                Text("移动落点后保留当前判定。").font(.caption).foregroundStyle(.secondary)
+                            }.notebookPanel()
+                            HStack {
+                                Button("取消") { dismiss() }.buttonStyle(NotebookActionStyle())
+                                Button("保存修正") {
+                                    if save(mark) { dismiss() }
+                                    else { issue = "修正未能保存，当前输入已保留。" }
+                                }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("pitchCorrectionSave")
+                            }
+                        }
                     }
-                    Text("移动落点保持原判定；需要时单独切换好坏球。").font(.caption).foregroundStyle(.secondary)
                     if let issue { Text(issue).font(.callout).foregroundStyle(.red) }
-                }.padding(20).frame(maxWidth: 600).frame(maxWidth: .infinity)
+                }.padding(20).frame(maxWidth: 1000).frame(maxWidth: .infinity)
             }.accessibilityIdentifier("pitchCorrectionSheet")
-                .background(Theme.paper).navigationTitle("修正第 \(number) 球")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("保存修正") {
-                            if save(mark) { dismiss() }
-                            else { issue = "修正未能保存，当前输入已保留。请检查本机储存后重试，或取消返回。" }
-                        }.accessibilityIdentifier("pitchCorrectionSave")
-                    }
-                }
+                .background(Theme.paper).navigationTitle("修正投球").navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -474,27 +489,55 @@ private struct PitchReviewView: View {
     @Binding var viewpoint: PitchViewpoint
     @Environment(\.dismiss) private var dismiss
     @State private var index = 0
+    @State private var playing = false
     var body: some View {
         NavigationStack {
             ScrollView {
                 if pitches.indices.contains(index) {
-                    let mark = pitches[index]
-                    VStack(spacing: 16) {
-                        ProgressView(value: Double(index + 1), total: Double(pitches.count))
-                            .accessibilityLabel("回看进度")
-                        PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("replayViewpoint")
-                        PitchLocationMap(pitches: [mark], viewpoint: viewpoint, readOnly: true, correcting: true, sequence: index + 1) { _ in }
-                        Text("第 \(index + 1) / \(pitches.count) 球 · \(mark.isStrike ? "好球" : "坏球") · \(viewpoint.title(for: mark.zone))").font(.headline)
-                        HStack {
-                            Button("上一球") { index -= 1 }.disabled(index == 0)
-                            Spacer()
-                            Button("下一球") { index += 1 }.disabled(index + 1 >= pitches.count)
-                        }.buttonStyle(.bordered).controlSize(.large)
-                    }.padding().frame(maxWidth: 540)
+                    NotebookColumns {
+                        VStack(spacing: 12) {
+                            PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("replayViewpoint")
+                            PitchLocationMap(pitches: Array(pitches.prefix(index + 1)), viewpoint: viewpoint, readOnly: true, selectedIndex: index, ratio: 1.25) { _ in }
+                            let mark = pitches[index]
+                            Text("第 \(index + 1) / \(pitches.count) 球 · \(mark.isStrike ? "好球" : "坏球") · \(viewpoint.title(for: mark.zone))").font(.headline)
+                            HStack {
+                                Button("上一球") { playing = false; index -= 1 }.disabled(index == 0)
+                                Spacer()
+                                Button(playing ? "暂停" : "播放") {
+                                    if !playing && index == pitches.count - 1 { index = 0 }
+                                    playing.toggle()
+                                }.disabled(pitches.count < 2)
+                                Spacer()
+                                Button("下一球") { playing = false; index += 1 }.disabled(index + 1 >= pitches.count)
+                            }.buttonStyle(NotebookActionStyle())
+                        }
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            Text("本轮球序").font(.headline)
+                            ForEach(pitches.indices, id: \.self) { i in
+                                Button { playing = false; index = i } label: {
+                                    HStack {
+                                        Text(String(format: "%02d", i + 1)).monospacedDigit()
+                                        Text(pitches[i].isStrike ? "好球" : "坏球")
+                                        Spacer()
+                                        Text(viewpoint.title(for: pitches[i].zone))
+                                    }.padding(10).frame(minHeight: 44).background(i == index ? Notebook.inset : Notebook.paper)
+                                }.buttonStyle(.plain).accessibilityIdentifier("replayPitch_"+String(i + 1))
+                                Divider()
+                            }
+                        }
+                    }.padding().frame(maxWidth: 1000)
                 }
             }.frame(maxWidth: .infinity).background(Theme.paper)
             .navigationTitle("逐球回看").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("完成") { dismiss() } }
+            .task(id: playing) {
+                guard playing else { return }
+                while index + 1 < pitches.count {
+                    do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                    index += 1
+                }
+                playing = false
+            }
         }
     }
 }

@@ -18,9 +18,13 @@ struct CaptureView: View {
             VStack(alignment: .leading, spacing: 18) {
                 NotebookHeading(title: camera.reviewURL == nil ? "拍摄训练动作" : "确认拍摄素材",
                                 detail: camera.reviewURL == nil ? "让球员全身入镜，再开始录制。" : "回看视频后保存到本机记录。")
+                NotebookColumns {
+                    Group {
                 if let url = camera.reviewURL { ReviewMovie(url: url).aspectRatio(4/3, contentMode: .fit).frame(maxHeight: 400) }
                 else if camera.available { CameraPreview(session:camera.session).aspectRatio(4.0/3.0, contentMode: .fit).background(.black).clipShape(RoundedRectangle(cornerRadius: 8)) }
                 else { EmptyPanel(icon:"video.slash",title:"准备拍摄",detail:camera.issue ?? "正在检查相机…") }
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
                 if camera.available {
                     Picker("录制格式",selection:$camera.selectedFormat) { ForEach(camera.formats) { Text($0.label).tag($0.id) } }
                         .disabled(camera.recording).onChange(of:camera.selectedFormat) { _,id in Task { do { try await camera.applyFormat(id) } catch { camera.issue=error.localizedDescription } } }
@@ -50,7 +54,9 @@ struct CaptureView: View {
                 if let issue=camera.issue, camera.available { Text(issue).foregroundStyle(.secondary) }
                 if !camera.available { Button("重试相机") { Task { await camera.prepare() } } }
                 if let savedSession { NavigationLink("进入分析",destination:SessionDetail(session:savedSession)).accessibilityIdentifier("openCapturedAnalysis") }
-            }.padding().frame(maxWidth:850).frame(maxWidth:.infinity)
+                    }.notebookPanel()
+                }
+            }.padding().frame(maxWidth: 1100).frame(maxWidth: .infinity)
         }.background(Theme.paper).navigationTitle("拍摄与回看").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement:.cancellationAction) { Button("完成") { camera.stop(); dismiss() } } }
         .task { await camera.prepare() }

@@ -115,6 +115,10 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "偏左")).firstMatch.exists)
         app.segmentedControls["replayViewpoint"].buttons["捕手后方"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "偏右")).firstMatch.exists)
+        app.buttons["replayPitch_1"].tap()
+        XCTAssertFalse(app.buttons["上一球"].isEnabled)
+        app.buttons["播放"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: app.buttons["下一球"])], timeout: 5), .completed)
         app.buttons["完成"].tap()
         XCTAssertTrue(app.staticTexts["50%"].exists)
     }
@@ -140,10 +144,10 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertTrue(correction.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: app.buttons["pitchCorrectionSave"])], timeout: 5), .completed)
         mapTap(app, x: 0.5, y: 0.85, correcting: true)
-        let judgement = correction.switches["pitchStrikeToggle"]
+        let judgement = correction.segmentedControls["pitchStrikeToggle"].buttons["坏球"]
         for _ in 0..<3 { if judgement.isHittable { break }; correction.swipeUp() }
         XCTAssertTrue(judgement.isHittable)
-        judgement.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        judgement.tap()
         shot("phase00-pitch-correction")
         app.buttons["pitchCorrectionSave"].tap()
         XCTAssertTrue(app.buttons["pitchEvent_0"].label.contains("偏低") && app.buttons["pitchEvent_0"].label.contains("坏球"))
@@ -243,8 +247,8 @@ final class FieldToolsUITests: XCTestCase {
         let sidebar = app.descendants(matching: .any).matching(identifier: "studioSidebar").firstMatch
         let studio = sidebar.waitForExistence(timeout: 2)
         if studio {
-            for _ in 0..<5 { if app.buttons["sidebar_bullpenLog"].isHittable { break }; sidebar.swipeUp() }
-            app.buttons["sidebar_bullpenLog"].tap()
+            app.buttons["sidebarScene_quick"].tap()
+            app.buttons["tool_bullpenLog"].tap()
             XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5))
             mapTap(app, x: 0.5, y: 0.49); mapTap(app, x: 0.38, y: 0.33); mapTap(app, x: 0.85, y: 0.42)
             for _ in 0..<5 { if app.buttons["studioSidebarToggle"].isHittable { break }; sidebar.swipeDown() }
@@ -254,7 +258,14 @@ final class FieldToolsUITests: XCTestCase {
             app.buttons["studioSidebarToggle"].tap()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5)); shot("phase00-ipad-pitch-studio")
         } else {
-            tap(app, "scene_quick"); tap(app, "tool_battingLog")
+            let scene = app.buttons["scene_quick"]
+            let bottomTab = app.buttons["toolboxTab"]
+            for _ in 0..<4 {
+                if scene.isHittable && scene.frame.midY < bottomTab.frame.minY { break }
+                app.swipeUp()
+            }
+            scene.tap()
+            tap(app, "tool_battingLog")
             XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); shot("phase00-iphone-landscape")
         }
         XCUIDevice.shared.orientation = .portrait

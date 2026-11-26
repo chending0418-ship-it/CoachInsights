@@ -60,7 +60,7 @@ enum PocketTool: String, CaseIterable, Identifiable {
         case .personalPlan: return "个人训练计划"
         case .coachNotes: return "教练笔记"
         case .homeworkCard: return "课后练习卡"
-        case .teamPlan: return "训练计划"
+        case .teamPlan: return "团训计划"
         case .planTimer: return "按计划计时"
         case .battingLog: return "打击记录"
         case .bullpenLog: return "投球记录"

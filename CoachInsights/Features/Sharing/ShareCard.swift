@@ -100,6 +100,8 @@ struct ShareCardContent: Equatable {
 struct ShareCardPreview: View {
     let content: ShareCardContent
     @State private var images: [UIImage] = []
+    @State private var page = 0
+    @State private var wide = false
     @State private var issue: String?
     @State private var notice: String?
     @State private var saving = false
@@ -108,20 +110,51 @@ struct ShareCardPreview: View {
     private struct CardExport: Identifiable { let id = UUID(); let urls: [URL] }
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                if content.isExample { Text("示例内容 · 用于查看图片样式").font(.callout).foregroundStyle(Theme.burgundy) }
-                NotebookHeading(title: content.title, detail: "图片预览 · 分享时包含全部页面")
-                    .frame(maxWidth: 540)
-                ForEach(images.indices, id: \.self) { index in
-                    Image(uiImage: images[index]).resizable().scaledToFit().frame(maxWidth: 540)
-                        .overlay { Rectangle().stroke(Theme.burgundy.opacity(0.15)) }
-                        .accessibilityLabel("图片第 \(index + 1) 页，共 \(images.count) 页").accessibilityIdentifier("shareCardPage_\(index)")
+            NotebookColumns {
+                VStack(alignment: .leading, spacing: 10) {
+                    NotebookHeading(title: content.title, detail: "图片预览")
+                    if images.indices.contains(page) {
+                        Image(uiImage: images[page]).resizable().scaledToFit().frame(maxHeight: 600)
+                            .accessibilityLabel("图片第 \(page + 1) 页，共 \(images.count) 页").accessibilityIdentifier("shareCardPage_\(page)")
+                    }
+                    HStack {
+                        Button("上一页") { page -= 1 }.disabled(page == 0)
+                        Spacer(); Text("\(images.isEmpty ? 0 : page + 1) / \(images.count)").monospacedDigit(); Spacer()
+                        Button("下一页") { page += 1 }.disabled(page + 1 >= images.count)
+                    }.buttonStyle(.bordered)
                 }
-                Button("重新生成") { generate() }.buttonStyle(.bordered).accessibilityIdentifier("shareCardRegenerate")
-            }.padding(20).frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("全部页面").font(.headline)
+                    ForEach(images.indices, id: \.self) { i in
+                        Button {
+                            page = i
+                        } label: {
+                            Label("第 \(i + 1) 页", systemImage: page == i ? "checkmark.circle.fill" : "doc")
+                        }
+                    }
+                    Button("重新生成") { generate() }.buttonStyle(.bordered).accessibilityIdentifier("shareCardRegenerate")
+                    if wide { actions }
+                }.notebookPanel()
+            }.padding()
+        }.background(Notebook.inset).navigationTitle("图片预览").navigationBarTitleDisplayMode(.inline)
+            .onGeometryChange(for: Bool.self) {
+                $0.size.width >= 752
+            } action: {
+                wide = $0
+            }
+            .safeAreaInset(edge: .bottom) { if !wide { actions } }
+            .onAppear { if images.isEmpty { generate() } }
+            .onChange(of: content) { _, _ in generate() }
+            .sheet(item: $share, onDismiss: cleanup) { export in
+                CardActivitySheet(urls: export.urls) { completed, error in
+                    notice = completed ? "分享已完成" : "已取消分享，图片仍可重新分享"
+                    if let error { issue = error.localizedDescription }
+                    share = nil
+                }
         }
-        .background(Notebook.inset).navigationTitle("图片预览").navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
+            .onDisappear { if share == nil { cleanup() } }
+    }
+    private var actions: some View {
             VStack(spacing: 8) {
                 Text("共 \(images.count) 页").font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("shareCardPageCount")
                 if let issue { Text(issue).font(.callout).foregroundStyle(.red).accessibilityIdentifier("shareCardIssue") }
@@ -141,19 +174,8 @@ struct ShareCardPreview: View {
                 .disabled(images.isEmpty || saving)
             }.padding(12).frame(maxWidth: .infinity).background(Theme.paper)
         }
-        .onAppear { if images.isEmpty { generate() } }
-        .onChange(of: content) { _, _ in generate() }
-        .sheet(item: $share, onDismiss: cleanup) { export in
-            CardActivitySheet(urls: export.urls) { completed, error in
-                notice = completed ? "分享已完成" : "已取消分享，图片仍可重新分享"
-                if let error { issue = error.localizedDescription }
-                share = nil
-            }
-        }
-        .onDisappear { if share == nil { cleanup() } }
-    }
     private func generate() {
-        issue = nil; notice = nil; images = []
+        issue = nil; notice = nil; images = []; page = 0
         do { images = try ShareCardRenderer.render(content) }
         catch { issue = error.localizedDescription }
     }
