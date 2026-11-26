@@ -511,8 +511,8 @@ private struct PitchReviewView: View {
                             PitchLocationMap(pitches: Array(pitches.prefix(index + 1)), viewpoint: viewpoint, readOnly: true, selectedIndex: index, ratio: 1.25) { _ in }
                             let mark = pitches[index]
                             HStack {
-                                Label("好球", systemImage: "circle.fill").foregroundStyle(Notebook.fieldGreen)
-                                Label("坏球", systemImage: "circle").foregroundStyle(Theme.burgundy)
+                                Label("好球", systemImage: "circle.fill").foregroundStyle(PitchLocationMap.strikeColor)
+                                Label("坏球", systemImage: "circle").foregroundStyle(PitchLocationMap.ballColor)
                                 Spacer()
                                 Text("第 \(index + 1) 球 · \(viewpoint.title(for: mark.zone))")
                             }.font(.caption)
