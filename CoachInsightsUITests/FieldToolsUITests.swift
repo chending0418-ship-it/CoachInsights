@@ -258,7 +258,14 @@ final class FieldToolsUITests: XCTestCase {
             app.buttons["studioSidebarToggle"].tap()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5)); shot("phase00-ipad-pitch-studio")
         } else {
-            tap(app, "scene_quick"); tap(app, "tool_battingLog")
+            let scene = app.buttons["scene_quick"]
+            let bottomTab = app.buttons["toolboxTab"]
+            for _ in 0..<4 {
+                if scene.isHittable && scene.frame.midY < bottomTab.frame.minY { break }
+                app.swipeUp()
+            }
+            scene.tap()
+            tap(app, "tool_battingLog")
             XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); shot("phase00-iphone-landscape")
         }
         XCUIDevice.shared.orientation = .portrait

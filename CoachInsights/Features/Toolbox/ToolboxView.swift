@@ -155,7 +155,6 @@ private struct ToolboxHomeView: View {
     @AppStorage("bullpen.viewpoint") private var viewpoint = PitchViewpoint.catcher
     let showRecords: (UUID?) -> Void
     @State private var showHelp = false
-    @State private var wideShortcuts = false
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -175,7 +174,7 @@ private struct ToolboxHomeView: View {
                 }
                 NotebookColumns(minimumWidth: 680, leadingFraction: 0.57) {
                     fieldSection
-                    shortcuts
+                    shortcuts(vertical: geometry.size.width >= 720 && geometry.size.height >= 500)
                 }
                 scenes
                 recentSection
@@ -184,7 +183,7 @@ private struct ToolboxHomeView: View {
                 #endif
             }.padding(.horizontal,20).padding(.bottom,20).frame(maxWidth: 1120).frame(maxWidth:.infinity)
             }
-        }.onGeometryChange(for: Bool.self) { $0.size.width >= 720 } action: { wideShortcuts = $0 }
+        }
         .background(PocketStyle.paper).toolbar(.hidden,for:.navigationBar)
         .sheet(isPresented: $showHelp) { NavigationStack { HelpView().toolbar { Button("完成") { showHelp = false } } } }
     }
@@ -210,10 +209,10 @@ private struct ToolboxHomeView: View {
             }.buttonStyle(.plain).accessibilityIdentifier("bullpenShortcut")
         }
     }
-    private var shortcuts: some View {
+    private func shortcuts(vertical: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("场边常用").font(.headline)
-            let flow = wideShortcuts ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 5))
+            let flow = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 5))
             flow {
                 ForEach([PocketTool.battingLog, .tacticsBoard, .stopwatch]) { tool in
                     NavigationLink(value: ToolboxRoute.tool(tool)) {
