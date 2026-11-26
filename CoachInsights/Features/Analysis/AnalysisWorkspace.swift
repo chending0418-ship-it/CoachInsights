@@ -101,25 +101,31 @@ import AVFoundation
         scrubTask=nil;scrubbing=true;seeking=false
     }
     func scrub(to seconds:Double) {
+        guard let metadata, let index = metadata.timeline.frameIndex(at: MediaTime(seconds: seconds), in: clip) else { return }
+        scrub(toFrame: index)
+    }
+    func scrub(toFrame index: Int) {
+        guard let provider else { return }
         if !scrubbing { beginScrubbing() }
-        guard let metadata,let bounds=metadata.timeline.frameBounds(in:clip),let provider else { return }
-        frameIndex=min(bounds.upperBound,max(bounds.lowerBound,metadata.timeline.nearestFrame(to:MediaTime(seconds:max(0,seconds)))))
+        if index != frameIndex, selectedAnnotation != nil { selectedAnnotation = nil }
+        frameIndex = index
         // A single preview worker samples the latest target while the finger moves.
         // Debouncing every change would starve previews during a continuous drag.
         guard scrubTask == nil else { return }
         let generation=loadGeneration
         scrubTask=Task { [weak self] in
+            let generator = await provider.makePreviewGenerator()
             var displayed = -1
             while !Task.isCancelled,let self,self.scrubbing,self.loadGeneration==generation {
                 let target=self.frameIndex
                 do {
                     if target != displayed {
-                        let image=try await provider.preview(at:target)
+                        let image=try await provider.preview(at: target, using: generator)
                         try Task.checkCancellation()
                         guard self.scrubbing,self.loadGeneration==generation else { return }
                         self.frame=image;displayed=target
                     }
-                    try await Task.sleep(for:.milliseconds(33))
+                    if target == self.frameIndex { try await Task.sleep(for:.milliseconds(16)) }
                 } catch is CancellationError { return }
                 catch { try? await Task.sleep(for:.milliseconds(50)) }
             }

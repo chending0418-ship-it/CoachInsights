@@ -125,8 +125,15 @@ struct ComparisonEditor:View {
     private var sharedSlider: some View {
         Group {
             if let range = workspace.range, range.upperBound > range.lowerBound {
-                Slider(value: Binding(get: { workspace.time }, set: { workspace.seek($0) }), in: range, onEditingChanged: { editing in
-                    if !editing { workspace.save() }
+                Slider(value: Binding(get: { workspace.time }, set: { value in
+                    if workspace.left.scrubbing && workspace.right.scrubbing && !workspace.independent {
+                        workspace.scrubShared(to: value)
+                    } else {
+                        workspace.seek(value)
+                    }
+                }), in: range, onEditingChanged: { editing in
+                    if editing { workspace.beginSharedScrub() }
+                    else { workspace.finishSharedScrub() }
                 }).accessibilityIdentifier("comparisonSlider")
             }
         }

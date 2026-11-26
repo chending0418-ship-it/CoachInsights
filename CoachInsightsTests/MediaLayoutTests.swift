@@ -78,6 +78,28 @@ import XCTest
         XCTAssertEqual([workspace.left.frameIndex, workspace.right.frameIndex], indices)
     }
 
+    func testSharedScrubPreviewsBothChannelsBeforeReleaseAndSettlesAfterReversal() async throws {
+        let (_, _, workspace) = try await pair()
+        workspace.play()
+        try await wait { workspace.playing }
+        workspace.beginSharedScrub()
+        XCTAssertFalse(workspace.playing)
+        for position in [0.8, 0.2] {
+            workspace.scrubShared(to: position)
+            try await wait {
+                guard let left = workspace.left.frame, let right = workspace.right.frame else { return false }
+                return abs(left.actualTime.seconds - position) < 0.08 && abs(right.actualTime.seconds - position) < 0.08
+            }
+            XCTAssertTrue(workspace.left.scrubbing && workspace.right.scrubbing)
+        }
+        workspace.finishSharedScrub()
+        try await wait { workspace.left.frameReady && workspace.right.frameReady }
+        XCTAssertEqual(workspace.left.frame?.index, 6)
+        XCTAssertEqual(workspace.right.frame?.index, 12)
+        workspace.play()
+        try await wait { workspace.playing && workspace.time > 0.24 }
+    }
+
     func testManualAndPreviouslySavedLayoutsArePreservedOnRotationAndReopen() async throws {
         let (repository, session, workspace) = try await pair()
         workspace.adaptLayout(width: 744, height: 1060)
@@ -103,5 +125,11 @@ import XCTest
         XCTAssertEqual(fixed.setup?.layout, "vertical")
         fixed.selectLayout("invalid", width: 1133, height: 680)
         XCTAssertEqual(fixed.setup?.layout, "vertical")
+        let automatic = ComparisonWorkspace(session: session, repository: repository)
+        workspaces.append(automatic)
+        await automatic.load()
+        XCTAssertEqual(automatic.layoutChoice, "automatic")
+        automatic.adaptLayout(width: 1133, height: 680)
+        XCTAssertEqual(automatic.setup?.layout, "horizontal")
     }
 }

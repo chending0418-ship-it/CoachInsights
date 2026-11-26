@@ -37,6 +37,8 @@ struct ComparisonSetup: Codable, Equatable {
     var leftClip: ClipRange
     var rightClip: ClipRange
     var layout = "horizontal"
+    // Older records persisted only the resolved horizontal/vertical layout.
+    var automaticLayout: Bool?
     var rate: Double = 1
     var leftView = ViewSettings()
     var rightView = ViewSettings()

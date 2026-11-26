@@ -41,7 +41,7 @@ import AVFoundation
             let snapshot=try session.snapshot()
             guard let first=left.assets.first(where:{$0.id==initialVideoID}) ?? left.assets.first else { return }
             let saved=snapshot.comparison
-            if secondVideoID == nil,let saved,(initialVideoID == nil || saved.leftVideoID == initialVideoID) { setup=saved;followsWindow=false }
+            if secondVideoID == nil,let saved,(initialVideoID == nil || saved.leftVideoID == initialVideoID) { setup=saved;followsWindow=saved.automaticLayout ?? false }
             else {
                 guard let second=left.assets.first(where:{$0.id==secondVideoID && $0.id != first.id}) ?? left.assets.first(where:{$0.id != first.id}) else { await left.select(first.id);setup=nil;return }
                 let a=try first.metadata(),b=try second.metadata()
@@ -51,6 +51,7 @@ import AVFoundation
                     leftClip:snapshot.clips[first.id.uuidString] ?? ClipRange(start:a.timeline.frames[0].presentationTime,end:a.timeline.duration),
                     rightClip:rightClip,rate:snapshot.playbackRates[first.id.uuidString] ?? 1,
                     leftView:snapshot.views[first.id.uuidString] ?? ViewSettings(),rightView:snapshot.views[second.id.uuidString] ?? ViewSettings())
+                setup?.automaticLayout = true
                 followsWindow=true
             }
             guard let setup else { return }
@@ -59,7 +60,7 @@ import AVFoundation
             left.snapshot.clips[left.key]=setup.leftClip;right.snapshot.clips[right.key]=setup.rightClip
             left.externalSave={ [weak self] snapshot in self?.viewChanged(snapshot,isLeft:true) }
             right.externalSave={ [weak self] snapshot in self?.viewChanged(snapshot,isLeft:false) }
-            rebuild();seek(0)
+            rebuild();seek(0);save()
         } catch { issue=error.localizedDescription }
     }
     var layoutChoice: String { followsWindow ? "automatic" : (setup?.layout ?? "horizontal") }
@@ -76,12 +77,15 @@ import AVFoundation
     func selectLayout(_ choice: String, width: CGFloat, height: CGFloat) {
         guard ["automatic", "horizontal", "vertical"].contains(choice), setup != nil else { return }
         followsWindow = choice == "automatic"
-        if followsWindow { adaptLayout(width: width, height: height) }
-        else if setup?.layout != choice { setup?.layout = choice; save() }
+        setup?.automaticLayout = followsWindow
+        if !followsWindow { setup?.layout = choice }
+        else if width > 0, height > 0 { setup?.layout = Self.automaticLayout(width: width, height: height) }
+        save()
     }
     func independentSeek(_ seconds:Double,isLeft:Bool) {
-        pause();independent=true
-        (isLeft ? left:right).scrub(to:seconds)
+        let channel = isLeft ? left : right
+        if !independent || !channel.scrubbing { pause(); independent = true }
+        channel.scrub(to: seconds)
         if let setup,let range {
             let anchor=isLeft ? setup.leftAnchor:setup.rightAnchor
             time=min(range.upperBound,max(range.lowerBound,seconds-anchor.seconds))
@@ -129,6 +133,29 @@ import AVFoundation
         if isLeft { setup.leftClip=w.clip } else { setup.rightClip=w.clip }
         self.setup=setup;rebuild();seek(time);save()
     }
+    func beginSharedScrub() {
+        guard range != nil else { return }
+        pause()
+        independent = false
+        left.beginScrubbing()
+        right.beginScrubbing()
+    }
+
+    func scrubShared(to value: Double) {
+        guard let range, let indices = dual?.frameIndices(at: value) else { return }
+        if !left.scrubbing || !right.scrubbing { beginSharedScrub() }
+        time = min(range.upperBound, max(range.lowerBound, value))
+        left.scrub(toFrame: indices.0)
+        right.scrub(toFrame: indices.1)
+    }
+
+    func finishSharedScrub() {
+        guard !independent, left.scrubbing || right.scrubbing else { return }
+        // Decode exactly once per channel at the final common-clock position.
+        seek(time)
+        save()
+    }
+
     func seek(_ value:Double) {
         pause();independent=false;guard let dual,let range=range,let indices=dual.frameIndices(at:value) else { return }
         time=min(range.upperBound,max(range.lowerBound,value));left.seek(frame:indices.0);right.seek(frame:indices.1)
@@ -167,10 +194,10 @@ import AVFoundation
                         let b=right.metadata?.timeline.frames[safe:right.frameIndex]?.duration.seconds ?? 1/30
                         let tolerance=max(0.001,min(0.035,min(a,b)*0.9))
                         refresh+=1
-                        if refresh%6 == 0 { do { try await dual.correctIfNeeded(tolerance:tolerance) } catch { issue=error.localizedDescription;pause() } }
+                        if refresh%6 == 0 { do { try await dual.correctIfNeeded(tolerance:tolerance) } catch { guard !Task.isCancelled else { return };issue=error.localizedDescription;pause() } }
                     }
                 }
-            } catch is CancellationError {} catch { issue=error.localizedDescription }
+            } catch is CancellationError {} catch { if !Task.isCancelled { issue=error.localizedDescription } }
         }
     }
     func pause() {
@@ -184,7 +211,7 @@ import AVFoundation
         do { var snapshot=try session.snapshot();snapshot.comparison=setup;try repository.save(session,snapshot:snapshot) }
         catch { issue=error.localizedDescription }
     }
-    func changedSetup() { followsWindow=false;pause();rebuild();save() }
+    func changedSetup() { followsWindow=false;setup?.automaticLayout=false;pause();rebuild();save() }
     private func viewChanged(_ snapshot:SessionSnapshot,isLeft:Bool) {
         guard var setup else { return }
         if isLeft { setup.leftView=snapshot.views[left.key] ?? ViewSettings() }

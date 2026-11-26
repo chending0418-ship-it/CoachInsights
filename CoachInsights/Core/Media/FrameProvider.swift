@@ -23,7 +23,17 @@ actor FrameProvider {
         cache = LRUCache(costLimit: costLimit)
     }
 
-    func frame(at index: Int) async throws -> ResolvedFrame {
+    func makeExactGenerator() -> AVAssetImageGenerator {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        if #available(iOS 18, *) { generator.dynamicRangePolicy = .forceSDR }
+        generator.maximumSize = CGSize(width: maximumDimension, height: maximumDimension)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        return generator
+    }
+
+    func frame(at index: Int, using sequentialGenerator: AVAssetImageGenerator? = nil) async throws -> ResolvedFrame {
         try Task.checkCancellation()
         if pressureTask == nil {
             pressureTask = Task { [weak self] in
@@ -36,13 +46,8 @@ actor FrameProvider {
         if let cached = cache.value(for: index) { return cached }
         try Task.checkCancellation()
         let epoch = cacheEpoch
-        // A generator per outstanding request keeps cancellation local to that request.
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        if #available(iOS 18, *) { generator.dynamicRangePolicy = .forceSDR }
-        generator.maximumSize = CGSize(width: maximumDimension, height: maximumDimension)
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
+        // Interactive exact seeks may overlap. Each gets its own cancellation domain.
+        let generator = sequentialGenerator ?? makeExactGenerator()
         let time = metadata.timeline.frames[index].presentationTime
         let (image, actual) = try await withTaskCancellationHandler {
             try await generator.image(at: time.cmTime)
@@ -66,17 +71,21 @@ actor FrameProvider {
             _ = try? await frame(at: frameIndex)
         }
     }
-    /// Coalesced drag previews may use nearby decode times. Keep the actual displayed
-    /// source PTS so overlays are never drawn using the requested playhead instead.
-    func preview(at index:Int) async throws -> ResolvedFrame {
-        let target=metadata.timeline.steppedIndex(from:index,by:0)
-        if let cached=cache.value(for:target) { return cached }
+    // Give each drag its own decoder so cancelling one gesture cannot cancel the next.
+    func makePreviewGenerator() -> AVAssetImageGenerator {
         let generator=AVAssetImageGenerator(asset:asset)
         generator.appliesPreferredTrackTransform=true
         generator.maximumSize=CGSize(width:640,height:640)
         if #available(iOS 18,*) { generator.dynamicRangePolicy = .forceSDR }
         generator.requestedTimeToleranceBefore=CMTime(seconds:0.05,preferredTimescale:600_000)
         generator.requestedTimeToleranceAfter=CMTime(seconds:0.05,preferredTimescale:600_000)
+        return generator
+    }
+
+    func preview(at index: Int, using generator: AVAssetImageGenerator) async throws -> ResolvedFrame {
+        try Task.checkCancellation()
+        let target = metadata.timeline.steppedIndex(from: index, by: 0)
+        if let cached = cache.value(for: target) { return cached }
         let (image,actual)=try await withTaskCancellationHandler {
             try await generator.image(at:metadata.timeline.frames[target].presentationTime.cmTime)
         } onCancel: { generator.cancelAllCGImageGeneration() }
