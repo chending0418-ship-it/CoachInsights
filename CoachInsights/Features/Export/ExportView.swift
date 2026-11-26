@@ -27,6 +27,7 @@ struct ExportView:View {
     @State private var task:Task<Void,Never>?
     private var summaryRate:Double { compare ? ((try? session.snapshot().comparison?.rate) ?? 1) : rate }
     @State private var resultSummary: String?
+    @State private var comparisonAvailable = false
     private var rangeSummary: String {
         guard let snapshot = try? session.snapshot() else { return "无法读取片段" }
         if compare {
@@ -63,7 +64,11 @@ struct ExportView:View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("输出设置").font(.headline)
                         Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
-                        Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
+                        Toggle("双视频同屏合成",isOn:$compare).disabled(busy || !comparisonAvailable)
+                        if !comparisonAvailable {
+                            Text("先在动作对比中选择两段视频，再导出同屏视频。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         Toggle("包含可见绘图标注",isOn:$includeAnnotations).disabled(busy)
                         Toggle("包含可见骨架和角度（辅助估算）",isOn:$includePose).disabled(busy)
                         if includePose {
@@ -119,7 +124,17 @@ struct ExportView:View {
         }.background(Theme.paper).notebookPageTitle(resultURL == nil ? "导出设置" : "导出结果")
         .task {
             includePose=initialPose;includeAnnotations=initialAnnotations
-            do { let ids=try session.snapshot().videoIDs;assets=try library.repository?.assets().filter{ids.contains($0.id)} ?? [];videoID=assets.first(where:{$0.id==initialVideoID})?.id ?? assets.first?.id; compare=initialComparison; if let id=videoID { rate=try session.snapshot().playbackRates[id.uuidString] ?? 1 } }
+            do {
+                let snapshot = try session.snapshot()
+                assets = try library.repository?.assets().filter { snapshot.videoIDs.contains($0.id) } ?? []
+                let ids = Set(assets.map(\.id))
+                if let setup = snapshot.comparison {
+                    comparisonAvailable = setup.leftVideoID != setup.rightVideoID && ids.contains(setup.leftVideoID) && ids.contains(setup.rightVideoID)
+                }
+                videoID = assets.first(where: { $0.id == initialVideoID })?.id ?? assets.first?.id
+                compare = initialComparison && comparisonAvailable
+                if let id = videoID { rate = snapshot.playbackRates[id.uuidString] ?? 1 }
+            }
             catch { issue=error.localizedDescription }
         }
         .onChange(of:videoID) { _,id in if let id { rate=(try? session.snapshot().playbackRates[id.uuidString]) ?? 1 } }

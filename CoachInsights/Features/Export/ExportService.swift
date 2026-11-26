@@ -91,14 +91,17 @@ actor ExportService {
         guard writer.startWriting() else { throw writer.error ?? ExportFailure.encoding };writer.startSession(atSourceTime:.zero)
         let left=FrameProvider(asset:recipe.left.asset,metadata:recipe.left.metadata,maximumDimension:1920,costLimit:32*1024*1024)
         let right=recipe.right.map { FrameProvider(asset:$0.asset,metadata:$0.metadata,maximumDimension:1920,costLimit:32*1024*1024) }
+        // Each export reads its channel in order and owns its decoder until completion.
+        let leftGenerator = await left.makeExactGenerator()
+        let rightGenerator = await right?.makeExactGenerator()
         do {
             for index in 0..<count {
                 try Task.checkCancellation()
                 let time=min(recipe.end-0.000001,recipe.start+Double(index)/30*recipe.rate)
                 let times=recipe.clock?.times(at:time) ?? (time,time)
-                let a=try await left.frame(at:recipe.left.frameIndex(at:times.0))
+                let a=try await left.frame(at: recipe.left.frameIndex(at: times.0), using: leftGenerator)
                 let b:ResolvedFrame?
-                if let right,let source=recipe.right { b=try await right.frame(at:source.frameIndex(at:times.1)) } else { b=nil }
+                if let right,let source=recipe.right { b=try await right.frame(at: source.frameIndex(at: times.1), using: rightGenerator) } else { b=nil }
                 var waited=0
                 while !input.isReadyForMoreMediaData {
                     try Task.checkCancellation();guard writer.status == .writing,waited<10_000 else { throw writer.error ?? ExportFailure.encoding }

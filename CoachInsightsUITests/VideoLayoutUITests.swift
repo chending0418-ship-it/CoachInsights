@@ -13,7 +13,7 @@ final class VideoLayoutUITests: XCTestCase {
         if app.buttons["libraryCreateMenu"].exists { app.buttons["libraryCreateMenu"].tap() }; app.buttons["createSession"].tap()
         let field = app.textFields["sessionName"]; XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap(); field.typeText(name); app.buttons["confirmCreate"].tap()
-        let row = app.staticTexts[name].firstMatch; XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        XCTAssertTrue(app.buttons["closeVideo"].waitForExistence(timeout: 8))
     }
     @MainActor private func fixture(_ app: XCUIApplication) {
         let second = app.staticTexts["frameReadout"].exists

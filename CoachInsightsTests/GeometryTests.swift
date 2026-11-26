@@ -24,6 +24,21 @@ final class GeometryTests: XCTestCase {
         XCTAssertNil(bars.normalizedPoint(from: .zero))
         XCTAssertEqual(bars.normalizedPoint(from: CGPoint(x: 200, y: 200)), CGPoint(x: 0.5, y: 0.5))
     }
+    func testOffscreenPanIsClampedInEditorAndExportIncludingLegacyValues() {
+        let image = CGSize(width: 1280, height: 720)
+        var view = ViewSettings()
+        view.pan = UnitPointValue(x: 0, y: -2.1412)
+        for width in [640.0, 1920.0] {
+            let viewport = CGSize(width: width, height: width * 9 / 16)
+            XCTAssertEqual(view.geometry(image: image, viewport: viewport).pan, .zero)
+        }
+        view.zoom = 2; view.quarterTurns = 1; view.mirrored = true
+        view.pan = UnitPointValue(x: 4, y: -4)
+        let rotated = view.geometry(image: image, viewport: CGSize(width: 640, height: 360))
+        XCTAssertEqual(rotated.pan.x, 0, accuracy: 0.0001)
+        XCTAssertEqual(rotated.pan.y, -180, accuracy: 0.0001)
+    }
+
     func testAngleUsesPixelAspectAndRejectsDegeneratePoints() {
         let size = CGSize(width: 200, height: 100)
         let angle = VideoGeometry.angle(a: CGPoint(x: 0.25, y: 0), vertex: CGPoint(x: 0, y: 0),

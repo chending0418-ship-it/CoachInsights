@@ -13,6 +13,7 @@ struct VideoLibraryView: View {
     @State private var sport = "全部"
     @State private var period = "全部日期"
     @State private var showCreate = false
+    @State private var createdSession: AnalysisSession?
     @State private var showCapture = false
     @State private var pendingDelete: AnalysisSession?
     @State private var initialVideoID:UUID?
@@ -87,7 +88,14 @@ struct VideoLibraryView: View {
             NewVideoImportView(selection: value) { session in
             importedSession=session;initialVideoID=nil;importSelection=nil;openImported=true
         } }
-        .navigationDestination(isPresented: $showCreate) { CreateSessionView { _ in } }
+        .navigationDestination(isPresented: $showCreate) {
+            if let createdSession {
+                SessionDetail(session: createdSession, onClose: { showCreate = false })
+            } else {
+                CreateSessionView { createdSession = $0 }
+            }
+        }
+        .onChange(of: showCreate) { _, showing in if !showing { createdSession = nil } }
         .navigationDestination(isPresented: $showCapture) { CaptureView() }
         .alert("删除分析记录？", isPresented: Binding(get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } })) {
@@ -246,12 +254,11 @@ struct EmptyPanel: View {
 
 struct CreateSessionView: View {
     @EnvironmentObject private var library: LibraryStore
-    @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var sport = Sport.pitching
     @State private var hand = "未指定"
     @State private var angle = "未指定"
-    let created: (UUID) -> Void
+    let created: (AnalysisSession) -> Void
     var body: some View {
         Group {
             ScrollView {
@@ -266,7 +273,7 @@ struct CreateSessionView: View {
                             if let session = library.create(
                                 name: name, sport: sport, handedness: hand == "未指定" ? nil : hand, angle: angle == "未指定" ? nil : angle)
                             {
-                                created(session.id); dismiss()
+                                created(session)
                             }
                         }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("confirmCreate")
                     }

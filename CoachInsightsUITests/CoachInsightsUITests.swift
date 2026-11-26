@@ -18,7 +18,7 @@ final class CoachInsightsUITests:XCTestCase {
         if app.buttons["libraryCreateMenu"].exists { app.buttons["libraryCreateMenu"].tap() }
         app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
         XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText(name);app.buttons["confirmCreate"].tap()
-        let record=app.staticTexts[name].firstMatch;XCTAssertTrue(record.waitForExistence(timeout:5));record.tap()
+        XCTAssertTrue(app.buttons["closeVideo"].waitForExistence(timeout: 8))
     }
     @MainActor func fixture(_ app:XCUIApplication) {
         if !app.buttons.matching(identifier:"importFixture").firstMatch.isHittable { app.buttons["videoOptions"].tap();app.buttons["添加素材"].tap() }

@@ -7,44 +7,59 @@ struct ComparisonView:View {
     @State private var workspace:ComparisonWorkspace?
     @State private var choosing=false
     @State private var choosingLeft=false
-    @State private var pageVisible=false
+    @State private var ready = false
     @Environment(\.dismiss) private var dismiss
-    var body:some View {
+    var body: some View {
         Group {
-            if let workspace {
-                ComparisonEditor(workspace:workspace) { isLeft in choosingLeft=isLeft;workspace.pause();choosing=true }
-            } else { ProgressView("打开对比…") }
-        }.background(.black).foregroundStyle(.white).tint(Theme.rose)
-            .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: false)
-        .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: false)
-        .notebookPageTitle("双视频对比")
-        .task {
-            guard workspace == nil,let repository=library.repository else { return }
-            let w=ComparisonWorkspace(session:session,repository:repository);workspace=w
-            let saved=try? session.snapshot().comparison
-            if let saved,initialVideoID == nil || saved.leftVideoID==initialVideoID { await w.load(initialVideoID:initialVideoID) }
-            else {
-                await w.left.reload(openVideo:false)
-                if let id=initialVideoID ?? w.left.assets.first?.id { await w.left.select(id) }
-            }
-            if w.setup == nil { choosingLeft=false;choosing=true }
-        }
-            .navigationDestination(isPresented: $choosing) {
-            if let repository=library.repository {
-                    VideoSourcePicker(
-                        repository: repository, targetSession: session, choosingLeft: choosingLeft,
-                        excluding: choosingLeft ? workspace?.right.selectedVideoID : workspace?.left.selectedVideoID
-                    ) { id in
-                    choosing=false
-                    Task {
-                        if workspace?.setup == nil { await workspace?.load(initialVideoID:initialVideoID,secondVideoID:id) }
-                        else { await workspace?.refreshAssets();await workspace?.replace(id,isLeft:choosingLeft) }
+            if ready, let workspace, let repository = library.repository {
+                if workspace.setup == nil {
+                    let first = workspace.left.selectedVideoID
+                    VideoSourcePicker(repository: repository, targetSession: session,
+                                      choosingLeft: first == nil, excluding: first) { id in
+                        ready = false
+                        Task {
+                            if let first { await workspace.load(initialVideoID: first, secondVideoID: id) }
+                            else { await workspace.left.reload(openVideo: false); await workspace.left.select(id) }
+                            ready = true
+                        }
+                    } onCancel: { dismiss() }
+                } else {
+                    ComparisonEditor(workspace: workspace) { isLeft in
+                        choosingLeft = isLeft; workspace.pause(); choosing = true
                     }
-                } onCancel: { choosing=false;if workspace?.setup == nil { dismiss() } }
+                    .background(.black).foregroundStyle(.white).tint(Theme.rose)
+                    .notebookPageTitle("双视频对比")
+                }
+            } else {
+                ProgressView("打开对比…").frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onAppear { pageVisible = true }
-        .onDisappear { pageVisible = false; workspace?.stopAndSave() }
+        .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: false)
+        .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: false)
+        .task {
+            guard workspace == nil, let repository = library.repository else { return }
+            let value = ComparisonWorkspace(session: session, repository: repository)
+            workspace = value
+            let saved = try? session.snapshot().comparison
+            if let saved, initialVideoID == nil || saved.leftVideoID == initialVideoID {
+                await value.load(initialVideoID: initialVideoID)
+            } else {
+                await value.left.reload(openVideo: false)
+                if let id = initialVideoID ?? value.left.assets.first?.id { await value.left.select(id) }
+            }
+            ready = true
+        }
+        .navigationDestination(isPresented: $choosing) {
+            if let workspace, let repository = library.repository {
+                VideoSourcePicker(repository: repository, targetSession: session, choosingLeft: choosingLeft,
+                                  excluding: choosingLeft ? workspace.right.selectedVideoID : workspace.left.selectedVideoID) { id in
+                    let isLeft = choosingLeft
+                    choosing = false
+                    Task { await workspace.refreshAssets(); await workspace.replace(id, isLeft: isLeft) }
+                } onCancel: { choosing = false }
+            }
+        }
+        .onDisappear { workspace?.stopAndSave() }
     }
 }
 
@@ -125,8 +140,15 @@ struct ComparisonEditor:View {
     private var sharedSlider: some View {
         Group {
             if let range = workspace.range, range.upperBound > range.lowerBound {
-                Slider(value: Binding(get: { workspace.time }, set: { workspace.seek($0) }), in: range, onEditingChanged: { editing in
-                    if !editing { workspace.save() }
+                Slider(value: Binding(get: { workspace.time }, set: { value in
+                    if workspace.left.scrubbing && workspace.right.scrubbing && !workspace.independent {
+                        workspace.scrubShared(to: value)
+                    } else {
+                        workspace.seek(value)
+                    }
+                }), in: range, onEditingChanged: { editing in
+                    if editing { workspace.beginSharedScrub() }
+                    else { workspace.finishSharedScrub() }
                 }).accessibilityIdentifier("comparisonSlider")
             }
         }

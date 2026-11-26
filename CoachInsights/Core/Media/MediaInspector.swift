@@ -63,9 +63,10 @@ actor MediaInspector {
             if Task.isCancelled { reader.cancelReading(); throw CancellationError() }
             // AVAssetReader may return zero-sample boundary markers with an invalid PTS.
             guard CMSampleBufferGetNumSamples(sample) > 0 else { continue }
-            let time = CMSampleBufferGetPresentationTimeStamp(sample)
+            // Use the output timeline, including edit-list offsets for reordered frames.
+            let time = CMSampleBufferGetOutputPresentationTimeStamp(sample)
             guard time.isNumeric else { reader.cancelReading(); throw MediaFailure.invalidTiming }
-            times.append((time, CMSampleBufferGetDuration(sample)))
+            times.append((time, CMSampleBufferGetOutputDuration(sample)))
         }
         guard reader.status == .completed else { throw reader.error ?? MediaFailure.readFailed }
         times.sort { CMTimeCompare($0.0, $1.0) < 0 }

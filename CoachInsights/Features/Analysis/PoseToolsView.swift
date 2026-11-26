@@ -58,28 +58,20 @@ struct PoseSettingsPanel: View {
 }
 
 struct PoseRegionPicker:View {
-    let image: CGImage
-    let settings: ViewSettings
-    let annotations: [Annotation]
-    let pose: PoseFrame?
-    let confidence: Float
+    @ObservedObject var workspace: AnalysisWorkspace
     @Binding var region:[Double]
     @State private var start:CGPoint?
     var body:some View {
         GeometryReader { proxy in
-            let geometry = settings.geometry(image: CGSize(width: image.width, height: image.height), viewport: proxy.size)
+            let imageSize = workspace.metadata?.displaySize ?? proxy.size
+            let geometry = workspace.viewSettings.geometry(image: imageSize, viewport: proxy.size)
+            let a = geometry.viewPoint(from: CGPoint(x: region[0], y: region[1]))
+            let b = geometry.viewPoint(from: CGPoint(x: region[0] + region[2], y: region[1] + region[3]))
             ZStack {
-                Color.black
-                Canvas { context, size in
-                    context.withCGContext { graphics in
-                        AnalysisRenderer.draw(image: image, in: graphics, size: size, settings: settings,
-                                              annotations: annotations, pose: pose, confidence: confidence)
-                        AnalysisRenderer.drawPoseNotice(pose, context: graphics, size: size, confidence: confidence)
-                    }
-                    let a=geometry.viewPoint(from:CGPoint(x:region[0],y:region[1]))
-                    let b=geometry.viewPoint(from:CGPoint(x:region[0]+region[2],y:region[1]+region[3]))
-                    context.stroke(Path(CGRect(x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y).standardized),with:.color(.cyan),lineWidth:2)
-                }
+                AnalysisCanvas(workspace: workspace)
+                    .allowsHitTesting(false)
+                Path(CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y).standardized)
+                    .stroke(.cyan, lineWidth: 2)
             }.contentShape(Rectangle()).gesture(DragGesture(minimumDistance:5).onChanged { value in
                 if start==nil { start=geometry.normalizedPoint(from:value.startLocation) }
                 guard let start,let end=geometry.normalizedPoint(from:value.location,allowOutside:true) else { return }

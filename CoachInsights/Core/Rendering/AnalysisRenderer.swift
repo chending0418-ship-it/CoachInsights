@@ -6,10 +6,17 @@ extension UnitPointValue {
 }
 extension ViewSettings {
     func geometry(image: CGSize, viewport: CGSize) -> VideoGeometry {
-        VideoGeometry(imageSize: image, viewportSize: viewport,
+        var result = VideoGeometry(imageSize: image, viewportSize: viewport,
                       crop: CGRect(x: crop[0], y: crop[1], width: crop[2], height: crop[3]),
                       quarterTurns: quarterTurns, mirrored: mirrored, zoom: zoom,
                       pan: CGPoint(x: pan.x * viewport.width, y: pan.y * viewport.height))
+        // Limit translation to the part of the enlarged crop outside this viewport.
+        // Rendering also repairs the effective framing of older off-screen views.
+        let limitX = max(0, (result.rotatedSize.width * result.scale - viewport.width) / 2)
+        let limitY = max(0, (result.rotatedSize.height * result.scale - viewport.height) / 2)
+        result.pan = CGPoint(x: min(limitX, max(-limitX, result.pan.x)),
+                             y: min(limitY, max(-limitY, result.pan.y)))
+        return result
     }
 }
 extension UIColor {
