@@ -152,9 +152,8 @@ struct AnalysisEditor: View {
                                 NotebookColumns(minimumWidth: 680, leadingFraction: 0.65, spacing: 16) {
                                     VStack(alignment: .leading, spacing: 0) {
                                         Group {
-                                            if panel == .pose, let frame = w.frame {
-                                                PoseRegionPicker(image: frame.image, settings: w.viewSettings, annotations: w.visibleAnnotations, pose: w.currentPose,
-                                                                 confidence: w.poseSettings.minimumConfidence, region: $poseRegion)
+                                            if panel == .pose {
+                                                PoseRegionPicker(workspace: w, region: $poseRegion)
                                                     .disabled(w.poseBusy)
                                             } else { canvas }
                                         }
