@@ -50,7 +50,10 @@ final class PersonalPlanUITests: XCTestCase {
         app.buttons["cancelPersonalPlan"].tap()
         app.alerts.buttons["继续编辑"].tap()
         save.tap()
-        XCTAssertEqual(app.scrollViews["personalPlanTextPreview"].staticTexts["personalPlanPreviewTitle"].label, "Practice plan revised")
+        let revisedTitle = app.staticTexts.matching(NSPredicate(
+            format: "identifier == %@ AND label == %@", "personalPlanPreviewTitle", "Practice plan revised"
+        )).firstMatch
+        XCTAssertTrue(revisedTitle.waitForExistence(timeout: 5))
 
         app.buttons["personalPlanShare"].tap()
         let count = app.staticTexts["shareCardPageCount"]

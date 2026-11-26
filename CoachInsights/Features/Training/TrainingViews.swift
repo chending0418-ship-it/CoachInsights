@@ -150,14 +150,22 @@ private struct TrainingEditor: View {
           VStack(alignment: .leading, spacing: 12) {
             Text("训练环节").font(.headline)
           ForEach($draft.stages) { $stage in
-            VStack(alignment: .leading, spacing: 7) {
-                let i = draft.stages.firstIndex { $0.id == stage.id } ?? 0
-                HStack {
-                  Text(String(format: "%02d", i + 1)).monospacedDigit().foregroundStyle(Theme.burgundy);
-                  TextField("环节名称", text: $stage.name).accessibilityIdentifier("stageName")
+            VStack(alignment: .leading, spacing: 10) {
+              let i = draft.stages.firstIndex { $0.id == stage.id } ?? 0
+              Text("环节 " + String(format: "%02d", i + 1))
+                .font(.subheadline.bold()).foregroundStyle(Theme.burgundy)
+              HStack(alignment: .top, spacing: 10) {
+                NotebookInput(title: "名称") {
+                  TextField("例如：两人接传", text: $stage.name).accessibilityIdentifier("stageName")
                 }
-              Stepper("\(stage.minutes) 分钟", value: $stage.minutes, in: 1...240)
-              TextField("安排与提示", text: $stage.instructions, axis: .vertical)
+                NotebookInput(title: "时长（分钟）") {
+                  TextField("分钟", value: $stage.minutes, format: .number)
+                    .keyboardType(.numberPad).accessibilityIdentifier("stageMinutes")
+                }.frame(width: 112)
+              }
+              NotebookInput(title: "动作说明") {
+                TextField("器材、站位或训练要点", text: $stage.instructions, axis: .vertical).lineLimit(2...8)
+              }
               HStack {
                 Button("上移") { draft.stages.swapAt(i, i - 1) }.disabled(i == 0)
                 Button("下移") { draft.stages.swapAt(i, i + 1) }.disabled(i + 1 >= draft.stages.count)
