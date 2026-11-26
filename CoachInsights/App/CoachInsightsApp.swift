@@ -50,7 +50,7 @@ private struct LayoutProbeView: View {
 
 enum Theme {
     static let burgundy = Color(red: 0.447, green: 0.184, blue: 0.216)
-    static let paper = Color(red: 0.984, green: 0.980, blue: 0.961)
+    static let paper = Notebook.paper
     static let boardPaper = Color(red: 0.973, green: 0.953, blue: 0.945)
     static let rose = Color(red: 0.937, green: 0.812, blue: 0.827)
 }

@@ -20,7 +20,19 @@ struct FieldLogView: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                if let log, kind == .batting {
+                if let log, geometry.size.width >= 740, [.game, .batting].contains(kind) {
+                    HStack(alignment: .top, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            header(log)
+                            controls(log, availableHeight: geometry.size.height)
+                            if let notice { Text(notice).font(.caption).foregroundStyle(Theme.burgundy).accessibilityIdentifier("fieldNotice") }
+                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("本轮过程 · "+String(log.events.count)).font(.headline)
+                            recentEvents(log)
+                        }.frame(width: min(310, geometry.size.width * 0.34))
+                    }.padding(20)
+                } else if let log, kind == .batting {
                     battingLayout(log)
                 } else if let log, kind == .bullpen && geometry.size.width >= 670 {
                     HStack(alignment: .top, spacing: 24) {
@@ -136,7 +148,8 @@ struct FieldLogView: View {
                 Text(log.ended ? "已结束 · 可继续编辑" : "修改自动保存").foregroundStyle(Theme.burgundy)
             }.font(.caption)
             TextField(kind == .game ? "比赛名称（可选）" : "姓名或本轮名称（可选）", text: $name)
-                .font(.headline).textFieldStyle(.roundedBorder).disabled(log.ended)
+                .font(.headline).padding(.horizontal, 10).frame(minHeight: 44)
+                .background(Notebook.inset, in: RoundedRectangle(cornerRadius: 6)).disabled(log.ended)
                 .accessibilityIdentifier("fieldName")
         }
     }
@@ -420,7 +433,7 @@ private struct PitchCorrectionView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    Text("修正同一球，球数保持不变").font(.subheadline).foregroundStyle(.secondary)
+                    NotebookHeading(title: "第 "+String(number)+" 球", detail: "移动落点或调整判定，球数保持不变。")
                     PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("correctionViewpoint")
                     PitchLocationMap(pitches: [mark], viewpoint: viewpoint, correcting: true, sequence: number) { point in
                         mark.location = point; mark.zone = .at(point)
@@ -469,6 +482,8 @@ private struct PitchReviewView: View {
                 if pitches.indices.contains(index) {
                     let mark = pitches[index]
                     VStack(spacing: 16) {
+                        ProgressView(value: Double(index + 1), total: Double(pitches.count))
+                            .accessibilityLabel("回看进度")
                         PitchViewpointPicker(viewpoint: $viewpoint).accessibilityIdentifier("replayViewpoint")
                         PitchLocationMap(pitches: [mark], viewpoint: viewpoint, readOnly: true, correcting: true, sequence: index + 1) { _ in }
                         Text("第 \(index + 1) / \(pitches.count) 球 · \(mark.isStrike ? "好球" : "坏球") · \(viewpoint.title(for: mark.zone))").font(.headline)
@@ -476,7 +491,7 @@ private struct PitchReviewView: View {
                             Button("上一球") { index -= 1 }.disabled(index == 0)
                             Spacer()
                             Button("下一球") { index += 1 }.disabled(index + 1 >= pitches.count)
-                        }.buttonStyle(.bordered)
+                        }.buttonStyle(.bordered).controlSize(.large)
                     }.padding().frame(maxWidth: 540)
                 }
             }.frame(maxWidth: .infinity).background(Theme.paper)

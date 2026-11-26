@@ -3,8 +3,26 @@ import SwiftUI
 struct PersonalPlanListView: View {
     @EnvironmentObject private var store: PersonalPlanStore
     @State private var creating = false
+    @State private var selection: UUID?
 
     var body: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 720
+            HStack(spacing: 0) {
+                list(wide: wide)
+                if wide, let plan = selection.flatMap({ store.plan($0) }) ?? store.plans.first {
+                    Divider()
+                    PersonalPlanDetailView(id: plan.id, embedded: true).id(plan.id)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .navigationTitle(PocketTool.personalPlan.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $creating) { PersonalPlanEditor() }
+    }
+
+    private func list(wide: Bool) -> some View {
         List {
             if let issue = store.readIssue {
                 Section {
@@ -13,6 +31,8 @@ struct PersonalPlanListView: View {
                 }
             }
             Section {
+                NotebookHeading(title: "个人训练计划", detail: "已保存 "+String(store.plans.count)+" 份计划")
+                    .listRowBackground(Color.clear)
                 Button("新建计划", systemImage: "plus") { creating = true }
                     .accessibilityIdentifier("newPersonalPlan")
                     .disabled(store.readIssue != nil)
@@ -23,20 +43,16 @@ struct PersonalPlanListView: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(store.plans) { plan in
-                    NavigationLink {
-                        PersonalPlanDetailView(id: plan.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(plan.title).font(.headline)
-                            Text(plan.date, style: .date).font(.caption).foregroundStyle(.secondary)
-                        }
+                    let row = NotebookToolRow(title: plan.title, detail: plan.date.formatted(date: .abbreviated, time: .omitted), icon: "list.clipboard")
+                    if wide {
+                        Button { selection = plan.id } label: { row }.buttonStyle(.plain)
+                    } else {
+                        NavigationLink { PersonalPlanDetailView(id: plan.id) } label: { row }
                     }
                 }
             }
         }
-        .navigationTitle(PocketTool.personalPlan.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $creating) { PersonalPlanEditor() }
+        .notebookForm()
     }
 }
 
@@ -47,6 +63,7 @@ struct PersonalPlanDetailView: View {
     @State private var confirmingDeletion = false
     @State private var issue: String?
     let id: UUID
+    var embedded = false
 
     var body: some View {
         Group {
@@ -88,7 +105,7 @@ struct PersonalPlanDetailView: View {
         .alert("删除这份计划？", isPresented: $confirmingDeletion) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
-                do { try store.remove(id); dismiss() }
+                do { try store.remove(id); if !embedded { dismiss() } }
                 catch { issue = error.localizedDescription }
             }
         } message: {
@@ -201,7 +218,7 @@ private struct PersonalPlanEditor: View {
                 Text("可按顺序逐行填写，附上组数、次数或时长。")
             }
         }
-        .scrollDismissesKeyboard(.interactively)
+        .notebookForm()
     }
 
     private var preview: some View {
@@ -221,6 +238,7 @@ private struct PersonalPlanSummary: View {
                 .accessibilityIdentifier("personalPlanPreviewTitle")
             ForEach(content.sections, id: \.heading) { section in
                 VStack(alignment: .leading, spacing: 8) {
+                    Divider()
                     Text(section.heading).font(.headline).foregroundStyle(Theme.burgundy)
                     Text(section.body).textSelection(.enabled)
                 }
@@ -229,6 +247,7 @@ private struct PersonalPlanSummary: View {
                 Text(content.author).font(.subheadline).foregroundStyle(.secondary)
             }
         }
+        .notebookPanel()
         .frame(maxWidth: 680, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .top)
     }

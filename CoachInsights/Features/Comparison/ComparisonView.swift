@@ -59,7 +59,7 @@ struct ComparisonEditor:View {
                             Text("自动").tag("automatic");Text("左右").tag("horizontal");Text("上下").tag("vertical")
                         }.pickerStyle(.segmented).accessibilityIdentifier("comparisonLayout")
                         Menu { NavigationLink("导出同屏视频") { ExportView(session:workspace.session,initialComparison:true) } } label: { Image(systemName:"square.and.arrow.up").frame(width:44,height:44) }.accessibilityLabel("导出同屏视频")
-                    }.padding(.horizontal,8)
+                    }.padding(.horizontal,12).background(Theme.paper).environment(\.colorScheme, .light).foregroundStyle(Theme.burgundy).tint(Theme.burgundy)
                     let horizontal=workspace.setup?.layout == "horizontal"
                     let layout=horizontal ? AnyLayout(HStackLayout(spacing:4)):AnyLayout(VStackLayout(spacing:4))
                     layout {

@@ -61,6 +61,7 @@ struct DistanceView: View {
                 measurement
             } else { ProgressView("准备相机…") }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.paper)
         .navigationTitle("测距").navigationBarTitleDisplayMode(.inline)
         .task { await model.authorize() }
         .onChange(of: model.result?.id) { _, _ in saved = false }
@@ -257,9 +258,9 @@ struct SavedDistanceView: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "ruler").font(.largeTitle).foregroundStyle(Theme.burgundy)
-            Text(record.summary).font(.system(size: 64, weight: .light)).monospacedDigit()
+            Text(record.summary).font(.system(size: 56, weight: .semibold, design: .monospaced)).monospacedDigit()
             Text(record.createdAt.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
             Text("AR 估算距离 · 请复核").font(.footnote).foregroundStyle(.secondary)
-        }.padding(24).navigationTitle("测距记录").navigationBarTitleDisplayMode(.inline)
+        }.notebookPanel().padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.paper).navigationTitle("测距记录").navigationBarTitleDisplayMode(.inline)
     }
 }

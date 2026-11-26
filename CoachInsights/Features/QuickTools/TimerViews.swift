@@ -5,14 +5,14 @@ private struct ClockButton: View {
     let title: String
     var color: Color = Theme.burgundy
     var subtle = false
-    var diameter: CGFloat = 80
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.system(size: 19)).foregroundStyle(color)
-                .frame(width: diameter, height: diameter)
-                .background(subtle ? Color.white : Theme.rose.opacity(0.55), in: Circle())
-                .overlay { Circle().stroke(Theme.burgundy.opacity(0.12), lineWidth: 1) }
+            Text(title).font(.headline)
+                .foregroundStyle(subtle ? color : .white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(subtle ? Notebook.paper : color, in: RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(subtle ? Notebook.rule : .clear) }
         }.buttonStyle(.plain)
     }
 }
@@ -49,11 +49,22 @@ struct StopwatchView: View {
     }
 
     private func readout(_ now: Date) -> some View {
-        Text(PocketTimeFormat.stopwatch(watch.elapsed(at: now)))
-            .font(.system(size: 120, weight: .ultraLight)).monospacedDigit()
-            .lineLimit(1).minimumScaleFactor(0.2).frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(watch.elapsed(at: now)))
-            .accessibilityIdentifier("stopwatchTime")
+        let elapsed = watch.elapsed(at: now)
+        return ZStack {
+            Circle().stroke(Notebook.rule, lineWidth: 2)
+            Circle().trim(from: 0, to: (elapsed.truncatingRemainder(dividingBy: 60) / 60))
+                .stroke(Notebook.fieldGreen, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            VStack(spacing: 6) {
+                Text(watch.isRunning ? "计时中" : elapsed > 0 ? "已暂停" : "准备计时")
+                    .font(.caption).foregroundStyle(Notebook.fieldGreen)
+                Text(PocketTimeFormat.stopwatch(elapsed))
+                    .font(.system(size: 48, weight: .semibold, design: .monospaced))
+                    .lineLimit(1).minimumScaleFactor(0.45)
+                    .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(elapsed))
+                    .accessibilityIdentifier("stopwatchTime")
+            }.padding(.horizontal, 14)
+        }.aspectRatio(1, contentMode: .fit).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var controls: some View {
@@ -74,7 +85,12 @@ struct StopwatchView: View {
 
     private func laps(_ now: Date) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                HStack { Text("分段记录").font(.headline); Spacer(); Text("\(watch.laps.count) 段").font(.caption.monospacedDigit()) }
+                    .padding(.vertical, 10)
+                if watch.laps.isEmpty && !watch.isRunning {
+                    Text("开始计时后，可在每个训练环节结束时记一段。").font(.subheadline).foregroundStyle(.secondary)
+                }
                 if watch.isRunning {
                     lapRow(number: watch.laps.count + 1,
                         value: watch.elapsed(at: now) - (watch.laps.last?.total ?? 0), color: .primary)
@@ -186,7 +202,7 @@ struct CountdownView: View {
                             Text(countdown.isFinished(at: now) ? "时间到" : "已暂停").font(.title3).foregroundStyle(.gray)
                         }
                         Text(PocketTimeFormat.countdown(countdown.remaining(at: now)))
-                            .font(.system(size: size * 0.23, weight: .ultraLight)).monospacedDigit()
+                            .font(.system(size: size * 0.23, weight: .semibold, design: .monospaced)).monospacedDigit()
                             .lineLimit(1).minimumScaleFactor(0.3).padding(.horizontal, 22)
                             .accessibilityIdentifier("countdownTime")
                     }

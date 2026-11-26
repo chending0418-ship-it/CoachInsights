@@ -31,7 +31,7 @@ struct VideoSourcePicker:View {
                 }
                 if busy { Section { ProgressView("导入到本机…",value:progress);Button("取消导入") { task?.cancel() } } }
                 if let issue { Section { Text(issue).foregroundStyle(.red);Text("请重新选择素材重试。").font(.caption) } }
-            }.navigationTitle("选择第二段视频").navigationBarTitleDisplayMode(.inline)
+            }.notebookForm().navigationTitle("选择第二段视频").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("取消") { task?.cancel();onCancel() }.accessibilityIdentifier("cancelVideoPicker") }
             .task { do { candidates=try repository.assets().filter{$0.id != excluding}.sorted{$0.createdAt>$1.createdAt} } catch { issue=error.localizedDescription } }
             .fileImporter(isPresented:$files,allowedContentTypes:[.movie]) { result in switch result { case .success(let url):importVideo(url);case .failure(let error):issue=error.localizedDescription } }
