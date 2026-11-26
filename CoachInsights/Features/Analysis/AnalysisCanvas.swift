@@ -129,14 +129,15 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
     @objc private func resetView() { guard tool == "view" else { return };settings=ViewSettings();onView?(settings);setNeedsLayout();setNeedsDisplay() }
     override func gestureRecognizerShouldBegin(_ recognizer:UIGestureRecognizer)->Bool {
         if recognizer is UITapGestureRecognizer || recognizer is UIPinchGestureRecognizer { return tool == "view" }
+        if recognizer is CanvasTouchRecognizer, tool == "view" { return settings.zoom > 1 }
         return true
     }
     @objc private func pinch(_ gesture: UIPinchGestureRecognizer) {
         guard tool == "view" else { return }
         if gesture.state == .began { pinchStart = settings.zoom }
         var value = settings; value.zoom = min(8, max(1, pinchStart * Double(gesture.scale)))
-        settings = value; setNeedsDisplay(); setNeedsLayout()
-        if gesture.state == .ended { onView?(value) }
+        settings = value; constrainPan(); setNeedsDisplay(); setNeedsLayout()
+        if gesture.state == .ended { onView?(settings) }
     }
     @objc private func handleCanvasTouch(_ gesture: CanvasTouchRecognizer) {
         switch gesture.state {
@@ -148,8 +149,14 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         }
     }
 
+    private func constrainPan() {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let pan = geometry.pan
+        settings.pan = UnitPointValue(x: pan.x / bounds.width, y: pan.y / bounds.height)
+    }
     private func beginTouch(at location: CGPoint) {
         guard geometry.isValid else { return }
+        if tool == "view" { constrainPan() }
         start = location; originalSettings = settings
         if tool == "select" {
             if let selected = annotations.first(where: { $0.id == selectedID }),
@@ -177,6 +184,7 @@ final class AnalysisCanvasView: UIView, UIGestureRecognizerDelegate {
         if tool == "view", let originalSettings {
             settings.pan.x = originalSettings.pan.x + (location.x-start.x)/bounds.width
             settings.pan.y = originalSettings.pan.y + (location.y-start.y)/bounds.height
+            constrainPan()
             setNeedsLayout()
         } else if tool == "select", let original,
                   let a = geometry.normalizedPoint(from: start, allowOutside: true),
