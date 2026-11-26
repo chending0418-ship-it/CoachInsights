@@ -238,31 +238,40 @@ struct FieldLogView: View {
             }.accessibilityElement(children: .combine).accessibilityIdentifier("battingTotal")
             Divider()
             sectionHeading("击球结果", detail: log.ended ? "本轮已结束" : "点选一次，记录一棒")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                ForEach(BattingContact.allCases, id: \.self) { contact in
-                    Button { change { $0.append(.batting(contact)) } } label: {
-                        GeometryReader { geometry in
-                            ZStack(alignment: .bottomTrailing) {
-                                BattingContactIcon(contact: contact)
-                                    .frame(width: geometry.size.width * 0.59).padding(.trailing, 7).padding(.bottom, 10)
-                                VStack(alignment: .leading) {
-                                    HStack {
-                                        Text(contact.title).font(.headline)
-                                        Spacer()
-                                        Image(systemName: "plus").font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer(minLength: 8)
-                                    Text("\(log.count(contact))").font(.system(size: 31, weight: .semibold, design: .monospaced))
-                                }.padding(12)
-                            }.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }.frame(height: wide ? 143 : 116)
-                            .background(Color(red: 0.965, green: 0.957, blue: 0.918), in: RoundedRectangle(cornerRadius: 8))
-                            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }.contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(contact.title).accessibilityValue("\(log.count(contact))")
-                        .accessibilityIdentifier("batting_" + contact.rawValue)
+            VStack(spacing: 9) {
+                HStack(spacing: 9) {
+                    contactCard(.ground, log: log, wide: wide)
+                    contactCard(.line, log: log, wide: wide)
+                }
+                HStack(spacing: 9) {
+                    contactCard(.fly, log: log, wide: wide)
+                    contactCard(.miss, log: log, wide: wide)
                 }
             }.disabled(log.ended || log.events.count >= FieldLog.eventLimit)
         }
+    }
+
+    private func contactCard(_ contact: BattingContact, log: FieldLog, wide: Bool) -> some View {
+        Button { change { $0.append(.batting(contact)) } } label: {
+            GeometryReader { geometry in
+                ZStack(alignment: .bottomTrailing) {
+                    BattingContactIcon(contact: contact)
+                        .frame(width: geometry.size.width * 0.59).padding(.trailing, 7).padding(.bottom, 10)
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text(contact.title).font(.headline)
+                            Spacer()
+                            Image(systemName: "plus").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text("\(log.count(contact))").font(.system(size: 31, weight: .semibold, design: .monospaced))
+                    }.padding(12)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }.frame(height: wide ? 143 : 116)
+                .background(Color(red: 0.965, green: 0.957, blue: 0.918), in: RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }.contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(contact.title).accessibilityValue("\(log.count(contact))")
+            .accessibilityIdentifier("batting_" + contact.rawValue)
     }
 
     private func sectionHeading(_ title: String, detail: String) -> some View {

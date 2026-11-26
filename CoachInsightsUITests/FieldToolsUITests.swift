@@ -5,7 +5,12 @@ final class FieldToolsUITests: XCTestCase {
     @MainActor private func launch(reset: Bool = true) -> XCUIApplication {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing"] + (reset ? ["--reset-library"] : [])
-        app.launch(); XCTAssertTrue(app.buttons["scene_quick"].waitForExistence(timeout: 10)); return app
+        app.launch()
+        if UIDevice.current.userInterfaceIdiom == .phone && app.frame.width > app.frame.height {
+            XCUIDevice.shared.orientation = .landscapeRight
+            XCUIDevice.shared.orientation = .portrait
+        }
+        XCTAssertTrue(app.buttons["scene_quick"].waitForExistence(timeout: 10)); return app
     }
     @MainActor private func open(_ app: XCUIApplication, scene: String, tool: String) {
         app.buttons["scene_" + scene].tap(); app.buttons["tool_" + tool].tap()
