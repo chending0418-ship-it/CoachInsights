@@ -15,6 +15,26 @@ import Vision
         round.events.removeAll(); XCTAssertEqual(round.events.count, 0)
     }
 
+    func testPitchViewpointAndRateUseTheSameSavedPitches() throws {
+        for zone in PitchZone.allCases {
+            let old = PitchMark(zone: zone)
+            let displayed = PitchViewpoint.pitcher.transform(old.point)
+            XCTAssertEqual(displayed.y, old.point.y)
+            XCTAssertEqual(PitchViewpoint.pitcher.transform(displayed).x, old.point.x, accuracy: 0.00001)
+        }
+        XCTAssertEqual(PitchViewpoint.pitcher.title(for: .upperLeft), "右上")
+        XCTAssertEqual(PitchViewpoint.pitcher.title(for: .right), "偏左")
+        var log = FieldLog(kind: .bullpen)
+        XCTAssertEqual(log.strikeRateText, "—")
+        for zone in [PitchZone.center, .upperLeft, .right] { log.append(.pitch(PitchMark(zone: zone))) }
+        log.append(.bullpenOut)
+        XCTAssertEqual(log.strikeRateText, "67%")
+        log.correctPitch(at: 0, isStrike: false)
+        XCTAssertEqual(log.strikeRateText, "33%")
+        log.undo()
+        XCTAssertEqual(try JSONDecoder().decode(FieldLog.self, from: JSONEncoder().encode(log)).strikeRateText, "67%")
+    }
+
     func testPitchCorrectionKeepsTotalAndOutsIndependent() {
         var round = FieldLog(kind: .bullpen)
         round.append(.pitch(PitchMark(zone: .center))); round.append(.bullpenOut)

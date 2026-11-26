@@ -50,10 +50,8 @@ final class CoachInsightsUITests:XCTestCase {
         XCTAssertTrue(personal.isHittable && team.isHittable && quick.isHittable)
         shot(app,"v11-toolbox-home")
         team.tap();XCTAssertTrue(app.buttons["tool_teamPlan"].waitForExistence(timeout:5))
-        let availableTool = app.buttons["tool_gameCounter"], plannedTool = app.buttons["tool_teamPlan"]
-        XCTAssertLessThan(availableTool.frame.minY, plannedTool.frame.minY)
-        XCTAssertTrue(availableTool.label.contains("已上线") || availableTool.staticTexts["已上线"].exists)
-        app.buttons["tool_teamPlan"].tap();XCTAssertTrue(app.staticTexts["内容待完善"].waitForExistence(timeout:5))
+        app.buttons["tool_teamPlan"].tap()
+        XCTAssertTrue(app.buttons["newTraining"].waitForExistence(timeout:5))
         app.navigationBars.buttons.element(boundBy:0).tap()
         XCTAssertTrue(app.buttons["tool_teamPlan"].waitForExistence(timeout:5))
         app.navigationBars.buttons.element(boundBy:0).tap()

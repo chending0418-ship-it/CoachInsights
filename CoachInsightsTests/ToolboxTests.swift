@@ -39,9 +39,6 @@ import XCTest
     func testMovedToolsKeepAvailabilityAndExistingBoardRecordsFollowTeamScene() {
         XCTAssertEqual(PocketScene.team.tools, [.gameCounter, .tacticsBoard, .teamPlan, .planTimer])
         XCTAssertEqual(Set(PocketScene.quick.tools), Set([.stopwatch, .countdown, .battingLog, .bullpenLog, .distance]))
-        XCTAssertTrue(PocketTool.tacticsBoard.isAvailable)
-        XCTAssertTrue(PocketTool.battingLog.isAvailable)
-        XCTAssertTrue(PocketTool.bullpenLog.isAvailable)
         let record = PocketRecord(board: TacticsDocument())
         XCTAssertTrue(PocketRecordFilter(scene: .team, tool: .tacticsBoard).includes(record))
         XCTAssertFalse(PocketRecordFilter(scene: .quick).includes(record))

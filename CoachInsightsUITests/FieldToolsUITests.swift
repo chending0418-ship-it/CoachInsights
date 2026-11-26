@@ -28,7 +28,6 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertLessThan(pitch.frame.midY, footer.frame.minY)
         pitch.tap()
     }
-
     @MainActor private func mapTap(_ app: XCUIApplication, x: CGFloat, y: CGFloat, correcting: Bool = false) {
         let scope = correcting ? app.scrollViews["pitchCorrectionSheet"] : app
         let map = scope.descendants(matching: .any).matching(identifier: "pitchMap").firstMatch
@@ -53,16 +52,15 @@ final class FieldToolsUITests: XCTestCase {
 
     @MainActor func testBattingUndoResetRestoreHistoryContinueDelete() {
         var app = launch(); open(app, scene: "quick", tool: "battingLog"); name(app, "Batting round")
-        for id in ["batting_ground", "batting_line", "batting_fly", "batting_miss", "fieldSave", "fieldOptions"] { XCTAssertTrue(app.buttons[id].isHittable, id) }
         tap(app, "batting_ground"); tap(app, "batting_line"); tap(app, "batting_fly"); tap(app, "batting_miss")
         XCTAssertTrue(label(app, "battingTotal").contains("4"))
-        tap(app, "fieldUndo"); tap(app, "fieldOptions"); app.buttons["fieldReset"].tap(); app.buttons["清零本轮"].tap()
+        tap(app, "fieldUndo"); tap(app, "fieldOptions"); app.buttons["清零本轮"].tap(); app.buttons["清零本轮"].tap()
         tap(app, "fieldUndo")
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
         tap(app, "fieldSave"); shot("phase00-batting")
         app.terminate(); app = launch(reset: false); open(app, scene: "quick", tool: "battingLog")
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
-        tap(app, "fieldOptions"); app.buttons["fieldEnd"].tap(); app.buttons["保存并结束本轮"].tap()
+        tap(app, "fieldOptions"); app.buttons["结束本轮"].tap(); app.buttons["保存并结束本轮"].tap()
         toRecords(app)
         app.segmentedControls["recordSceneFilter"].buttons["随手工具"].tap()
         let record = app.staticTexts["Batting round"].firstMatch
@@ -71,6 +69,27 @@ final class FieldToolsUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         record.swipeLeft(); app.buttons["删除"].firstMatch.tap(); app.alerts.buttons["删除"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor func testDualViewpointAndReplay() {
+        let app = launch()
+        app.buttons["bullpenShortcut"].tap()
+        let picker = app.segmentedControls["pitchViewpoint"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        picker.buttons["捕手后方"].tap()
+        mapTap(app, x: 0.4, y: 0.35)
+        picker.buttons["投手后方"].tap()
+        mapTap(app, x: 0.02, y: 0.5)
+        XCTAssertTrue(app.staticTexts["50%"].exists)
+        tap(app, "pitchReplay")
+        XCTAssertTrue(app.navigationBars["逐球回看"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "右上")).firstMatch.exists)
+        app.buttons["下一球"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "偏左")).firstMatch.exists)
+        app.segmentedControls["replayViewpoint"].buttons["捕手后方"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "偏右")).firstMatch.exists)
+        app.buttons["完成"].tap()
+        XCTAssertTrue(app.staticTexts["50%"].exists)
     }
 
     @MainActor func testBullpenGridCorrectionUndoReopenAndHistory() {

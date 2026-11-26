@@ -30,8 +30,11 @@ enum PocketScene: String, CaseIterable, Identifiable {
     }
 
     var tools: [PocketTool] {
-        let tools = PocketTool.allCases.filter { $0.scene == self }
-        return tools.filter(\.isAvailable) + tools.filter { !$0.isAvailable }
+        switch self {
+        case .personal: [.videoAnalysis, .motionComparison, .personalPlan, .coachNotes, .homeworkCard]
+        case .team: [.gameCounter, .tacticsBoard, .teamPlan, .planTimer]
+        case .quick: [.bullpenLog, .battingLog, .stopwatch, .countdown, .distance]
+        }
     }
 }
 
@@ -106,13 +109,7 @@ enum PocketTool: String, CaseIterable, Identifiable {
         }
     }
 
-    var isAvailable: Bool {
-        switch self {
-        case .videoAnalysis, .motionComparison, .stopwatch, .countdown, .tacticsBoard, .distance,
-             .battingLog, .bullpenLog, .gameCounter: return true
-        default: return false
-        }
-    }
+
 }
 
 enum ToolboxRoute: Hashable {
