@@ -2,7 +2,7 @@
 
 ## 1.1.0（Build 11）A 稿逐页整改
 
-对照 Build 10 的本机核对表，修改 iPhone 34 项、iPad 37 项，包含场景与记录、投球修正及回看、计时、视频资料库与编辑工作区，以及教练内容的填写、预览和分享。两端各 45 项对照见 [Build 11 全页复核](../artifacts/validation/1.1.0-11-a/index.html)，包括 44 项 A 稿页面或状态和 1 项旧版白板。相机实拍、AR 端点及距离待支持设备复核。TestFlight 由用户自行上传。
+对照 Build 10 的本机核对表，修改 iPhone 34 项、iPad 37 项，包含场景与记录、投球修正及回看、计时、视频资料库与编辑工作区，以及教练内容的填写、预览和分享。两端各 45 项对照见 [Build 11 全页复核](../artifacts/validation/1.1.0-11-a/index.html)，包括 44 项 A 稿页面或状态和 1 项旧版白板。[逐页验收记录](validation/v1.1.0-build11-page-review.md)随此版本保存。相机实拍、AR 端点及距离待支持设备复核。TestFlight 由用户自行上传。
 
 
 ## 1.1.0（Build 10）原生界面修订
