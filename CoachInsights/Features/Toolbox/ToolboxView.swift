@@ -492,7 +492,7 @@ private struct PocketRecordsView: View {
                     Divider()
                     VStack(alignment: .leading) {
                         Button("打开详情", systemImage: "arrow.up.right") { inspectRecord(selected.id) }.padding(.horizontal, 16)
-                        RecordInspection(record: selected, open: { openRecord(selected.id) },
+                        RecordInspection(record: selected, embedded: true, open: { openRecord(selected.id) },
                                      delete: { pendingDelete = selected.id })
                     }.frame(width: geometry.size.width * 0.42)
                 }
@@ -648,7 +648,9 @@ private struct PocketRecordsView: View {
 
 struct RecordInspection: View {
     @EnvironmentObject private var library: LibraryStore
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let record: PocketRecord
+    var embedded = false
     let open: () -> Void
     let delete: () -> Void
 
@@ -661,13 +663,21 @@ struct RecordInspection: View {
                 }
                 Divider()
                 let session = library.sessions.first { $0.id == record.id }
-                if let session, let repository = library.repository, let ids = try? session.snapshot().videoIDs,
+                if embedded, let session, let repository = library.repository, let ids = try? session.snapshot().videoIDs,
                    let asset = try? repository.assets().first(where: { ids.contains($0.id) }) {
                     VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
                 }
-                LabeledContent("训练内容", value: record.summary ?? session?.sportValue ?? record.tool.title)
-                LabeledContent("最近更新") { Text((session?.updatedAt ?? record.createdAt).formatted(date: .abbreviated, time: .shortened)) }
-                LabeledContent("保存位置", value: "本机记录")
+                HStack(alignment: .top, spacing: 20) {
+                    if !embedded && sizeClass == .regular {
+                        Image(systemName: record.tool.symbol).font(.system(size: 42)).foregroundStyle(Theme.burgundy)
+                            .frame(width: 95, height: 96).background(Notebook.inset, in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    VStack(alignment: .leading, spacing: 11) {
+                        datum("训练内容", record.summary ?? session?.sportValue ?? record.tool.title)
+                        datum("最近更新", (session?.updatedAt ?? record.createdAt).formatted(date: .abbreviated, time: .shortened))
+                        datum("保存位置", "本机记录")
+                    }
+                }
                 Divider()
                 HStack {
                     Button(action: open) { Label("打开记录", systemImage: "arrow.up.right") }.buttonStyle(DocumentButtonStyle(primary: true))
@@ -677,4 +687,11 @@ struct RecordInspection: View {
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
         }.frame(maxWidth: .infinity).background(Theme.paper)
     }
+    private func datum(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary).frame(width: 86, alignment: .leading)
+            Text(value).font(.subheadline.weight(.semibold))
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
 }
