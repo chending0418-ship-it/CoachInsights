@@ -12,10 +12,11 @@ final class CoachInsightsUITests:XCTestCase {
     @MainActor func openVideoLibrary(_ app:XCUIApplication) {
         if app.buttons["scene_personal"].exists { app.buttons["scene_personal"].tap() }
         if app.buttons["tool_videoAnalysis"].exists { app.buttons["tool_videoAnalysis"].tap() }
-        XCTAssertTrue(app.buttons["libraryCreateMenu"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout:10))
     }
     @MainActor func create(_ app:XCUIApplication,_ name:String) {
-        app.buttons["libraryCreateMenu"].tap();app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
+        if app.buttons["libraryCreateMenu"].exists { app.buttons["libraryCreateMenu"].tap() }
+        app.buttons["createSession"].tap();let field=app.textFields["sessionName"]
         XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText(name);app.buttons["confirmCreate"].tap()
         let record=app.staticTexts[name].firstMatch;XCTAssertTrue(record.waitForExistence(timeout:5));record.tap()
     }
@@ -79,6 +80,7 @@ final class CoachInsightsUITests:XCTestCase {
         app.buttons["recordToolFilter"].tap();app.buttons["视频分析"].tap()
         let record=app.staticTexts["Entry filter record"].firstMatch
         XCTAssertTrue(record.waitForExistence(timeout:5));shot(app,"v11-record-filters");record.tap()
+        if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
         XCTAssertTrue(app.buttons["closeVideo"].waitForExistence(timeout:5));app.buttons["closeVideo"].tap()
         XCTAssertTrue(scene.buttons["私教"].isSelected)
         XCTAssertTrue(app.buttons["recordToolFilter"].label.contains("视频分析"))
@@ -87,7 +89,7 @@ final class CoachInsightsUITests:XCTestCase {
         app.buttons["recordsTab"].tap()
         XCTAssertTrue(scene.buttons["私教"].isSelected)
         XCTAssertTrue(app.buttons["recordToolFilter"].label.contains("视频分析"))
-        record.tap();app.buttons["moreActions"].tap();app.buttons["deleteSession"].tap()
+        record.tap(); if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }; app.buttons["moreActions"].tap();app.buttons["deleteSession"].tap()
         app.alerts.buttons["删除"].tap()
         XCTAssertTrue(app.staticTexts["没有符合筛选条件的记录"].waitForExistence(timeout:10))
         XCTAssertTrue(scene.buttons["私教"].isSelected)
@@ -143,8 +145,18 @@ final class CoachInsightsUITests:XCTestCase {
         let count=app.staticTexts["annotationCount"];waitLabel(count,"1 个标注")
         app.buttons["undoAnnotation"].tap();waitLabel(count,"0 个标注");app.buttons["重做"].tap();waitLabel(count,"1 个标注")
         shot(app,"v101-drawing")
-        app.buttons["drawingTools"].tap();app.buttons["videoOptions"].tap();app.buttons["保存关键帧"].tap()
-        app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("Contact");app.alerts.buttons["保存"].tap();waitLabel(count,"1 个关键帧")
+        app.buttons["drawingTools"].tap()
+        app.buttons["keyframeWorkspace"].tap()
+        XCTAssertTrue(app.otherElements["analysisCanvas"].waitForExistence(timeout: 5))
+        let nodeName = app.textFields["例如：出手"]
+        nodeName.tap(); nodeName.typeText("Contact")
+        app.buttons["保存关键帧"].tap()
+        app.buttons["完成"].tap(); waitLabel(count, "1 个关键帧")
+        app.buttons["trimWorkspace"].tap()
+        XCTAssertTrue(app.sliders["clipStartSlider"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.sliders["clipEndSlider"].exists)
+        XCTAssertTrue(app.otherElements["analysisCanvas"].exists)
+        app.buttons["完成"].tap()
         app.buttons["poseTools"].tap();let limitations=app.staticTexts["poseLimitations"]
         XCTAssertTrue(limitations.waitForExistence(timeout:5));XCTAssertTrue(limitations.label.contains("辅助估算") && limitations.label.contains("高置信度也可能出错"))
         let run=app.buttons["runPose"];XCTAssertTrue(run.isHittable);run.tap()
@@ -204,7 +216,7 @@ final class CoachInsightsUITests:XCTestCase {
         waitLabel(app.staticTexts["frameReadout"],"第 2 /")
     }
     @MainActor func testSimulatorCaptureFlow() {
-        let app=launch();app.buttons["libraryCreateMenu"].tap();app.buttons["rootCapture"].tap()
+        let app=launch();if app.buttons["libraryCreateMenu"].exists { app.buttons["libraryCreateMenu"].tap() };app.buttons["rootCapture"].tap()
         XCTAssertTrue(app.buttons["simulateCapture"].waitForExistence(timeout:5));app.buttons["simulateCapture"].tap()
         let save=app.buttons["saveCapture"];XCTAssertTrue(save.waitForExistence(timeout:10));if !save.isHittable { app.swipeUp() };save.tap()
         let open=app.buttons["openCapturedAnalysis"];XCTAssertTrue(open.waitForExistence(timeout:15));if !open.isHittable { app.swipeUp() };open.tap()

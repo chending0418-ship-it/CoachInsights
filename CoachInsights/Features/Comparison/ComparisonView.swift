@@ -15,10 +15,12 @@ struct ComparisonView:View {
                 ComparisonEditor(workspace:workspace) { isLeft in choosingLeft=isLeft;workspace.pause();choosing=true }
             } else { ProgressView("打开对比…") }
         }.background(.black).foregroundStyle(.white).tint(Theme.rose)
-        .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: pageVisible)
+            .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: false)
         .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: false)
         .navigationTitle("双视频对比").navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.black,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar).toolbarColorScheme(.dark,for:.navigationBar)
+            .toolbarBackground(Notebook.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).toolbarColorScheme(
+                .light, for: .navigationBar
+            )
         .task {
             guard workspace == nil,let repository=library.repository else { return }
             let w=ComparisonWorkspace(session:session,repository:repository);workspace=w
@@ -30,9 +32,12 @@ struct ComparisonView:View {
             }
             if w.setup == nil { choosingLeft=false;choosing=true }
         }
-        .sheet(isPresented:$choosing) {
+            .fullScreenCover(isPresented: $choosing) {
             if let repository=library.repository {
-                VideoSourcePicker(repository:repository,targetSession:session,excluding:choosingLeft ? workspace?.right.selectedVideoID:workspace?.left.selectedVideoID) { id in
+                    VideoSourcePicker(
+                        repository: repository, targetSession: session, choosingLeft: choosingLeft,
+                        excluding: choosingLeft ? workspace?.right.selectedVideoID : workspace?.left.selectedVideoID
+                    ) { id in
                     choosing=false
                     Task {
                         if workspace?.setup == nil { await workspace?.load(initialVideoID:initialVideoID,secondVideoID:id) }
@@ -49,26 +54,61 @@ struct ComparisonView:View {
 struct ComparisonEditor:View {
     @ObservedObject var workspace:ComparisonWorkspace
     var choose:(Bool)->Void
+    @State private var adjustingLeft = true
     @Environment(\.scenePhase) private var phase
     var body:some View {
         GeometryReader { geo in
             VStack(spacing:6) {
                 if workspace.setup != nil {
-                    HStack {
-                        Picker("布局",selection:Binding(get:{workspace.layoutChoice},set:{workspace.selectLayout($0, width: geo.size.width, height: geo.size.height)})) {
-                            Text("自动").tag("automatic");Text("左右").tag("horizontal");Text("上下").tag("vertical")
-                        }.pickerStyle(.segmented).accessibilityIdentifier("comparisonLayout")
-                        Menu { NavigationLink("导出同屏视频") { ExportView(session:workspace.session,initialComparison:true) } } label: { Image(systemName:"square.and.arrow.up").frame(width:44,height:44) }.accessibilityLabel("导出同屏视频")
-                    }.padding(.horizontal,12).background(Theme.paper).environment(\.colorScheme, .light).foregroundStyle(Theme.burgundy).tint(Theme.burgundy)
-                    let horizontal=workspace.setup?.layout == "horizontal"
-                    let layout=horizontal ? AnyLayout(HStackLayout(spacing:4)):AnyLayout(VStackLayout(spacing:4))
-                    layout {
-                        ComparisonSide(workspace:workspace.left,comparison:workspace,isLeft:true) { choose(true) }
-                        ComparisonSide(workspace:workspace.right,comparison:workspace,isLeft:false) { choose(false) }
-                    }.frame(maxWidth:.infinity,maxHeight:.infinity)
-                    .accessibilityElement(children: .contain).accessibilityIdentifier("comparisonSurface")
-                    sharedControls(wide: geo.size.width >= 650)
-                    Text("人体结果为画面辅助估算，请逐帧复核点位。").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    ScrollView {
+                        NotebookColumns(minimumWidth: 740, leadingFraction: 0.68) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                NotebookHeading(title: "动作对比", detail: workspace.session.name)
+                                let horizontal = workspace.setup?.layout == "horizontal"
+                                let layout = horizontal ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(spacing: 4))
+                                layout {
+                                    ComparisonSide(workspace: workspace.left, comparison: workspace, isLeft: true) { choose(true) }
+                                    ComparisonSide(workspace: workspace.right, comparison: workspace, isLeft: false) { choose(false) }
+                                }.accessibilityElement(children: .contain).accessibilityIdentifier("comparisonSurface")
+                                sharedControls(wide: false).foregroundStyle(.white).environment(\.colorScheme, .dark)
+                                ForEach([true, false], id: \.self) { left in
+                                    ComparisonChannel(workspace: left ? workspace.left : workspace.right, comparison: workspace, isLeft: left)
+                                }
+                            }
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text("同步与显示").font(.headline)
+                                Text(workspace.independent ? "独立定位" : "两路已联动").foregroundStyle(Notebook.fieldGreen)
+                                Button(workspace.independent ? "联动播放定位" : "解除联动") {
+                                    if workspace.independent {
+                                        workspace.seek(workspace.time)
+                                    } else {
+                                        workspace.pause(); workspace.independent = true
+                                    }
+                                }.buttonStyle(NotebookActionStyle())
+                                Text("画面布局").font(.subheadline.bold())
+                                Picker(
+                                    "布局",
+                                    selection: Binding(
+                                        get: { workspace.layoutChoice },
+                                        set: { workspace.selectLayout($0, width: geo.size.width, height: geo.size.height) })
+                                ) {
+                                    Text("自动").tag("automatic"); Text("左右").tag("horizontal"); Text("上下").tag("vertical")
+                                }.pickerStyle(.segmented).accessibilityIdentifier("comparisonLayout")
+                                Picker("当前调整", selection: $adjustingLeft) {
+                                    Text("A 素材").tag(true); Text("B 素材").tag(false)
+                                }.pickerStyle(.segmented)
+                                HStack {
+                                    Button("同步点 −1 帧") { workspace.frameOffset(-1, isLeft: adjustingLeft) }
+                                    Button("同步点 +1 帧") { workspace.frameOffset(1, isLeft: adjustingLeft) }
+                                }.buttonStyle(.bordered)
+                                Button("替换当前素材") { choose(adjustingLeft) }.buttonStyle(NotebookActionStyle())
+                                NavigationLink("导出同屏视频") { ExportView(session: workspace.session, initialComparison: true) }
+                                    .buttonStyle(NotebookActionStyle(prominent: true))
+                            }.notebookPanel()
+                        }.padding(12)
+                    }.frame(maxWidth: .infinity).background(Notebook.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
+                        .environment(\.colorScheme, .light)
+
                 } else {
                     Spacer();EmptyPanel(icon:"rectangle.split.2x1",title:"将两次动作放在一起",detail:"选择第二段本机视频，设置同步点后联动播放。")
                     Button("选择第二段视频") { choose(false) };Spacer()
@@ -117,19 +157,10 @@ struct ComparisonSide:View {
     let isLeft:Bool
     var choose:()->Void
     var body:some View {
-        VStack(spacing:0) {
-            AnalysisCanvas(workspace:workspace).frame(maxWidth:.infinity,maxHeight:.infinity).clipped()
-                .overlay(alignment: .top) { sideHeader }
-            HStack(spacing:8) {
-                Text("\(workspace.time,specifier:"%.3f")s").font(.caption2.monospacedDigit()).frame(minWidth:44)
-                if workspace.metadata != nil {
-                    Slider(value:Binding(get:{workspace.time},set:{comparison.independentSeek($0,isLeft:isLeft)}),in:workspace.clip.start.seconds...max(workspace.clip.start.seconds+0.001,workspace.clip.end.seconds),onEditingChanged:{editing in if !editing { workspace.endScrubbing() } }).accessibilityIdentifier(isLeft ? "leftSlider":"rightSlider")
-                }
-                Button("同步点") { comparison.anchor(isLeft:isLeft) }.font(.caption).frame(minHeight:44).accessibilityIdentifier(isLeft ? "leftAnchor":"rightAnchor")
-                Menu { Button("−1 帧偏移") { comparison.frameOffset(-1,isLeft:isLeft) };Button("+1 帧偏移") { comparison.frameOffset(1,isLeft:isLeft) } } label: { Image(systemName:"plusminus").frame(width:44,height:44) }.accessibilityLabel("微调同步点")
-            }.padding(.horizontal,8).background(Color(white:0.08))
-        }.frame(maxWidth:.infinity,maxHeight:.infinity)
-        .accessibilityElement(children: .contain).accessibilityIdentifier(isLeft ? "comparisonSideA" : "comparisonSideB")
+        AnalysisCanvas(workspace: workspace)
+            .aspectRatio(workspace.metadata.map { $0.displayWidth / max(1, $0.displayHeight) } ?? 16 / 9, contentMode: .fit)
+            .clipped().overlay(alignment: .top) { sideHeader.foregroundStyle(.white).tint(.white) }
+            .accessibilityElement(children: .contain).accessibilityIdentifier(isLeft ? "comparisonSideA" : "comparisonSideB")
     }
     private var sideHeader: some View {
         HStack {
@@ -146,5 +177,35 @@ struct ComparisonSide:View {
                 } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel(isLeft ? "A 路设置":"B 路设置")
             }.padding(.horizontal,8)
         .background(.black.opacity(0.55))
+    }
+}
+
+private struct ComparisonChannel: View {
+    @ObservedObject var workspace: AnalysisWorkspace
+    @ObservedObject var comparison: ComparisonWorkspace
+    let isLeft: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent((isLeft ? "A · " : "B · ") + (workspace.selectedAsset?.originalName ?? "视频")) {
+                Text(String(format: "%.3f s", workspace.time)).monospacedDigit()
+            }.font(.subheadline.bold())
+            if workspace.metadata != nil {
+                Slider(
+                    value: Binding(get: { workspace.time }, set: { comparison.independentSeek($0, isLeft: isLeft) }),
+                    in: workspace.clip.start.seconds...max(workspace.clip.start.seconds + 0.001, workspace.clip.end.seconds),
+                    onEditingChanged: { editing in if !editing { workspace.endScrubbing() } }
+                )
+                .accessibilityIdentifier(isLeft ? "leftSlider" : "rightSlider")
+            }
+            HStack {
+                if let setup = comparison.setup {
+                    let anchor = isLeft ? setup.leftAnchor : setup.rightAnchor
+                    Text(String(format: "同步点 %.3f s", anchor.seconds)).font(.caption.monospacedDigit())
+                }
+                Spacer()
+                Button("设为同步点") { comparison.anchor(isLeft: isLeft) }
+                    .accessibilityIdentifier(isLeft ? "leftAnchor" : "rightAnchor")
+            }
+        }.notebookPanel()
     }
 }

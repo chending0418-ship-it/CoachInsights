@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct VideoSourcePicker:View {
     let repository:LibraryRepository
     let targetSession:AnalysisSession
+    var choosingLeft = false
     var excluding:UUID?
     var selected:(UUID)->Void
     var onCancel:()->Void
@@ -16,28 +17,44 @@ struct VideoSourcePicker:View {
     @State private var task:Task<Void,Never>?
     var body:some View {
         NavigationStack {
-            List {
-                Section("选择第二段来源") {
-                    Button("相册",systemImage:"photo.on.rectangle") { photos=true }.accessibilityIdentifier("comparisonPhotos")
-                    Button("文件",systemImage:"folder") { files=true }.accessibilityIdentifier("comparisonFiles")
-                }.disabled(busy)
-                Section("本机资料库") {
-                    if candidates.isEmpty { Text("没有其他视频，可从相册或文件添加。").foregroundStyle(.secondary) }
-                    ForEach(candidates) { asset in
-                        Button { attach(asset) } label: {
-                            HStack { VideoCover(asset:asset,repository:repository).frame(width:80,height:55).clipped();VStack(alignment:.leading) { Text(asset.originalName).lineLimit(2);Text(asset.createdAt.formatted(date:.abbreviated,time:.omitted)).font(.caption).foregroundStyle(.secondary) } }
-                        }.disabled(busy).accessibilityIdentifier("chooseVideo_"+asset.id.uuidString)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    SourceSelectionStrip(first: choosingLeft ? nil : otherName, second: choosingLeft ? otherName : nil, choosingLeft: choosingLeft)
+                    NotebookColumns {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("本机资料库").font(.headline)
+                            if candidates.isEmpty { Text("没有其他视频，可从相册或文件添加。").foregroundStyle(.secondary) }
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 14) {
+                                ForEach(candidates) { asset in
+                                    Button { attach(asset) } label: {
+                                        VStack(alignment: .leading) {
+                                            VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
+                                            Text(asset.originalName).lineLimit(2)
+                                        }
+                                    }.buttonStyle(.plain).disabled(busy).accessibilityIdentifier("chooseVideo_"+asset.id.uuidString)
+                                }
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("从其他位置添加").font(.headline)
+                            Button("相册",systemImage:"photo.on.rectangle") { photos=true }.accessibilityIdentifier("comparisonPhotos")
+                            Button("文件",systemImage:"folder") { files=true }.accessibilityIdentifier("comparisonFiles")
+                        }.notebookPanel().disabled(busy)
                     }
-                }
-                if busy { Section { ProgressView("导入到本机…",value:progress);Button("取消导入") { task?.cancel() } } }
-                if let issue { Section { Text(issue).foregroundStyle(.red);Text("请重新选择素材重试。").font(.caption) } }
-            }.notebookForm().navigationTitle("选择第二段视频").navigationBarTitleDisplayMode(.inline)
+                    if busy { ProgressView("导入到本机…",value:progress);Button("取消导入") { task?.cancel() } }
+                    if let issue { Text(issue).foregroundStyle(.red) }
+                }.padding()
+            }.background(Notebook.paper).navigationTitle(choosingLeft ? "选择第一段视频" : "选择第二段视频").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("取消") { task?.cancel();onCancel() }.accessibilityIdentifier("cancelVideoPicker") }
             .task { do { candidates=try repository.assets().filter{$0.id != excluding}.sorted{$0.createdAt>$1.createdAt} } catch { issue=error.localizedDescription } }
             .fileImporter(isPresented:$files,allowedContentTypes:[.movie]) { result in switch result { case .success(let url):importVideo(url);case .failure(let error):issue=error.localizedDescription } }
             .sheet(isPresented:$photos) { PhotoImportView { result in photos=false;switch result { case .success(let value):importVideo(value.url,timing:value.timing);case .failure(let error):if !(error is CancellationError) { issue=error.localizedDescription } } } }
             .onDisappear { task?.cancel() }
         }
+    }
+    private var otherName: String? {
+        guard let excluding else { return nil }
+        return (try? repository.assets())?.first { $0.id == excluding }?.originalName
     }
     private func attach(_ asset:VideoAsset) {
         do { try repository.attach(asset.id,into:targetSession);selected(asset.id) } catch { issue=error.localizedDescription }
@@ -93,5 +110,21 @@ struct VideoCover:View {
                     guard !Task.isCancelled else { return };image=value
                 } catch { image=nil }
             }
+    }
+}
+
+struct SourceSelectionStrip: View {
+    let first: String?
+    let second: String?
+    let choosingLeft: Bool
+    var body: some View {
+        HStack {
+            ForEach([true, false], id: \.self) { left in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(left ? "A" : "B").font(.caption.bold()).foregroundStyle(Theme.burgundy)
+                    Text((left ? first : second) ?? (left == choosingLeft ? "请选择素材" : "等待选择")).font(.subheadline).lineLimit(2)
+                }.frame(maxWidth: .infinity, alignment: .leading).notebookPanel()
+            }
+        }
     }
 }

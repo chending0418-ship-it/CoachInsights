@@ -12,12 +12,13 @@ struct TrainingList: View {
     GeometryReader { geometry in
       HStack(spacing: 0) {
         listing(wide: geometry.size.width >= 680)
+          .frame(width: geometry.size.width >= 680 && current != nil ? max(265, geometry.size.width * 0.34) : geometry.size.width)
         if geometry.size.width >= 680, let item = current {
           Divider()
           TrainingDetail(id: item.id, embedded: true).id(item.id).frame(maxWidth: .infinity)
         }
       }
-    }.background(Theme.paper).navigationTitle(kind.tool.title)
+    }.background(Theme.paper).navigationTitle(kind.tool.title).navigationBarTitleDisplayMode(.inline)
       .fullScreenCover(isPresented: $creating) {
         TrainingEditor(draft: TrainingMaterial(kind: kind), original: nil)
       }
@@ -39,7 +40,8 @@ struct TrainingList: View {
           Section("最近保存") {
             NavigationLink { TrainingDetail(id: first.id) } label: {
               LatestTrainingCard(title: first.title, audience: first.audience.isEmpty ? kind.tool.title : first.audience,
-                                 date: first.date, summary: first.body, action: "查看"+kind.tool.title, icon: kind.tool.symbol)
+                date: first.date, summary: first.kind == .note ? first.body : first.summary, action: "查看" + kind.tool.title,
+                icon: kind.tool.symbol)
             }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
           }
         }
@@ -84,8 +86,9 @@ struct TrainingDetail: View {
     Group {
       if let item = store.item(id) {
         ScrollView {
-          VStack(alignment: .leading, spacing: 14) {
-            TrainingSummary(content: item.card)
+          NotebookColumns {
+            TrainingSummary(item: item)
+            VStack(alignment: .leading, spacing: 18) {
             if item.kind == .team {
               NavigationLink {
                 PlanRunView(preferred: item.id)
@@ -108,7 +111,8 @@ struct TrainingDetail: View {
                 Image(systemName: "trash")
               }.accessibilityLabel("删除")
             }.buttonStyle(.bordered)
-          }.padding().frame(maxWidth: 680)
+            }.notebookPanel()
+          }.padding().frame(maxWidth: 1100)
         }.frame(maxWidth: .infinity)
       } else {
         ContentUnavailableView("记录已删除", systemImage: "folder")
@@ -153,7 +157,7 @@ private struct TrainingEditor: View {
       GeometryReader { geometry in
         if geometry.size.width >= 700 {
           HStack(spacing: 0) {
-            fields
+            fields.frame(width: geometry.size.width * 0.49)
             Divider()
             summary.frame(maxWidth: .infinity)
           }
@@ -196,65 +200,90 @@ private struct TrainingEditor: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
 
-        TrainingSummary(content: draft.card)
+        Text("实时预览").font(.headline)
+        TrainingSummary(item: draft)
       }.padding()
     }.frame(maxWidth: .infinity)
   }
   private var fields: some View {
-    Form {
-      Section {
-        TextField("标题", text: $draft.title).accessibilityIdentifier("trainingTitle")
-        TextField(draft.kind.audienceLabel, text: $draft.audience)
-        DatePicker("日期", selection: $draft.date, displayedComponents: .date)
-      }
-      Section(draft.kind.bodyLabel) {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        NotebookInput(title: "标题 · 必填") { TextField("标题", text: $draft.title).accessibilityIdentifier("trainingTitle") }
+        NotebookInput(title: draft.kind.audienceLabel) { TextField(draft.kind.audienceLabel, text: $draft.audience) }
+        NotebookInput(title: draft.kind.bodyLabel) {
         TextField(draft.kind.bodyLabel, text: $draft.body, axis: .vertical).lineLimit(3...12)
           .accessibilityIdentifier("trainingBody")
       }
       if draft.kind == .team {
-        Section("训练环节") {
+          VStack(alignment: .leading, spacing: 12) {
+            Text("训练环节").font(.headline)
           ForEach($draft.stages) { $stage in
             VStack(alignment: .leading, spacing: 7) {
-              TextField("环节名称", text: $stage.name).accessibilityIdentifier("stageName")
+                let i = draft.stages.firstIndex { $0.id == stage.id } ?? 0
+                HStack {
+                  Text(String(format: "%02d", i + 1)).monospacedDigit().foregroundStyle(Theme.burgundy);
+                  TextField("环节名称", text: $stage.name).accessibilityIdentifier("stageName")
+                }
               Stepper("\(stage.minutes) 分钟", value: $stage.minutes, in: 1...240)
               TextField("安排与提示", text: $stage.instructions, axis: .vertical)
-              let i = draft.stages.firstIndex { $0.id == stage.id } ?? 0
               HStack {
                 Button("上移") { draft.stages.swapAt(i, i - 1) }.disabled(i == 0)
                 Button("下移") { draft.stages.swapAt(i, i + 1) }.disabled(i + 1 >= draft.stages.count)
                 Spacer()
                 Button("移除", role: .destructive) { draft.stages.removeAll { $0.id == stage.id } }
               }.buttonStyle(.borderless)
-            }
+              }.notebookPanel()
           }
           Button("添加环节", systemImage: "plus") { draft.stages.append(TrainingStage()) }
         }
       } else {
-        Section(draft.kind == .note ? "教学重点" : "次数或时长") {
+          NotebookInput(title: draft.kind == .note ? "教学重点" : "次数或时长 · 必填") {
           TextField(draft.kind == .note ? "教学重点" : "次数或时长", text: $draft.focus, axis: .vertical)
             .accessibilityIdentifier("trainingFocus")
         }
-        Section(draft.kind == .note ? "下次跟进" : "注意事项") {
+          NotebookInput(title: draft.kind == .note ? "下次跟进" : "注意事项") {
           TextField(draft.kind == .note ? "下次跟进" : "注意事项", text: $draft.followUp, axis: .vertical)
         }
       }
-      TextField("教练署名", text: $draft.author)
-    }.notebookForm()
+        DatePicker("日期", selection: $draft.date, displayedComponents: .date)
+        NotebookInput(title: "教练署名") { TextField("教练署名", text: $draft.author) }
+      }.padding(20)
+    }.scrollDismissesKeyboard(.interactively)
   }
 }
 
 struct TrainingSummary: View {
-  let content: ShareCardContent
+  let item: TrainingMaterial
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Text(content.title.isEmpty ? "标题" : content.title).font(.title.bold())
-      Text(content.date, style: .date).font(.caption).foregroundStyle(.secondary)
-      ForEach(content.sections.indices, id: \.self) { i in
-        Divider()
-        Text(content.sections[i].heading).font(.headline).foregroundStyle(Theme.burgundy)
-        Text(content.sections[i].body).textSelection(.enabled)
+      Label(item.kind == .team ? "团训计划" : item.kind.tool.title, systemImage: item.kind.tool.symbol)
+        .font(.caption.bold()).foregroundStyle(Theme.burgundy)
+      Text(item.title.isEmpty ? "标题" : item.title).font(.title.bold())
+      HStack {
+        Text(item.date, style: .date); Text(item.audience)
+      }.font(.subheadline).foregroundStyle(.secondary)
+      if item.kind == .homework {
+        LabeledContent("练习量", value: item.focus).font(.title3.bold()).foregroundStyle(Notebook.fieldGreen)
       }
-      if !content.author.isEmpty { Label(content.author, systemImage: "signature").font(.subheadline).foregroundStyle(.secondary) }
+      if !item.body.isEmpty {
+        Divider(); Text(item.kind.bodyLabel).font(.headline)
+        if item.kind == .homework { NumberedInstructions(text: item.body) } else { Text(item.body) }
+      }
+      if item.kind == .team {
+        Divider(); LabeledContent("训练环节", value: item.summary).font(.headline)
+        ForEach(Array(item.stages.enumerated()), id: \.element.id) { index, stage in
+          HStack(alignment: .firstTextBaseline) {
+            Text(String(format: "%02d", index + 1)).foregroundStyle(Theme.burgundy)
+            VStack(alignment: .leading) {
+              Text(stage.name).bold(); Text(stage.instructions).font(.caption)
+            }
+            Spacer(); Text("\(stage.minutes) 分钟").monospacedDigit()
+          }
+        }
+      }
+      if item.kind == .note && !item.focus.isEmpty { Divider(); Text("教学重点").font(.headline); Text(item.focus) }
+      if !item.followUp.isEmpty { Divider(); Text(item.kind == .note ? "下次跟进" : "注意事项").font(.headline); Text(item.followUp) }
+      if !item.author.isEmpty { Label(item.author, systemImage: "signature").font(.subheadline).foregroundStyle(.secondary) }
     }.frame(maxWidth: .infinity, alignment: .leading).notebookPanel()
   }
 }
@@ -272,6 +301,11 @@ struct PlanRunView: View {
     do { try action() } catch { problem = error.localizedDescription }
   }
   private func start() { if let plan { act { try store.begin(plan) } } }
+  private var startButton: some View {
+    Button(store.run?.finished == false ? "重新开始所选计划" : "开始计时") {
+      if store.run?.finished == false { replace = true } else { start() }
+    }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("startPlanTimer")
+  }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
@@ -279,7 +313,17 @@ struct PlanRunView: View {
           Text(issue)
           Button("重试读取") { store.reload() }
         }
-        if let run = store.run {
+        NotebookColumns {
+          VStack(alignment: .leading) {
+            if store.run == nil, let plan, let stage = plan.stages.first {
+              Text("准备开始").font(.caption).foregroundStyle(Notebook.fieldGreen)
+              Text(stage.name).font(.title.bold())
+              Text(String(format: "%02d:00", stage.minutes)).font(.system(size: 56, weight: .semibold)).monospacedDigit()
+              Text(stage.instructions)
+              ProgressView(value: 0).tint(Notebook.fieldGreen)
+              startButton
+            }
+            if let run = store.run {
           TimelineView(.periodic(from: .now, by: 1)) { clock in
             let left = run.remaining(at: clock.date)
             let stage = run.plan.stages[run.index]
@@ -296,6 +340,8 @@ struct PlanRunView: View {
                 Text(String(format: "%02d:%02d", left / 60, left % 60)).font(
                   .system(size: 62, weight: .semibold, design: .rounded)
                 ).monospacedDigit().accessibilityIdentifier("planRemaining")
+                    ProgressView(value: 1 - min(1, Double(left) / Double(max(1, stage.minutes * 60))))
+                      .tint(Theme.burgundy).accessibilityLabel("当前环节进度")
                 if left == 0 { Text("本段时间到，请确认下一步。").foregroundStyle(Theme.burgundy) }
                 if !stage.instructions.isEmpty { Text(stage.instructions) }
                 HStack {
@@ -315,27 +361,33 @@ struct PlanRunView: View {
               .white, in: RoundedRectangle(cornerRadius: 12))
           }
         }
+          }
+          VStack(alignment: .leading, spacing: 12) {
         if let plan {
           Picker("选择团训计划", selection: Binding(get: { plan.id }, set: { selected = $0 })) {
             ForEach(plans) { Text($0.title).tag($0.id) }
           }
-          NotebookHeading(title: "环节顺序", detail: plan.summary)
-          ForEach(Array(plan.stages.enumerated()), id: \.element.id) { index, stage in
+              let ordered = store.run.flatMap { $0.finished ? nil : $0.plan } ?? plan
+              NotebookHeading(title: "环节顺序", detail: ordered.summary)
+              ForEach(Array(ordered.stages.enumerated()), id: \.element.id) { index, stage in
             HStack {
               Text(String(format: "%02d", index + 1)).font(.caption.monospacedDigit()).foregroundStyle(Theme.burgundy)
-              Text(stage.name)
+                  VStack(alignment: .leading) {
+                    Text(stage.name); if !stage.instructions.isEmpty { Text(stage.instructions).font(.caption).foregroundStyle(.secondary) }
+                  }
               Spacer()
               Text("\(stage.minutes) 分钟").foregroundStyle(.secondary)
             }
           }
-          Button(store.run?.finished == false ? "重新开始所选计划" : "开始计时") {
-            if store.run?.finished == false { replace = true } else { start() }
-          }.buttonStyle(.borderedProminent).accessibilityIdentifier("startPlanTimer")
+
+              if store.run != nil { startButton }
         } else {
           Text("先编排训练环节，再按顺序计时。").foregroundStyle(.secondary)
           NavigationLink("前往团训计划") { TrainingList(kind: .team) }
         }
-      }.padding().frame(maxWidth: 620)
+          }
+        }
+      }.padding().frame(maxWidth: 1100)
     }.frame(maxWidth: .infinity).background(Theme.paper).navigationTitle("按计划计时")
       .navigationBarTitleDisplayMode(.inline)
       .onAppear { if selected == nil { selected = preferred ?? store.run?.plan.id } }

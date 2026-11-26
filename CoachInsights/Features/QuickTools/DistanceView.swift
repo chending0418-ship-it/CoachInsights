@@ -72,40 +72,44 @@ struct DistanceView: View {
     }
 
     private var measurement: some View {
-        ZStack {
-            ARDistanceCamera(model: model, active: phase == .active).ignoresSafeArea(edges: .bottom)
-            Image(systemName: "plus").font(.system(size: 32, weight: .light))
-                .foregroundStyle(model.canPlace ? Theme.burgundy : .white.opacity(0.7)).allowsHitTesting(false)
-            VStack(spacing: 16) {
-                Text(model.instruction).font(.subheadline).padding(12)
-                    .background(.ultraThinMaterial, in: Capsule()).padding(.top, 12)
-                Spacer()
-                if let value = model.result?.meters ?? model.liveMeters {
-                    Text(centimeters ? String(format: "%.1f 厘米", value * 100) : String(format: "%.2f 米", value))
-                        .font(.system(size: 48, weight: .light)).monospacedDigit()
-                        .padding(18).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                        .accessibilityIdentifier("distanceReadout")
-                }
-                Text("AR 估算距离 · 请复核").font(.caption).padding(6).background(.ultraThinMaterial, in: Capsule())
-                HStack(spacing: 24) {
-                    Button {
-                        model.resetCommand += 1; saved = false
-                    } label: { Label("重测", systemImage: "arrow.counterclockwise") }
-                    Button {
-                        model.command += 1
-                    } label: {
-                        Image(systemName: "plus").font(.title).frame(width: 64, height: 64)
-                            .background(model.canPlace ? Theme.burgundy : Color.gray, in: Circle()).foregroundStyle(.white)
-                    }.disabled(!model.canPlace || model.result != nil)
-                        .accessibilityLabel(model.hasStart ? "确定终点" : "确定起点").accessibilityIdentifier("distancePlace")
-                    Button(centimeters ? "厘米" : "米") { centimeters.toggle() }.frame(minWidth: 48, minHeight: 44)
-                }.buttonStyle(.plain)
-                if let result = model.result {
-                    Button(saved ? "已保存到记录" : "保存测距记录") {
-                        tools.saveDistance(result); saved = tools.issue == nil
-                    }.buttonStyle(.borderedProminent).disabled(saved).accessibilityIdentifier("distanceSave")
-                }
-            }.padding(20).foregroundStyle(Theme.burgundy)
+        GeometryReader { geometry in
+            ScrollView {
+                NotebookColumns {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NotebookHeading(title: model.result != nil ? "两点距离" : model.hasStart ? "放置终点" : "放置起点", detail: model.instruction)
+                        ZStack {
+                            ARDistanceCamera(model: model, active: phase == .active)
+                            Image(systemName: "plus").font(.system(size: 30, weight: .light))
+                                .foregroundStyle(model.canPlace ? Theme.burgundy : .white).allowsHitTesting(false)
+                        }.frame(height: min(440, max(180, geometry.size.height * 0.44))).clipped()
+                        HStack(alignment: .lastTextBaseline) {
+                            Text("估算距离"); Spacer()
+                            if let value = model.result?.meters ?? model.liveMeters {
+                                Text(centimeters ? String(format: "%.1f", value * 100) : String(format: "%.2f", value))
+                                    .font(.largeTitle.bold()).monospacedDigit().accessibilityIdentifier("distanceReadout")
+                            } else { Text("—").font(.largeTitle) }
+                            Text(centimeters ? "厘米" : "米")
+                        }
+                        HStack {
+                            Button("重测", systemImage: "arrow.counterclockwise") { model.resetCommand += 1; saved = false }
+                                .buttonStyle(.bordered)
+                            Spacer()
+                            if let result = model.result {
+                                Button(saved ? "已保存到记录" : "保存测距记录") { tools.saveDistance(result); saved = tools.issue == nil }
+                                    .buttonStyle(.borderedProminent).disabled(saved).accessibilityIdentifier("distanceSave")
+                            } else {
+                                Button(model.hasStart ? "确定终点" : "确定起点") { model.command += 1 }
+                                    .buttonStyle(.borderedProminent).disabled(!model.canPlace).accessibilityIdentifier("distancePlace")
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("距离单位").font(.headline)
+                        Picker("距离单位", selection: $centimeters) { Text("米").tag(false); Text("厘米").tag(true) }.pickerStyle(.segmented)
+                        Text("AR 估算距离 · 请复核").font(.caption).foregroundStyle(.secondary)
+                    }.notebookPanel()
+                }.padding()
+            }
         }.background(Theme.paper).preferredColorScheme(.light).environment(\.colorScheme, .light)
     }
 }

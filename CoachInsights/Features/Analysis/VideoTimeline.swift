@@ -5,8 +5,13 @@ struct VideoTimeline:View {
     @ObservedObject var workspace:AnalysisWorkspace
     var compact=false
     @State private var fineOrigin:Double?
+    let expanded: Bool
     @State private var showClip=false
     private var w:AnalysisWorkspace { workspace }
+    init(workspace: AnalysisWorkspace, compact: Bool = false, expanded: Bool = false) {
+        self.workspace = workspace; self.compact = compact
+        self.expanded = expanded
+    }
     var body:some View {
         VStack(spacing:2) {
             if !compact && !w.thumbnails.isEmpty {
@@ -57,11 +62,23 @@ struct VideoTimeline:View {
                     }
                 }
             }
+            if expanded { clipBoundaries }
         }.sheet(isPresented:$showClip) {
             NavigationStack {
                 Form {
+                    clipBoundaries
+                }.notebookForm().navigationTitle("片段范围").toolbar {
+                    Button("完成") {
+                        w.save(); showClip = false
+                    }
+                }
+            }.presentationDetents([.medium, .large]).preferredColorScheme(.light)
+        }
+    }
+    @ViewBuilder private var clipBoundaries: some View {
                     if let map=w.metadata?.timeline,let bounds=map.frameBounds(in:w.clip) {
-                        Section("拖动调整片段") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("拖动调整片段").font(.headline)
                             Text("起点 \(w.clip.start.seconds,specifier:"%.3f") s")
                             Slider(value:Binding(get:{Double(bounds.lowerBound)},set:{w.setClipBoundary(frame:Int($0),start:true)}),in:0...Double(max(1,map.frames.count-1)),step:1,onEditingChanged:{if !$0 { w.save() }}).accessibilityIdentifier("clipStartSlider")
                             Text("终点 \(w.clip.end.seconds,specifier:"%.3f") s")
@@ -70,9 +87,6 @@ struct VideoTimeline:View {
                             Button("恢复完整视频") { w.fullClip() }
                         }
                     }
-                }.notebookForm().navigationTitle("片段范围").toolbar { Button("完成") { w.save();showClip=false } }
-            }.presentationDetents([.medium, .large]).preferredColorScheme(.light)
-        }
     }
 }
 

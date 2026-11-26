@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 enum VideoLibraryMode {
     case analysis, comparison
@@ -39,7 +40,13 @@ struct VideoLibraryView: View {
         }
     }
     var body: some View {
-        libraryPanel.navigationDestination(isPresented: $openImported) {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 720
+            HStack(alignment: .top, spacing: 0) {
+                libraryPanel(wide: wide)
+                if wide { Divider(); sources.frame(width: min(300, geometry.size.width * 0.30)).padding() }
+            }.background(Notebook.paper)
+        }.navigationDestination(isPresented: $openImported) {
             if let importedSession {
                 if mode == .comparison {
                     ComparisonView(session: importedSession, initialVideoID: initialVideoID)
@@ -58,10 +65,11 @@ struct VideoLibraryView: View {
             case .success(let value):importSelection=NewVideoSelection(url:value.url,timing:value.timing)
             case .failure(let error):if !(error is CancellationError) { library.issue=error.localizedDescription }
         } } }
-        .sheet(item:$importSelection) { value in NewVideoImportView(selection:value) { session in
+        .fullScreenCover(item: $importSelection) { value in
+            NewVideoImportView(selection: value) { session in
             importedSession=session;initialVideoID=nil;importSelection=nil;openImported=true
         } }
-        .sheet(isPresented: $showCreate) { CreateSessionView { _ in } }
+        .fullScreenCover(isPresented: $showCreate) { CreateSessionView { _ in } }
         .sheet(isPresented: $showCapture) { NavigationStack { CaptureView() } }
         .alert("删除分析记录？", isPresented: Binding(get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } })) {
@@ -82,10 +90,25 @@ struct VideoLibraryView: View {
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
     }
-    private var libraryPanel: some View {
+    private var sources: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("添加素材").font(.headline)
+            Button("相册", systemImage: "photo") { photoImport = true }.accessibilityIdentifier("rootPhotos")
+            Button("文件", systemImage: "folder") { fileImport = true }.accessibilityIdentifier("rootFiles")
+            if mode == .analysis {
+                Button("拍摄", systemImage: "video") { showCapture = true }.accessibilityIdentifier("rootCapture")
+                Divider()
+                Button("新建分析", systemImage: "plus") { showCreate = true }
+                    .buttonStyle(.borderedProminent).accessibilityIdentifier("createSession")
+            }
+        }.notebookPanel()
+    }
+    private func libraryPanel(wide: Bool) -> some View {
         List {
             VStack(alignment: .leading, spacing: 8) {
                 NotebookHeading(title: mode == .comparison ? "对比选片" : "视频资料库", detail: mode == .comparison ? "选择第一段视频，再添加第二段。" : "导入素材，或继续已有分析。")
+                if mode == .comparison { SourceSelectionStrip(first: nil, second: nil, choosingLeft: true) }
+                if !wide {
                 HStack(spacing: 8) {
                     Button { photoImport = true } label: {
                         HStack(spacing: 6) {
@@ -104,6 +127,7 @@ struct VideoLibraryView: View {
                             .accessibilityIdentifier("libraryCreateMenu")
                     }
                 }.font(.subheadline)
+                }
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("搜索分析名称", text: $query)
@@ -112,26 +136,17 @@ struct VideoLibraryView: View {
                         Button("清除搜索", systemImage: "xmark.circle.fill") { query = "" }
                             .labelStyle(.iconOnly).buttonStyle(.plain).frame(minWidth: 44, minHeight: 44)
                     }
-                    Divider().frame(height: 22)
-                    Menu {
-                        Picker("运动", selection: $sport) {
-                            ForEach(["全部", "打击", "投球"], id: \.self) { Text($0) }
-                        }
-                        Picker("日期", selection: $period) {
-                            ForEach(["全部日期", "最近 7 天", "最近 30 天"], id: \.self) { Text($0) }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.title3).frame(width: 44, height: 44)
-                            .foregroundStyle(sport != "全部" || period != "全部日期" ? Theme.burgundy : .secondary)
-                    }.accessibilityLabel("筛选").accessibilityIdentifier("sportFilter")
-                    .accessibilityValue(sport + "，" + period)
                 }.padding(.leading, 12).frame(minHeight: 44)
                     .background(.white, in: RoundedRectangle(cornerRadius: 12))
                 Picker("浏览方式", selection: $browseVideos) {
                     Text("视频").tag(true)
                     Text("分析记录").tag(false)
                 }.pickerStyle(.segmented).accessibilityIdentifier("libraryBrowseMode")
+                HStack {
+                    Picker("运动", selection: $sport) { ForEach(["全部", "打击", "投球"], id: \.self) { Text($0) } }
+                        .accessibilityIdentifier("sportFilter")
+                    Picker("日期", selection: $period) { ForEach(["全部日期", "最近 7 天", "最近 30 天"], id: \.self) { Text($0) } }
+                }.pickerStyle(.menu)
             }.listRowBackground(Theme.paper).listRowSeparator(.hidden)
             if let issue = library.issue {
                 Section {
@@ -141,7 +156,7 @@ struct VideoLibraryView: View {
             }
             if browseVideos,!videos.isEmpty,let repository=library.repository {
                 Section("视频 · \(videos.count)") {
-                    LazyVGrid(columns:[GridItem(.adaptive(minimum:130),spacing:12)],spacing:16) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 16) {
                         ForEach(videos) { item in
                             Button {
                                 openCompact(item.session, videoID: item.asset.id)
@@ -235,30 +250,28 @@ struct CreateSessionView: View {
     let created: (UUID) -> Void
     var body: some View {
         NavigationStack {
-            Form {
-                Section("分析记录") {
-                    TextField("例如：周末打击练习", text: $name).accessibilityIdentifier("sessionName")
-                    Picker("运动类型", selection: $sport) { ForEach(Sport.allCases, id: \.self) { Text($0.rawValue) } }
-                }
-                Section("可选信息") {
-                    Picker("惯用手", selection: $hand) { ForEach(["未指定", "左手", "右手"], id: \.self) { Text($0) } }
-                    Picker("拍摄角度", selection: $angle) { ForEach(["未指定", "正面", "侧面", "后方"], id: \.self) { Text($0) } }
-                }
-                Section { Label("只保存在当前设备", systemImage: "internaldrive").foregroundStyle(.secondary) }
-            }
-            .notebookForm()
-            .navigationTitle("新建分析").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("创建") {
-                        if let session = library.create(name: name, sport: sport,
-                            handedness: hand == "未指定" ? nil : hand, angle: angle == "未指定" ? nil : angle) {
-                            created(session.id); dismiss()
-                        }
-                    }.accessibilityIdentifier("confirmCreate")
-                }
-            }
+            ScrollView {
+                NotebookColumns {
+                    VStack(alignment: .leading, spacing: 16) {
+                        NotebookHeading(title: "新建分析记录", detail: "可先建立记录，再添加素材。")
+                        NotebookInput(title: "分析名称") { TextField("例如：周末打击练习", text: $name).accessibilityIdentifier("sessionName") }
+                        Picker("运动类型", selection: $sport) { ForEach(Sport.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented)
+                        Picker("惯用手", selection: $hand) { ForEach(["未指定", "左手", "右手"], id: \.self) { Text($0) } }
+                        Picker("拍摄角度", selection: $angle) { ForEach(["未指定", "正面", "侧面", "后方"], id: \.self) { Text($0) } }
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        NotebookHeading(title: "记录内容", detail: "素材、关键帧与绘图保存在这份本机分析记录中，可从训练记录重新打开。")
+                        Button("创建分析记录") {
+                            if let session = library.create(
+                                name: name, sport: sport, handedness: hand == "未指定" ? nil : hand, angle: angle == "未指定" ? nil : angle)
+                            {
+                                created(session.id); dismiss()
+                            }
+                        }.buttonStyle(NotebookActionStyle(prominent: true)).accessibilityIdentifier("confirmCreate")
+                    }.notebookPanel()
+                }.padding()
+            }.background(Notebook.paper).navigationTitle("新建分析").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
         }
     }
 }
@@ -285,15 +298,23 @@ struct NewVideoImportView:View {
     @State private var task:Task<Void,Never>?
     var body:some View {
         NavigationStack {
-            Form {
-                Section("待导入素材") { Label(selection.url.deletingPathExtension().lastPathComponent, systemImage: "film").font(.headline).lineLimit(2)
-                    Picker("运动类型",selection:$sport) { ForEach(Sport.allCases,id:\.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented).disabled(busy)
-                    Text("导入后自动创建分析记录，可随时重命名。").font(.caption).foregroundStyle(.secondary)
-                }
-                if busy { ProgressView("复制到本机…",value:progress) }
-                if let issue { Text(issue).foregroundStyle(.red) }
-                Button(busy ? "正在导入…":"打开并分析") { start() }.disabled(busy).accessibilityIdentifier("confirmNewImport")
-            }.notebookForm().navigationTitle("导入视频").navigationBarTitleDisplayMode(.inline)
+            ScrollView {
+                NotebookColumns {
+                    ImportMoviePreview(url: selection.url)
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("导入选项").font(.headline)
+                        Label(selection.url.deletingPathExtension().lastPathComponent, systemImage: "film").lineLimit(2)
+                        Picker("运动类型", selection: $sport) { ForEach(Sport.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(
+                            .segmented
+                        ).disabled(busy)
+                        Text("导入后自动创建分析记录，可随时重命名。").font(.caption).foregroundStyle(.secondary)
+                        if busy { ProgressView("复制到本机…", value: progress) }
+                        if let issue { Text(issue).foregroundStyle(.red) }
+                        Button(busy ? "正在导入…" : "打开并分析") { start() }.buttonStyle(NotebookActionStyle(prominent: true)).disabled(busy)
+                            .accessibilityIdentifier("confirmNewImport")
+                    }.notebookPanel()
+                }.padding()
+            }.background(Notebook.paper).navigationTitle("导入视频").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("取消") { task?.cancel();if !busy { dismiss() } } }
             .interactiveDismissDisabled(busy)
             .onDisappear { task?.cancel() }
@@ -311,6 +332,31 @@ struct NewVideoImportView:View {
                 if let created { try? await repository.delete(created) };library.reload();busy=false
                 if error is CancellationError { dismiss() } else { issue=error.localizedDescription }
             }
+        }
+    }
+}
+
+private struct ImportMoviePreview: View {
+    let url: URL
+    @State private var image: UIImage?
+    @State private var failed = false
+    var body: some View {
+        ZStack {
+            Color.black
+            if let image {
+                Image(uiImage: image).resizable().scaledToFit()
+            } else if failed {
+                Label("无法预览此素材", systemImage: "film").foregroundStyle(.white)
+            } else {
+                ProgressView().tint(.white)
+            }
+        }.aspectRatio(16 / 9, contentMode: .fit).task(id: url) {
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 1024, height: 768)
+            do { image = UIImage(cgImage: try await generator.image(at: .zero).image) } catch { if !Task.isCancelled { failed = true } }
         }
     }
 }

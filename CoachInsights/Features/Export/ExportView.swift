@@ -26,16 +26,40 @@ struct ExportView:View {
     @State private var notice:String?
     @State private var task:Task<Void,Never>?
     private var summaryRate:Double { compare ? ((try? session.snapshot().comparison?.rate) ?? 1) : rate }
+    @State private var resultSummary: String?
+    private var rangeSummary: String {
+        guard let snapshot = try? session.snapshot() else { return "无法读取片段" }
+        if compare {
+            guard let setup = snapshot.comparison else { return "请选择两段素材" }
+            let clock = ComparisonClock(
+                leftAnchor: setup.leftAnchor.seconds, rightAnchor: setup.rightAnchor.seconds,
+                leftRange: setup.leftClip.start.seconds...setup.leftClip.end.seconds,
+                rightRange: setup.rightClip.start.seconds...setup.rightClip.end.seconds)
+            guard let range = clock.commonRange else { return "没有共同片段" }
+            return String(format: "%.2f – %.2f s", range.lowerBound, range.upperBound)
+        }
+        guard let asset = assets.first(where: { $0.id == videoID }), let metadata = try? asset.metadata() else { return "—" }
+        let clip = snapshot.clips[asset.id.uuidString]
+        return String(
+            format: "%.2f – %.2f s", clip?.start.seconds ?? metadata.timeline.frames.first?.presentationTime.seconds ?? 0,
+            clip?.end.seconds ?? metadata.timeline.duration.seconds)
+    }
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
                 NotebookHeading(title: resultURL == nil ? "导出分析" : "导出结果", detail: session.name)
                 if resultURL == nil, !assets.isEmpty {
+                    NotebookColumns(leadingFraction: 0.54) {
                     VStack(alignment: .leading, spacing: 12) {
                         if let id = videoID, let asset = assets.first(where: { $0.id == id }), let repository = library.repository {
                             VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
-                                .frame(maxHeight: 190).clipped()
+                                    .frame(maxWidth: .infinity).clipped()
                         }
+                            LabeledContent("输出范围", value: rangeSummary)
+                            LabeledContent("视频格式", value: "H.264 · SDR · 30 fps")
+                        }.notebookPanel()
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("输出设置").font(.headline)
                         Picker("单视频素材",selection:$videoID) { ForEach(assets) { Text($0.originalName).lineLimit(1).truncationMode(.middle).tag(Optional($0.id)) } }.disabled(busy)
                         Toggle("双视频同屏合成",isOn:$compare).disabled(busy)
                         Toggle("包含可见绘图标注",isOn:$includeAnnotations).disabled(busy)
@@ -44,31 +68,40 @@ struct ExportView:View {
                             Text(PoseGuidance.exportNotice).font(.caption).foregroundStyle(.secondary)
                                 .accessibilityIdentifier("exportPoseLimitations")
                         }
-                    }.notebookPanel()
                     if !compare {
                         Picker("视频速度",selection:$rate) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } }.disabled(busy)
                         Toggle("保留原声（仅 1×）",isOn:$audio).disabled(busy || rate != 1)
                         Button("导出当前帧截图",systemImage:"photo") { run(screenshot:true) }.buttonStyle(.bordered).disabled(busy).accessibilityIdentifier("exportScreenshot")
                     }
-                    Button(compare ? "导出同屏视频":"导出慢放视频",systemImage:"film") { run(screenshot:false) }.buttonStyle(.borderedProminent).disabled(busy).accessibilityIdentifier("exportVideo")
+                            Button(compare ? "导出同屏视频" : "导出慢放视频", systemImage: "film") { run(screenshot: false) }.buttonStyle(
+                                NotebookActionStyle(prominent: true)
+                            ).disabled(busy).accessibilityIdentifier("exportVideo")
                     Text(compare ? "按已保存的布局、同步点和对比速度导出，无声。":"选定片段按展示时间导出。慢放结果无声；1× 可选保留原声。")
                         .font(.caption).foregroundStyle(.secondary)
                     Text("导出摘要：\(compare ? "双视频同屏":"当前素材") · \(summaryRate.formatted())× · \(includePose ? "包含可见分析图层":"不含人体图层")").font(.caption).foregroundStyle(.secondary)
-                    Text("兼容格式：H.264 · SDR · 30 fps；横画面最长边 1920，竖画面最长边 1920。画面保留原比例，不覆盖原片。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        }.notebookPanel()
+                    }
                 } else if assets.isEmpty { EmptyPanel(icon:"square.and.arrow.up",title:"添加视频后导出",detail:"回到分析记录，先导入或拍摄一段视频。") }
                 if busy { ProgressView("正在本机导出…",value:progress);Button("取消导出",role:.cancel){task?.cancel()}.accessibilityIdentifier("cancelExport") }
                 if let resultURL {
-                    Divider()
-                    if resultURL.pathExtension=="png",let image=UIImage(contentsOfFile:resultURL.path) { Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:300) }
+                    NotebookColumns {
+                        Group {
+                            if resultURL.pathExtension == "png", let image = UIImage(contentsOfFile: resultURL.path) {
+                                Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 520)
+                            }
                     else { ReviewMovie(url: resultURL).aspectRatio(16/9, contentMode: .fit).frame(maxHeight: 360) }
-                    HStack {
-                        Button("分享 / 存储到文件",systemImage:"square.and.arrow.up") { sharing=true }.accessibilityIdentifier("shareExport")
+                        }
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text(resultSummary ?? session.name).font(.subheadline)
+                            Button("分享 / 存储到文件", systemImage: "square.and.arrow.up") { sharing = true }.buttonStyle(
+                                NotebookActionStyle(prominent: true)
+                            ).accessibilityIdentifier("shareExport")
                         Button("保存到相册",systemImage:"square.and.arrow.down") { Task { await savePhoto(resultURL) } }
-                    }.buttonStyle(.bordered)
                     Label("导出完成", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Notebook.fieldGreen).accessibilityIdentifier("exportComplete")
                     Button("调整导出设置") { self.resultURL = nil; notice = nil; issue = nil }
+                        }.notebookPanel()
+                    }
                 }
                 if let notice { Text(notice).font(.caption) }
                 if let issue {
@@ -76,7 +109,7 @@ struct ExportView:View {
                     if let resultURL { Button("重试保存到相册") { Task { await savePhoto(resultURL) } } }
                     else { Button("重试导出") { run(screenshot:lastScreenshot) } }
                 }
-            }.padding().frame(maxWidth:850).frame(maxWidth:.infinity)
+            }.padding().frame(maxWidth: 1160).frame(maxWidth: .infinity)
         }.background(Theme.paper).navigationTitle("导出分析").navigationBarTitleDisplayMode(.inline)
         .task {
             includePose=initialPose;includeAnnotations=initialAnnotations
@@ -99,8 +132,13 @@ struct ExportView:View {
                 let service=ExportService()
                 if screenshot {
                     let snapshot=try session.snapshot(),time=snapshot.playheads[recipe.left.id.uuidString]?.seconds ?? recipe.start
+                    resultSummary =
+                        "\(assets.first { $0.id == recipe.left.id }?.originalName ?? session.name) · \(String(format: "%.2f", time)) s · PNG"
                     resultURL=try await service.screenshot(source:recipe.left,time:time,size:recipe.size,directory:directory)
                 } else {
+                    let sources = [recipe.left.id, recipe.right?.id].compactMap { id in assets.first { $0.id == id }?.originalName }.joined(
+                        separator: " + ")
+                    resultSummary = "\(sources) · \(rangeSummary) · \(recipe.rate.formatted())× · H.264 · 30 fps"
                     resultURL=try await service.video(recipe:recipe,directory:directory) { value in Task { @MainActor in progress=value } }
                 }
             } catch is CancellationError { notice="已取消导出，未完成文件已清理。" }

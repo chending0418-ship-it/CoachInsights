@@ -10,7 +10,7 @@ final class VideoLayoutUITests: XCTestCase {
     }
     @MainActor private func create(_ app: XCUIApplication, name: String) {
         app.buttons["scene_personal"].tap(); app.buttons["tool_videoAnalysis"].tap()
-        app.buttons["libraryCreateMenu"].tap(); app.buttons["createSession"].tap()
+        if app.buttons["libraryCreateMenu"].exists { app.buttons["libraryCreateMenu"].tap() }; app.buttons["createSession"].tap()
         let field = app.textFields["sessionName"]; XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap(); field.typeText(name); app.buttons["confirmCreate"].tap()
         let row = app.staticTexts[name].firstMatch; XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
@@ -181,7 +181,7 @@ final class VideoLayoutUITests: XCTestCase {
         wait("label == '横屏全屏'", on: app.buttons["analysisFullscreen"])
         XCTAssertEqual(app.staticTexts["frameReadout"].label, before)
         app.buttons["closeVideo"].tap()
-        XCTAssertTrue(app.buttons["libraryCreateMenu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(timeout: 5))
     }
 
     @MainActor func testIPadPortraitComparisonAutomaticRotationAndManualRestore() throws {
