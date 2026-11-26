@@ -160,9 +160,9 @@ struct AnalysisEditor: View {
                             if let metadata = w.metadata {
                                 ScrollView {
                                     VStack(alignment: .leading, spacing: 0) {
-                                        NotebookHeading(title: w.session.name,
-                                                        detail: "\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · \(metadata.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps")
-                                            .padding(.horizontal, 16).padding(.vertical, 10).foregroundStyle(Notebook.ink)
+                                        Label("\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · \(metadata.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps", systemImage: "film")
+                                            .font(.subheadline.monospacedDigit()).foregroundStyle(Notebook.ink)
+                                            .padding(.horizontal, 16).padding(.vertical, 10)
                                         let frameHeight = geometry.size.width * metadata.displayHeight / max(1, metadata.displayWidth)
                                         canvas.frame(height: min(geometry.size.height * 0.52, max(150, frameHeight))).clipped()
                                         playbackControls(compact: false).foregroundStyle(.white)
@@ -267,13 +267,13 @@ struct AnalysisEditor: View {
             .frame(maxWidth: 640).frame(maxWidth: .infinity)
             .background(immersive ? Color.black.opacity(0.78) : Theme.paper)
     }
-    private func workspaceAction(_ title: String, symbol: String, selected: Bool = false) -> some View {
+    private func workspaceAction(_ title: String, symbol: String, selected: Bool = false, onDark: Bool = false) -> some View {
         VStack(spacing: 3) {
             Image(systemName: symbol).font(.system(size: 15, weight: .medium))
             Text(title).font(.caption2).lineLimit(1)
         }
         .frame(maxWidth: .infinity, minHeight: 44)
-        .foregroundStyle(immersive ? Color.white : Theme.burgundy)
+        .foregroundStyle(immersive || onDark ? Color.white : Theme.burgundy)
         .background(selected ? (immersive ? Theme.burgundy : Notebook.inset) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
     }
@@ -339,7 +339,7 @@ struct AnalysisEditor: View {
             VideoTimeline(workspace: w, compact: true)
             HStack(spacing: 0) {
                 Button { w.pause(); showTimeline = true } label: {
-                    workspaceAction("片段", symbol: "timeline.selection").frame(width: 48)
+                    workspaceAction("片段", symbol: "timeline.selection", onDark: true).frame(width: 48)
                 }.accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
                 Spacer(minLength: 0)
                 FrameStepButton(direction: -1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
@@ -362,7 +362,7 @@ struct AnalysisEditor: View {
             }
         }.padding(.horizontal, 12).padding(.top, compact ? 4 : 8)
             .frame(maxWidth: 720).frame(maxWidth: .infinity)
-            .background(Color(white: 0.08))
+            .background(Color(white: 0.08)).tint(Theme.rose).environment(\.colorScheme, .dark)
     }
     private var importControls:some View {
         Group {

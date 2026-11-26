@@ -121,7 +121,7 @@ final class CoachInsightsUITests:XCTestCase {
         XCTAssertTrue(app.navigationBars["Saved analysis"].waitForExistence(timeout:5))
         app.buttons["双视频对比"].tap();XCTAssertTrue(app.buttons["cancelVideoPicker"].waitForExistence(timeout:5));app.buttons["cancelVideoPicker"].tap()
         XCTAssertTrue(app.buttons["moreActions"].waitForExistence(timeout:5))
-        app.buttons["moreActions"].tap();app.buttons["导出分析"].tap();XCTAssertTrue(app.staticTexts["分享动作里的发现"].waitForExistence(timeout:5))
+        app.buttons["moreActions"].tap();app.buttons["导出分析"].tap();XCTAssertTrue(app.navigationBars["导出分析"].waitForExistence(timeout:5))
         app.navigationBars.buttons.element(boundBy:0).tap()
         fixture(app);XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(app.buttons["playPause"].isHittable);XCTAssertTrue(app.buttons["nextFrame"].isHittable);shot(app,"v101-landscape-player")
