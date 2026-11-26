@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Shared surfaces for the field notebook. Media canvases and the classic board draw their own backgrounds.
 enum Notebook {
+    static let ink = Color(red: 39/255, green: 38/255, blue: 38/255)
     static let paper = Color(red: 1, green: 254/255, blue: 250/255)
     static let rule = Color(red: 217/255, green: 212/255, blue: 201/255)
     static let inset = Color(red: 241/255, green: 239/255, blue: 231/255)

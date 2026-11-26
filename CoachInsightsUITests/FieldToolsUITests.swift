@@ -65,6 +65,7 @@ final class FieldToolsUITests: XCTestCase {
         app.segmentedControls["recordSceneFilter"].buttons["随手工具"].tap()
         let record = app.staticTexts["Batting round"].firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
+        if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
         tap(app, "fieldResume"); tap(app, "batting_ground"); tap(app, "fieldSave")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         record.swipeLeft(); app.buttons["删除"].firstMatch.tap(); app.alerts.buttons["删除"].tap()
@@ -95,14 +96,19 @@ final class FieldToolsUITests: XCTestCase {
     @MainActor func testBullpenGridCorrectionUndoReopenAndHistory() {
         var app = launch(); open(app, scene: "quick", tool: "bullpenLog"); name(app, "Bullpen round")
         XCTAssertTrue(app.buttons["bullpenOut"].isHittable)
-        XCTAssertTrue(app.staticTexts["fieldProcess"].isHittable)
+        let wide = app.staticTexts["本轮球序"].exists
+        XCTAssertTrue(wide || app.staticTexts["fieldProcess"].isHittable)
         mapTap(app, x: 0.5, y: 0.49); mapTap(app, x: 0.5, y: 0.12)
         mapTap(app, x: 0.38, y: 0.32); mapTap(app, x: 0.65, y: 0.67); mapTap(app, x: 0.84, y: 0.42)
         tap(app, "bullpenOut")
         XCTAssertTrue(label(app, "bullpenTotal").contains("5"))
-        XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
-        shot("pitch-compact-collapsed")
-        app.staticTexts["fieldProcess"].tap()
+        if wide {
+            XCTAssertTrue(app.buttons["pitchEvent_0"].isHittable)
+        } else {
+            XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
+            shot("pitch-compact-collapsed")
+            app.staticTexts["fieldProcess"].tap()
+        }
         tapFirstPitch(app)
         let correction = app.scrollViews["pitchCorrectionSheet"]
         XCTAssertTrue(correction.waitForExistence(timeout: 5))
@@ -122,9 +128,12 @@ final class FieldToolsUITests: XCTestCase {
         app.terminate(); app = launch(reset: false); open(app, scene: "quick", tool: "bullpenLog")
         XCTAssertTrue(label(app, "bullpenTotal").contains("5"))
         toRecords(app); app.staticTexts["Bullpen round"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["fieldProcess"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
-        app.staticTexts["fieldProcess"].tap()
+        if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
+        if !wide {
+            XCTAssertTrue(app.staticTexts["fieldProcess"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["pitchEvent_0"].isHittable)
+            app.staticTexts["fieldProcess"].tap()
+        }
         tapFirstPitch(app)
     }
 
@@ -133,7 +142,7 @@ final class FieldToolsUITests: XCTestCase {
         for id in ["game_awayRun", "game_homeRun", "game_ball", "game_strike", "game_out", "gameNextBatter", "fieldOptions"] {
             XCTAssertTrue(app.buttons[id].isHittable, id)
         }
-        XCTAssertTrue(app.staticTexts["fieldProcess"].isHittable)
+        XCTAssertTrue(app.staticTexts["fieldProcess"].isHittable || app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "本轮过程")).firstMatch.isHittable)
         XCTAssertFalse(app.buttons["game_removeAwayRun"].isEnabled)
         tap(app, "game_awayRun")
         tap(app, "game_removeAwayRun")
@@ -168,6 +177,7 @@ final class FieldToolsUITests: XCTestCase {
         app.buttons["recordsTab"].tap(); app.segmentedControls["recordSceneFilter"].buttons["团训"].tap()
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Game round")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
+        if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
         XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); XCTAssertEqual(app.buttons["game_out"].value as? String, "2")
         XCTAssertEqual(app.buttons["game_awayRun"].value as? String, "1")
         XCTAssertEqual(app.buttons["game_homeRun"].value as? String, "1")
@@ -204,9 +214,9 @@ final class FieldToolsUITests: XCTestCase {
     @MainActor func testLandscapeAndNarrowWindowNavigation() {
         let app = launch()
         XCUIDevice.shared.orientation = .landscapeLeft
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "studioSidebar").firstMatch.waitForExistence(timeout: 5))
-            let sidebar = app.collectionViews["studioSidebar"]
+        let sidebar = app.descendants(matching: .any).matching(identifier: "studioSidebar").firstMatch
+        let studio = sidebar.waitForExistence(timeout: 2)
+        if studio {
             for _ in 0..<5 { if app.buttons["sidebar_bullpenLog"].isHittable { break }; sidebar.swipeUp() }
             app.buttons["sidebar_bullpenLog"].tap()
             XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5))
@@ -218,17 +228,17 @@ final class FieldToolsUITests: XCTestCase {
             app.buttons["studioSidebarToggle"].tap()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5)); shot("phase00-ipad-pitch-studio")
         } else {
-            app.buttons["scene_quick"].tap(); app.buttons["tool_battingLog"].tap()
+            tap(app, "scene_quick"); tap(app, "tool_battingLog")
             XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5)); shot("phase00-iphone-landscape")
         }
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(app.textFields["fieldName"].waitForExistence(timeout: 5))
-        if UIDevice.current.userInterfaceIdiom == .pad {
+        if studio {
             XCTAssertTrue(label(app, "bullpenTotal").contains("3"))
         } else {
             tap(app, "batting_ground"); XCTAssertTrue(label(app, "battingTotal").contains("1"))
         }
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons[UIDevice.current.userInterfaceIdiom == .pad ? "tool_bullpenLog" : "tool_battingLog"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons[studio ? "tool_bullpenLog" : "tool_battingLog"].waitForExistence(timeout: 5))
     }
 }

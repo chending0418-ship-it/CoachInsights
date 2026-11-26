@@ -140,7 +140,7 @@ struct AnalysisEditor: View {
                     if immersive {
                         immersiveCanvas(geometry.size)
                     } else {
-                        if geometry.size.width >= 820 {
+                        if geometry.size.width >= 820 && landscape {
                             HStack(spacing: 0) {
                                 VStack(spacing: 0) {
                                     canvas.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
@@ -154,13 +154,25 @@ struct AnalysisEditor: View {
                                         Divider()
                                         keyframes
                                     }.padding(16)
-                                }.frame(width: 295).foregroundStyle(.primary).background(Theme.paper)
+                                }.frame(width: 295).foregroundStyle(Notebook.ink).background(Theme.paper).environment(\.colorScheme, .light)
                             }
                         } else {
-                            canvas.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
-                            playbackControls(compact: landscape)
-                            quickActions
-                            if showTools { drawingControls }
+                            if let metadata = w.metadata {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        NotebookHeading(title: w.session.name,
+                                                        detail: "\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · \(metadata.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps")
+                                            .padding(.horizontal, 16).padding(.vertical, 10).foregroundStyle(Notebook.ink)
+                                        let frameHeight = geometry.size.width * metadata.displayHeight / max(1, metadata.displayWidth)
+                                        canvas.frame(height: min(geometry.size.height * 0.52, max(150, frameHeight))).clipped()
+                                        playbackControls(compact: false).foregroundStyle(.white)
+                                        quickActions
+                                        if showTools { drawingControls }
+                                        Divider()
+                                        keyframes.padding(16).foregroundStyle(Notebook.ink)
+                                    }
+                                }.background(Theme.paper).tint(Theme.burgundy)
+                            }
                         }
                     }
                 } else {
