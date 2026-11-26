@@ -33,6 +33,7 @@ struct SessionDetail: View {
     @State private var fullscreenRequested = false
     @State private var mediaLoaded = false
     @State private var pageVisible = false
+    @State private var toolTitle = "视频分析"
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         GeometryReader { geometry in
@@ -40,7 +41,7 @@ struct SessionDetail: View {
                 (UIDevice.current.userInterfaceIdiom == .phone && geometry.size.width > geometry.size.height))
             Group {
                 if let workspace {
-                    AnalysisEditor(workspace: workspace, immersive: immersive, toggleFullscreen: { toggleFullscreen(immersive) }, mediaReady: { mediaLoaded = $0 })
+                    AnalysisEditor(workspace: workspace, immersive: immersive, toggleFullscreen: { toggleFullscreen(immersive) }, mediaReady: { mediaLoaded = $0 }, toolTitleChanged: { toolTitle = $0 })
                 } else { ProgressView("打开本机分析…").frame(maxWidth:.infinity,maxHeight:.infinity).background(.black) }
             }
             .overlay(alignment: .topLeading) {
@@ -51,23 +52,17 @@ struct SessionDetail: View {
             .overlay(alignment: .topTrailing) {
                 if immersive { sessionMenu.foregroundStyle(.white).background(.black.opacity(0.65), in: Circle()).padding(4) }
             }
-            .toolbar(immersive && pageVisible ? .hidden : .visible, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !immersive {
+                    NotebookPageBar(title: toolTitle, parent: "返回", backID: "closeVideo", back: close) { sessionMenu }
+                }
+            }
             .statusBarHidden(immersive && pageVisible)
             .preference(key: MediaWorkspaceFocusPreferenceKey.self, value: immersive && pageVisible)
             .preference(key: MediaWorkspaceNavigationHiddenPreferenceKey.self, value: immersive && pageVisible)
         }
-        .navigationTitle(session.name).navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden()
-        .toolbarBackground(Notebook.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.light, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement:.topBarLeading) {
-                closeButton.foregroundStyle(Theme.burgundy)
-            }
-            ToolbarItem(placement:.topBarTrailing) {
-                sessionMenu.foregroundStyle(Theme.burgundy)
-            }
-        }
         .alert("删除分析记录？",isPresented:$deleting) {
             Button("取消",role:.cancel) {}
             Button("删除",role:.destructive) { Task { workspace?.stopAndSave();await library.remove(session);if let onClose { onClose() } else { dismiss() } } }
@@ -85,12 +80,13 @@ struct SessionDetail: View {
         .onDisappear { pageVisible = false; workspace?.stopAndSave() }
     }
     private var closeButton: some View {
-        Button("关闭视频", systemImage: "xmark") {
-            workspace?.stopAndSave()
-            if fullscreenRequested { MediaSceneOrientation.request(.portrait) }
-            fullscreenRequested = false
-            if let onClose { onClose() } else { dismiss() }
-        }.labelStyle(.iconOnly).accessibilityIdentifier("closeVideo")
+        Button("关闭视频", systemImage: "xmark", action: close).labelStyle(.iconOnly).accessibilityIdentifier("closeVideo")
+    }
+    private func close() {
+        workspace?.stopAndSave()
+        if fullscreenRequested { MediaSceneOrientation.request(.portrait) }
+        fullscreenRequested = false
+        if let onClose { onClose() } else { dismiss() }
     }
     private var sessionMenu: some View {
         Menu {
@@ -117,16 +113,17 @@ struct AnalysisEditor: View {
     var immersive = false
     var toggleFullscreen: () -> Void = {}
     var mediaReady: (Bool) -> Void = { _ in }
+    var toolTitleChanged: (String) -> Void = { _ in }
     @State private var importing=false
     @State private var photos=false
     @State private var capture=false
     @State private var showKeyframe=false
-    @State private var showPose=false
-    @State private var showTools=false
-    @State private var showNodes=false
+    private enum ToolPanel { case drawing, nodes, pose, timeline }
+    @State private var panel: ToolPanel?
+    private var showTools: Bool { panel == .drawing }
+    @State private var poseRegion = [0.0, 0.0, 1.0, 1.0]
     @State private var showAdd=false
     @State private var showCompare=false
-    @State private var showTimeline=false
     @State private var keyframeName=""
     @State private var screenshotURL:URL?
     @State private var screenshotBusy=false
@@ -140,49 +137,36 @@ struct AnalysisEditor: View {
                     if immersive {
                         immersiveCanvas(geometry.size)
                     } else {
-                        if geometry.size.width >= 760 && landscape {
-                            HStack(spacing: 0) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    NotebookHeading(title: w.session.name, detail: w.selectedAsset?.originalName ?? "")
-                                        .foregroundStyle(Notebook.ink)
-                                    canvas.aspectRatio(w.metadata.map { $0.displayWidth / max(1, $0.displayHeight) } ?? 1.6, contentMode: .fit)
-                                        .clipped()
-                                    playbackControls(compact: true)
-                                    quickActions
-                                    Spacer(minLength: 0)
-                                }.padding(12).frame(maxWidth: .infinity).background(Notebook.paper)
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 16) {
-                                        NotebookHeading(title: "动作分析", detail: w.session.name)
-                                        if showTools { drawingControls }
-                                        relatedActions
-                                        Divider()
-                                        keyframes
-                                    }.padding(16)
-                                }.frame(width: 295).foregroundStyle(Notebook.ink).background(Theme.paper).environment(\.colorScheme, .light)
-                            }
-                        } else {
-                            if let metadata = w.metadata {
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        NotebookHeading(
-                                            title: w.session.name,
-                                            detail:
-                                                "\(Int(metadata.displayWidth)) × \(Int(metadata.displayHeight)) · \(metadata.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps"
-                                        )
-                                        .foregroundStyle(Notebook.ink).padding(.horizontal, 12).padding(.vertical, 8)
-                                        let frameHeight = geometry.size.width * metadata.displayHeight / max(1, metadata.displayWidth)
-                                        canvas.frame(height: min(geometry.size.height * 0.52, max(150, frameHeight))).clipped()
-                                        playbackControls(compact: false).foregroundStyle(.white)
-                                        quickActions
-                                        if showTools { drawingControls }
-                                        relatedActions.padding(.horizontal, 16)
-                                        Divider()
-                                        keyframes.padding(16).foregroundStyle(Notebook.ink)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    NotebookHeading(title: w.session.name, detail: metadataLabel)
+                                    if panel == nil {
+                                        sourceMenu.fixedSize()
+                                        Button(action: toggleFullscreen) { Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 44, height: 44) }
+                                            .accessibilityLabel("全屏").accessibilityIdentifier("analysisFullscreen")
+                                    } else {
+                                        Button("完成") { selectPanel(nil) }.buttonStyle(DocumentButtonStyle())
                                     }
-                                }.background(Theme.paper).tint(Theme.burgundy)
-                            }
-                        }
+                                }
+                                NotebookColumns(minimumWidth: 680, leadingFraction: 0.65, spacing: 16) {
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        Group {
+                                            if panel == .pose, let frame = w.frame {
+                                                PoseRegionPicker(image: frame.image, settings: w.viewSettings, annotations: w.visibleAnnotations, pose: w.currentPose,
+                                                                 confidence: w.poseSettings.minimumConfidence, region: $poseRegion)
+                                                    .disabled(w.poseBusy)
+                                            } else { canvas }
+                                        }
+                                        .aspectRatio(w.metadata.map { $0.displayWidth / max(1, $0.displayHeight) } ?? 16/9, contentMode: .fit)
+                                        .clipped()
+                                        playbackControls(compact: landscape).background(.black).foregroundStyle(.white)
+                                        quickActions.padding(.top, 7)
+                                    }
+                                    inspector(wide: geometry.size.width - 30 >= 680).environment(\.colorScheme, .light)
+                                }
+                            }.padding(.horizontal, 15).padding(.vertical, 12)
+                        }.frame(maxWidth: .infinity).background(Theme.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
                     }
                 } else {
                     Spacer()
@@ -213,19 +197,6 @@ struct AnalysisEditor: View {
         .sheet(isPresented:$photos) { PhotoImportView { result in photos=false;switch result { case .success(let selection):w.notice=selection.notice;w.importFile(selection.url,timing:selection.timing)
         case .failure(let error):if !(error is CancellationError) { w.issue=error.localizedDescription } } } }
         .sheet(isPresented:$capture,onDismiss:{Task { await w.reload() }}) { NavigationStack { CaptureView(session:w.session) } }
-        .fullScreenCover(isPresented: $showTimeline) {
-            NavigationStack {
-                timelinePage.toolbar {
-                    Button("完成") {
-                        w.save(); showTimeline = false
-                    }
-                }
-            }
-        }
-        .fullScreenCover(isPresented: $showPose) { NavigationStack { PoseToolsView(workspace: w) } }
-        .fullScreenCover(isPresented: $showNodes) {
-            NavigationStack { nodesPage.toolbar { Button("完成") { showNodes = false } } }
-        }
         .sheet(isPresented:Binding(get:{screenshotURL != nil},set:{if !$0 { screenshotURL=nil }})) { if let screenshotURL { ShareSheet(url:screenshotURL) } }
         .navigationDestination(isPresented:$showCompare) { ComparisonView(session:w.session,initialVideoID:w.selectedVideoID) }
         .confirmationDialog("添加素材",isPresented:$showAdd,titleVisibility:.visible) { importControls }
@@ -234,50 +205,99 @@ struct AnalysisEditor: View {
         .onChange(of: w.metadata != nil, initial: true) { _, loaded in mediaReady(loaded) }
         .onChange(of:scenePhase) { _,phase in if phase != .active { w.stopAndSave() } else { w.resumeDisplay() } }
 
-        .onChange(of: immersive) { _, focused in if !focused && w.tool != "view" { showTools = true } }
+        .onChange(of: immersive) { _, focused in if !focused && w.tool != "view" { selectPanel(.drawing) } }
     }
-    var timelinePage: some View {
-        editPage("片段与时间轴") {
-            VideoTimeline(workspace: w, expanded: true).notebookPanel().foregroundStyle(Notebook.ink).tint(Theme.burgundy).environment(
-                \.colorScheme, .light)
+    private var metadataLabel: String {
+        guard let meta = w.metadata else { return "" }
+        return "\(Int(meta.displayWidth)) × \(Int(meta.displayHeight)) · \(meta.nominalFrameRate.formatted(.number.precision(.fractionLength(0...1)))) fps"
+    }
+
+    private func selectPanel(_ selected: ToolPanel?) {
+        w.pause()
+        if immersive && (selected == .nodes || selected == .pose || selected == .timeline) { toggleFullscreen() }
+        if panel == .drawing || selected == .drawing { w.activateDrawingTool(selected == .drawing ? "arrow" : "view") }
+        if selected == .pose { poseRegion = w.poseSettings.region }
+        if panel != nil { w.save() }
+        panel = selected
+        switch selected {
+        case nil: toolTitleChanged("视频分析")
+        case .drawing: toolTitleChanged("绘图标注")
+        case .pose: toolTitleChanged("人体辅助分析")
+        case .nodes: toolTitleChanged("关键帧")
+        case .timeline: toolTitleChanged("片段与时间轴")
         }
     }
-    var nodesPage: some View {
-        editPage("关键帧") {
+
+    @ViewBuilder private func inspector(wide: Bool) -> some View {
+        switch panel {
+        case .drawing:
+            VStack(alignment: .leading, spacing: 8) {
+                Rectangle().fill(Theme.burgundy).frame(height: 2)
+                Text("绘图工具").font(.headline)
+                drawingControls
+            }
+        case .nodes:
             VStack(alignment: .leading, spacing: 12) {
-                NotebookInput(title: "动作节点名称") {
-                    TextField("例如：出手", text: $keyframeName)
-                }
-                Button("保存关键帧") {
-                    w.addKeyframe(keyframeName); keyframeName = ""
-                }
-                .buttonStyle(.borderedProminent).disabled(keyframeName.trimmingCharacters(in: .whitespaces).isEmpty)
+                NotebookInput(title: "动作节点名称") { TextField("例如：出手", text: $keyframeName) }
+                Button("保存关键帧") { w.addKeyframe(keyframeName); keyframeName = "" }
+                    .buttonStyle(NotebookActionStyle(prominent: true)).disabled(keyframeName.trimmingCharacters(in: .whitespaces).isEmpty)
                 keyframes
             }.notebookPanel()
+        case .timeline:
+            VStack(alignment: .leading, spacing: 12) {
+                VideoTimeline(workspace: w, expanded: true)
+                Button("完成裁剪") { selectPanel(nil) }
+                    .buttonStyle(NotebookActionStyle(prominent: true))
+            }.notebookPanel()
+        case .pose:
+            PoseSettingsPanel(workspace: w, region: $poseRegion)
+        case nil:
+            VStack(alignment: .leading, spacing: 12) {
+                if wide {
+                    analysisSummary
+                    relatedActions
+                    Rectangle().fill(Theme.burgundy).frame(height: 2)
+                    Text("当前素材").font(.headline)
+                    Picker("当前素材", selection: Binding(get: { w.selectedVideoID }, set: { id in
+                        guard let id else { return }
+                        Task { w.save(); await w.select(id) }
+                    })) { ForEach(w.assets) { Text($0.originalName).tag(Optional($0.id)) } }.labelsHidden()
+                    Button("添加素材", systemImage: "plus") { w.pause(); showAdd = true }.buttonStyle(NotebookActionStyle())
+                } else {
+                    relatedActions
+                    analysisSummary
+                }
+            }.font(.subheadline)
         }
     }
-    private func editPage<Panel: View>(_ title: String, @ViewBuilder panel: () -> Panel) -> some View {
-        ScrollView {
-            NotebookColumns {
-                VStack(spacing: 0) {
-                    canvas.aspectRatio(w.metadata.map { $0.displayWidth / max(1, $0.displayHeight) } ?? 1.6, contentMode: .fit)
-                    playbackControls(compact: true)
-                }.background(.black).foregroundStyle(.white)
-                panel()
-            }.padding()
-        }.background(Notebook.paper).foregroundStyle(Notebook.ink).tint(Theme.burgundy)
-            .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+    @ViewBuilder private var analysisSummary: some View {
+        Rectangle().fill(Theme.burgundy).frame(height: 2)
+        Text("本次分析").font(.headline)
+        LabeledContent("绘图标注", value: "\(w.snapshot.annotations.filter { $0.videoID == w.selectedVideoID }.count) 处")
+        Divider()
+        LabeledContent("关键帧", value: "\(w.snapshot.keyframes.filter { $0.videoID == w.selectedVideoID }.count) 个")
+        Divider()
+        LabeledContent("片段时长", value: String(format: "%.2f s", w.clip.end.seconds - w.clip.start.seconds))
     }
     private var relatedActions: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("相关操作").font(.headline)
-            secondaryActions
+        VStack(alignment: .leading, spacing: 0) {
+            Button { w.pause(); w.save(); showCompare = true } label: { actionRow("添加第二段对比", "rectangle.split.2x1") }
+                .accessibilityIdentifier("openComparison")
+            Divider()
+            Button { Task { await screenshot() } } label: { actionRow("当前帧截图", "camera") }
+                .disabled(screenshotBusy || w.seeking || w.scrubbing || w.preparing).accessibilityIdentifier("quickScreenshot")
+            Divider()
             NavigationLink {
                 ExportView(session: w.session, initialVideoID: w.selectedVideoID, initialPose: w.overlaysVisible && w.poseSettings.visible, initialAnnotations: w.overlaysVisible)
-            } label: {
-                Label("导出截图或视频", systemImage: "square.and.arrow.up")
-            }.accessibilityIdentifier("editorExport")
-        }.frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(Notebook.ink)
+            } label: { actionRow("导出分析", "square.and.arrow.up") }.accessibilityIdentifier("editorExport")
+        }.buttonStyle(.plain).foregroundStyle(Notebook.ink)
+    }
+    private func actionRow(_ title: String, _ symbol: String) -> some View {
+        HStack {
+            Image(systemName: symbol).frame(width: 24).foregroundStyle(Theme.burgundy)
+            Text(title).font(.subheadline.weight(.semibold))
+            Spacer(); Image(systemName: "arrow.right").font(.caption)
+        }.frame(minHeight: 45).contentShape(Rectangle())
     }
     private var quickActions:some View {
         let rows = immersive ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
@@ -285,29 +305,48 @@ struct AnalysisEditor: View {
             HStack(spacing: 0) {
             Button {
                 w.pause()
-                showTools.toggle()
-                w.activateDrawingTool(showTools ? "arrow" : "view")
+                selectPanel(showTools ? nil : .drawing)
             } label: {
                 workspaceAction("绘图", symbol: "pencil.tip", selected: showTools)
             }.accessibilityIdentifier("drawingTools").accessibilityAddTraits(showTools ? .isSelected : [])
                 Button {
-                    w.pause(); showNodes = true
+                    w.pause(); selectPanel(.nodes)
                 } label: {
-                    workspaceAction("关键帧", symbol: "bookmark")
+                    workspaceAction("关键帧", symbol: "bookmark", selected: panel == .nodes)
                 }.accessibilityIdentifier("keyframeWorkspace")
-            Button { w.pause(); showPose = true } label: {
-                workspaceAction("人体", symbol: "figure.stand")
+            Button { w.pause(); selectPanel(.pose) } label: {
+                workspaceAction("人体分析", symbol: "figure.stand", selected: panel == .pose)
             }.accessibilityLabel("人体分析").accessibilityIdentifier("poseTools")
                 Button {
-                    w.pause(); showTimeline = true
+                    w.pause(); selectPanel(.timeline)
                 } label: {
-                    workspaceAction("修剪", symbol: "timeline.selection")
+                    workspaceAction("片段", symbol: "timeline.selection", selected: panel == .timeline)
                 }.accessibilityIdentifier("trimWorkspace")
             }.overlay { if !immersive { RoundedRectangle(cornerRadius: 6).strokeBorder(Notebook.rule).allowsHitTesting(false) } }
             if immersive { secondaryActions }
-        }.buttonStyle(.plain).padding(.horizontal, 6)
+        }.buttonStyle(.plain).padding(.horizontal, immersive ? 6 : 0)
             .frame(maxWidth: 640).frame(maxWidth: .infinity)
             .background(immersive ? Color.black.opacity(0.78) : Theme.paper)
+    }
+    private var sourceMenu: some View {
+            Menu {
+                Picker("当前素材", selection: Binding(get: { w.selectedVideoID }, set: { id in
+                    guard let id else { return }
+                    Task { w.save(); await w.select(id) }
+                })) { ForEach(w.assets) { Text($0.originalName).tag(Optional($0.id)) } }
+                Button("添加素材", systemImage: "plus") { w.pause(); showAdd = true }
+                Button("保存关键帧", systemImage: "bookmark.badge.plus") { w.pause(); showKeyframe = true }.accessibilityIdentifier("addKeyframe")
+                Button("关键帧列表", systemImage: "bookmark") { w.pause(); selectPanel(.nodes) }.accessibilityIdentifier("openKeyframes")
+                Button(w.muted ? "开启声音" : "静音", systemImage: w.muted ? "speaker.wave.2" : "speaker.slash") {
+                    w.muted.toggle()
+                    w.playback?.player.isMuted = w.muted
+                }
+                Button(w.overlaysVisible ? "隐藏标注与骨架" : "显示标注与骨架", systemImage: w.overlaysVisible ? "eye.slash" : "eye") {
+                    w.overlaysVisible.toggle()
+                    if !w.overlaysVisible { selectPanel(nil) }
+                }.accessibilityIdentifier("toggleOverlays")
+            } label: { workspaceAction("选项", symbol: "slider.horizontal.3") }
+                .accessibilityIdentifier("videoOptions")
     }
     private var secondaryActions: some View {
         HStack(spacing: 0) {
@@ -319,24 +358,7 @@ struct AnalysisEditor: View {
             Button { w.pause(); w.save(); showCompare = true } label: {
                 workspaceAction("对比", symbol: "rectangle.split.2x1")
             }.accessibilityIdentifier("openComparison")
-            Menu {
-                Picker("当前素材", selection: Binding(get: { w.selectedVideoID }, set: { id in
-                    guard let id else { return }
-                    Task { w.save(); await w.select(id) }
-                })) { ForEach(w.assets) { Text($0.originalName).tag(Optional($0.id)) } }
-                Button("添加素材", systemImage: "plus") { w.pause(); showAdd = true }
-                Button("保存关键帧", systemImage: "bookmark.badge.plus") { w.pause(); showKeyframe = true }.accessibilityIdentifier("addKeyframe")
-                Button("关键帧列表", systemImage: "bookmark") { w.pause(); showNodes = true }.accessibilityIdentifier("openKeyframes")
-                Button(w.muted ? "开启声音" : "静音", systemImage: w.muted ? "speaker.wave.2" : "speaker.slash") {
-                    w.muted.toggle()
-                    w.playback?.player.isMuted = w.muted
-                }
-                Button(w.overlaysVisible ? "隐藏标注与骨架" : "显示标注与骨架", systemImage: w.overlaysVisible ? "eye.slash" : "eye") {
-                    w.overlaysVisible.toggle()
-                    if !w.overlaysVisible { showTools = false; w.activateDrawingTool("view") }
-                }.accessibilityIdentifier("toggleOverlays")
-            } label: { workspaceAction("选项", symbol: "slider.horizontal.3") }
-                .accessibilityIdentifier("videoOptions")
+            sourceMenu
             Button(action: toggleFullscreen) {
                 workspaceAction(immersive ? "退出" : "全屏", symbol: immersive ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
             }.accessibilityLabel(immersive ? "退出全屏，返回竖屏" : "横屏全屏")
@@ -356,8 +378,8 @@ struct AnalysisEditor: View {
     private var canvas: some View {
         ZStack(alignment:.topLeading) {
             AnalysisCanvas(workspace:w)
-            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).padding(10).background(.black.opacity(0.65),in:Capsule()).padding(8).allowsHitTesting(false) }
-            if w.tool != "view" && w.frameReady { Text(w.rangeMode == "单帧" ? "在视频画面上绘图 · 当前帧":"在视频画面上绘图 · 整个片段").font(.caption).padding(8).background(.black.opacity(0.65),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
+            if w.seeking || w.preparing { ProgressView(w.preparing ? "准备播放…":"定位中…").font(.caption).foregroundStyle(.white).tint(.white).padding(10).background(.black.opacity(0.75),in:Capsule()).padding(8).allowsHitTesting(false) }
+            if w.tool != "view" && w.frameReady { Text(w.rangeMode == "单帧" ? "在视频画面上绘图 · 当前帧":"在视频画面上绘图 · 整个片段").font(.caption).foregroundStyle(.white).padding(8).background(.black.opacity(0.75),in:Capsule()).padding(.top, 56).padding(.leading, 8).allowsHitTesting(false) }
         }
     }
     private func immersiveCanvas(_ size: CGSize) -> some View {
@@ -378,7 +400,7 @@ struct AnalysisEditor: View {
     }
     private var immersivePlayback: some View {
         HStack(spacing: 6) {
-            Button { w.pause(); showTimeline = true } label: { Image(systemName: "timeline.selection").frame(width: 44, height: 44) }
+            Button { w.pause(); selectPanel(.timeline) } label: { Image(systemName: "timeline.selection").frame(width: 44, height: 44) }
                 .accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
             FrameStepButton(direction:-1) { w.step(-1) }.accessibilityIdentifier("previousFrame")
             Button {
@@ -412,9 +434,9 @@ struct AnalysisEditor: View {
                 Text("\(w.snapshot.annotations.count) 个标注 · \(w.snapshot.keyframes.count) 个关键帧")
                     .font(.caption2).accessibilityIdentifier("annotationCount")
             }.lineLimit(1).minimumScaleFactor(0.8).foregroundStyle(.secondary)
-            VideoTimeline(workspace: w, compact: true)
+            VideoTimeline(workspace: w, compact: true, showFilmstrip: !immersive)
             HStack(spacing: 0) {
-                Button { w.pause(); showTimeline = true } label: {
+                Button { w.pause(); selectPanel(.timeline) } label: {
                     workspaceAction("片段", symbol: "timeline.selection", onDark: true).frame(width: 48)
                 }.accessibilityLabel("时间轴与片段").accessibilityIdentifier("openTimeline")
                 Spacer(minLength: 0)
@@ -542,6 +564,11 @@ struct AnalysisEditor: View {
                                 .frame(minWidth: 32, minHeight: 44)
                         }.accessibilityLabel(color.0)
                     }
+                    Spacer(minLength: 4)
+                    Text("颜色").font(.caption).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("标注范围").font(.caption).foregroundStyle(.secondary)
                     Picker("显示范围", selection: $workspace.rangeMode) {
                         Text("当前帧").tag("单帧"); Text("片段").tag("片段")
                     }.pickerStyle(.segmented)

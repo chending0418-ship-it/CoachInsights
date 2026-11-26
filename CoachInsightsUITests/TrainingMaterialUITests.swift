@@ -36,8 +36,8 @@ final class TrainingMaterialUITests: XCTestCase {
       fill("trainingBody", "Infield practice")
       if index == 1 { fill("trainingFocus", "3 x 8") }
       app.buttons["trainingSave"].tap()
-      if !app.buttons["图片分享"].isHittable { app.staticTexts[tool].firstMatch.tap() }
-      app.buttons["图片分享"].tap()
+      if !app.buttons["trainingShare"].isHittable { app.staticTexts[tool].firstMatch.tap() }
+      app.buttons["trainingShare"].tap()
       XCTAssertTrue(app.staticTexts["shareCardPageCount"].waitForExistence(timeout: 8))
       app.terminate()
     }

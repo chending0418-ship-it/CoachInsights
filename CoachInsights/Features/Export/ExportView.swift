@@ -47,7 +47,7 @@ struct ExportView:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
-                NotebookHeading(title: resultURL == nil ? "导出分析" : "导出结果", detail: session.name)
+                NotebookHeading(title: resultURL == nil ? "导出分析" : "导出预览已就绪", detail: session.name)
                 if resultURL == nil, !assets.isEmpty {
                     NotebookColumns(leadingFraction: 0.54) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -55,6 +55,8 @@ struct ExportView:View {
                             VideoCover(asset: asset, repository: repository).aspectRatio(16/9, contentMode: .fit)
                                     .frame(maxWidth: .infinity).clipped()
                         }
+                            Text("视频信息").font(.headline)
+                            Divider()
                             LabeledContent("输出范围", value: rangeSummary)
                             LabeledContent("视频格式", value: "H.264 · SDR · 30 fps")
                         }.notebookPanel()
@@ -71,7 +73,7 @@ struct ExportView:View {
                     if !compare {
                         Picker("视频速度",selection:$rate) { ForEach([1.0,0.5,0.25,0.1,0.05],id:\.self) { Text("\($0.formatted())×").tag($0) } }.disabled(busy)
                         Toggle("保留原声（仅 1×）",isOn:$audio).disabled(busy || rate != 1)
-                        Button("导出当前帧截图",systemImage:"photo") { run(screenshot:true) }.buttonStyle(.bordered).disabled(busy).accessibilityIdentifier("exportScreenshot")
+                        Button("导出当前帧截图",systemImage:"photo") { run(screenshot:true) }.buttonStyle(NotebookActionStyle()).disabled(busy).accessibilityIdentifier("exportScreenshot")
                     }
                             Button(compare ? "导出同屏视频" : "导出慢放视频", systemImage: "film") { run(screenshot: false) }.buttonStyle(
                                 NotebookActionStyle(prominent: true)
@@ -85,14 +87,18 @@ struct ExportView:View {
                 if busy { ProgressView("正在本机导出…",value:progress);Button("取消导出",role:.cancel){task?.cancel()}.accessibilityIdentifier("cancelExport") }
                 if let resultURL {
                     NotebookColumns {
-                        Group {
+                        VStack(alignment: .leading, spacing: 12) {
                             if resultURL.pathExtension == "png", let image = UIImage(contentsOfFile: resultURL.path) {
                                 Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 520)
+                            } else {
+                                ReviewMovie(url: resultURL).aspectRatio(16/9, contentMode: .fit).frame(maxHeight: 360)
                             }
-                    else { ReviewMovie(url: resultURL).aspectRatio(16/9, contentMode: .fit).frame(maxHeight: 360) }
-                        }
-                        VStack(alignment: .leading, spacing: 14) {
+                            Text("视频信息").font(.headline)
+                            Divider()
                             Text(resultSummary ?? session.name).font(.subheadline)
+                        }.notebookPanel()
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("去向").font(.headline)
                             Button("分享 / 存储到文件", systemImage: "square.and.arrow.up") { sharing = true }.buttonStyle(
                                 NotebookActionStyle(prominent: true)
                             ).accessibilityIdentifier("shareExport")
@@ -110,7 +116,7 @@ struct ExportView:View {
                     else { Button("重试导出") { run(screenshot:lastScreenshot) } }
                 }
             }.padding().frame(maxWidth: 1160).frame(maxWidth: .infinity)
-        }.background(Theme.paper).navigationTitle("导出分析").navigationBarTitleDisplayMode(.inline)
+        }.background(Theme.paper).notebookPageTitle(resultURL == nil ? "导出设置" : "导出结果")
         .task {
             includePose=initialPose;includeAnnotations=initialAnnotations
             do { let ids=try session.snapshot().videoIDs;assets=try library.repository?.assets().filter{ids.contains($0.id)} ?? [];videoID=assets.first(where:{$0.id==initialVideoID})?.id ?? assets.first?.id; compare=initialComparison; if let id=videoID { rate=try session.snapshot().playbackRates[id.uuidString] ?? 1 } }

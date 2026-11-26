@@ -113,6 +113,7 @@ enum PocketTool: String, CaseIterable, Identifiable {
 }
 
 enum ToolboxRoute: Hashable {
+    case help
     case scene(PocketScene)
     case tool(PocketTool)
     #if DEBUG

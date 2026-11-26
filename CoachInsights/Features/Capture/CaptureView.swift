@@ -19,17 +19,26 @@ struct CaptureView: View {
                 NotebookHeading(title: camera.reviewURL == nil ? "拍摄训练动作" : "确认拍摄素材",
                                 detail: camera.reviewURL == nil ? "让球员全身入镜，再开始录制。" : "回看视频后保存到本机记录。")
                 NotebookColumns {
-                    Group {
+                    VStack(alignment: .center, spacing: 12) {
                 if let url = camera.reviewURL { ReviewMovie(url: url).aspectRatio(4/3, contentMode: .fit).frame(maxHeight: 400) }
                 else if camera.available { CameraPreview(session:camera.session).aspectRatio(4.0/3.0, contentMode: .fit).background(.black).clipShape(RoundedRectangle(cornerRadius: 8)) }
                 else { EmptyPanel(icon:"video.slash",title:"准备拍摄",detail:camera.issue ?? "正在检查相机…") }
+                        if camera.available && camera.reviewURL == nil {
+                            Button { if camera.recording { camera.stop() } else { camera.start() } } label: {
+                                HStack {
+                                    Image(systemName: camera.recording ? "stop.circle.fill" : "record.circle")
+                                        .font(.system(size: 42)).foregroundStyle(Theme.burgundy)
+                                    Text(camera.recording ? "停止录制" : "开始录制").font(.subheadline.weight(.semibold))
+                                }
+                            }.buttonStyle(.plain)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 14) {
                 if camera.available {
+                    Text("拍摄设置").font(.headline)
                     Picker("录制格式",selection:$camera.selectedFormat) { ForEach(camera.formats) { Text($0.label).tag($0.id) } }
                         .disabled(camera.recording).onChange(of:camera.selectedFormat) { _,id in Task { do { try await camera.applyFormat(id) } catch { camera.issue=error.localizedDescription } } }
                     Toggle(camera.audioEnabled ? "录音已开启" : "无声拍摄",isOn:Binding(get:{camera.audioEnabled},set:{ value in Task { await camera.setAudio(value) } })).disabled(camera.recording)
-                    Button(camera.recording ? "停止录制" : "开始录制",systemImage:camera.recording ? "stop.circle.fill" : "record.circle") { if camera.recording { camera.stop() } else { camera.start() } }.buttonStyle(.borderedProminent)
                 }
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
@@ -47,7 +56,7 @@ struct CaptureView: View {
                         TextField("分析名称",text:$name).textFieldStyle(.roundedBorder)
                         Picker("运动类型",selection:$sport) { ForEach(Sport.allCases,id:\.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
                     }
-                    Button("保存并分析",systemImage:"checkmark.circle") { save() }.buttonStyle(.borderedProminent).disabled(saving).accessibilityIdentifier("saveCapture")
+                    Button("保存并分析",systemImage:"checkmark.circle") { save() }.buttonStyle(NotebookActionStyle(prominent: true)).disabled(saving).accessibilityIdentifier("saveCapture")
                     Button("重新拍摄") { if let url=camera.reviewURL { try? FileManager.default.removeItem(at:url) }; camera.reviewURL=nil }.disabled(saving)
                 }
                 if saving { ProgressView("保存本机副本…",value:progress); Button("取消保存") { task?.cancel() } }
@@ -57,8 +66,7 @@ struct CaptureView: View {
                     }.notebookPanel()
                 }
             }.padding().frame(maxWidth: 1100).frame(maxWidth: .infinity)
-        }.background(Theme.paper).navigationTitle("拍摄与回看").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement:.cancellationAction) { Button("完成") { camera.stop(); dismiss() } } }
+        }.background(Theme.paper).notebookPageTitle("拍摄")
         .task { await camera.prepare() }
         .onDisappear { camera.stop(); camera.stopSession(); task?.cancel() }
         .onChange(of:scenePhase) { _,phase in if phase == .active { Task { if camera.available { await camera.startSession() } } } }

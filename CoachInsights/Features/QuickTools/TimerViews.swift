@@ -1,6 +1,14 @@
 import SwiftUI
 import AudioToolbox
 
+private extension View {
+    func clockPanel() -> some View {
+        padding(12).frame(maxWidth: .infinity)
+            .background(Color(red: 247/255, green: 245/255, blue: 236/255), in: RoundedRectangle(cornerRadius: 8))
+            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }
+    }
+}
+
 private struct ClockButton: View {
     let title: String
     var color: Color = Theme.burgundy
@@ -28,13 +36,15 @@ private struct TrainingClockDial: View {
             guard radius > 0 else { return }
             let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
             context.stroke(Path(ellipseIn: rect), with: .color(Notebook.rule), lineWidth: 2)
+            let inner = rect.insetBy(dx: radius * 0.11, dy: radius * 0.11)
+            context.stroke(Path(ellipseIn: inner), with: .color(Notebook.rule.opacity(0.55)), lineWidth: 0.7)
             for index in 0..<60 {
                 let angle = Double(index) * .pi / 30 - .pi / 2
-                let length: CGFloat = index.isMultiple(of: 5) ? 6 : 3
+                let length: CGFloat = index.isMultiple(of: 5) ? 8 : 4
                 var tick = Path()
                 tick.move(to: CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius))
                 tick.addLine(to: CGPoint(x: center.x + cos(angle) * (radius - length), y: center.y + sin(angle) * (radius - length)))
-                context.stroke(tick, with: .color(Notebook.rule), lineWidth: 1)
+                context.stroke(tick, with: .color(Notebook.ink.opacity(index.isMultiple(of: 5) ? 0.55 : 0.28)), lineWidth: 1.2)
             }
             var arc = Path()
             arc.addArc(center: center, radius: radius, startAngle: .degrees(-90), endAngle: .degrees(-90 + min(1, max(0, fraction)) * 360), clockwise: false)
@@ -50,21 +60,18 @@ struct StopwatchView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.03, paused: !watch.isRunning)) { context in
             GeometryReader { geometry in
-                let wide = geometry.size.width > geometry.size.height
-                Group {
-                    if wide {
-                        HStack(spacing: 36) {
-                            VStack { readout(context.date).frame(maxHeight: 360); controls }.notebookPanel().frame(maxWidth: .infinity)
-                            laps(context.date).frame(maxWidth: .infinity)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NotebookHeading(title: "分段秒表", detail: "单次计时，分段记录。")
+                        NotebookColumns(minimumWidth: 660, leadingFraction: 0.54) {
+                            VStack(spacing: 12) {
+                                readout(context.date).frame(height: min(320, geometry.size.width * 0.72))
+                                controls
+                            }.clockPanel()
+                            laps(context.date).notebookPanel()
                         }
-                    } else {
-                        VStack(spacing: 16) {
-                            readout(context.date).frame(height: max(140, geometry.size.height * 0.40))
-                            controls
-                            laps(context.date)
-                        }
-                    }
-                }.padding(.horizontal, 18).padding(.bottom, 12)
+                    }.padding(15)
+                }
             }
         }
         .background(Theme.paper).foregroundStyle(.primary).preferredColorScheme(.light).environment(\.colorScheme, .light)
@@ -82,10 +89,11 @@ struct StopwatchView: View {
                 Text(watch.isRunning ? "计时中" : elapsed > 0 ? "已暂停" : "准备计时")
                     .font(.caption).foregroundStyle(Notebook.fieldGreen)
                 Text(PocketTimeFormat.stopwatch(elapsed))
-                    .font(.system(size: 48, weight: .semibold, design: .monospaced))
+                    .font(.system(size: UIDevice.current.userInterfaceIdiom == .pad ? 45 : 32, weight: .medium, design: .monospaced))
                     .lineLimit(1).minimumScaleFactor(0.45)
                     .accessibilityLabel("已用时间 " + PocketTimeFormat.stopwatch(elapsed))
                     .accessibilityIdentifier("stopwatchTime")
+                Text("分 · 秒 · 百分秒").font(.caption).foregroundStyle(.secondary)
             }.padding(.horizontal, 14)
         }.aspectRatio(1, contentMode: .fit).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -98,7 +106,7 @@ struct StopwatchView: View {
                 }
             }.accessibilityIdentifier("stopwatchLapReset")
             Spacer()
-            ClockButton(title: watch.isRunning ? "停止" : "启动", color: Notebook.fieldGreen) {
+            ClockButton(title: watch.isRunning ? "停止" : "启动", color: Theme.burgundy) {
                 tools.updateStopwatch { value in
                     if value.isRunning { value.pause(at: Date()) } else { value.start(at: Date()) }
                 }
@@ -107,8 +115,7 @@ struct StopwatchView: View {
     }
 
     private func laps(_ now: Date) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
                 HStack { Text("分段记录").font(.headline); Spacer(); Text("\(watch.laps.count) 段").font(.caption.monospacedDigit()) }
                     .padding(.vertical, 10)
                 HStack { Text("分段"); Spacer(); Text("本段用时"); Text("累计时间").frame(width: 98, alignment: .trailing) }.font(.caption).foregroundStyle(.secondary)
@@ -122,7 +129,6 @@ struct StopwatchView: View {
                 ForEach(watch.laps.reversed()) { lap in
                     lapRow(number: lap.number, value: lap.duration, total: lap.total, color: lapColor(lap))
                 }
-            }
         }.frame(maxWidth: 720).frame(maxWidth: .infinity).accessibilityIdentifier("stopwatchLaps")
     }
 
@@ -157,22 +163,18 @@ struct CountdownView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { context in
             GeometryReader { geometry in
-                let wide = geometry.size.width > geometry.size.height
-                Group {
-                    if wide {
-                        HStack(spacing: 28) {
-                            VStack { face(context.date).frame(maxHeight: 360); controls(context.date) }.notebookPanel().frame(maxWidth: .infinity)
-                            details.frame(maxWidth: 340)
-                        }
-                    } else {
-                        VStack(spacing: 22) {
-                            face(context.date).frame(maxWidth: .infinity, maxHeight: .infinity)
-                            controls(context.date)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NotebookHeading(title: "训练倒计时", detail: "设定一组训练或休息的时长。")
+                        NotebookColumns(minimumWidth: 660, leadingFraction: 0.54) {
+                            VStack(spacing: 12) {
+                                face(context.date).frame(height: min(320, geometry.size.width * 0.72))
+                                controls(context.date)
+                            }.clockPanel()
                             details
-                            Spacer(minLength: 8)
                         }
-                    }
-                }.padding(.horizontal, 20).padding(.bottom, 16)
+                    }.padding(15)
+                }
             }
             .onChange(of: countdown.isFinished(at: context.date)) { _, finished in
                 if finished && countdown.isRunning {
@@ -216,8 +218,9 @@ struct CountdownView: View {
                 Text(countdown.isConfigured ? "设定时长" : countdown.isFinished(at: now) ? "时间到" : countdown.isRunning ? "计时中" : "已暂停")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Text(PocketTimeFormat.countdown(remaining))
-                    .font(.system(size: 48, weight: .semibold, design: .monospaced)).lineLimit(1).minimumScaleFactor(0.4)
+                    .font(.system(size: UIDevice.current.userInterfaceIdiom == .pad ? 45 : 32, weight: .medium, design: .monospaced)).lineLimit(1).minimumScaleFactor(0.4)
                     .accessibilityIdentifier("countdownTime")
+                Text("剩余时间").font(.caption).foregroundStyle(.secondary)
                 if let end = countdown.deadline {
                     Label(end.formatted(date: .omitted, time: .shortened), systemImage: "bell").font(.caption)
                 }
@@ -284,7 +287,7 @@ struct CountdownView: View {
                 }.font(.caption).tint(Theme.burgundy)
             }
         }.font(.subheadline).padding(18).frame(maxWidth: 600)
-            .background(.white, in: RoundedRectangle(cornerRadius: 20))
+            .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }
     }
     private func readDuration() {
         let total = Int(countdown.duration)

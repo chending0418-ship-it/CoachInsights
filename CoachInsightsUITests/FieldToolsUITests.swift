@@ -46,8 +46,8 @@ final class FieldToolsUITests: XCTestCase {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
     @MainActor private func toRecords(_ app: XCUIApplication) {
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["notebookBack"].tap()
+        app.buttons["notebookBack"].tap()
         app.buttons["recordsTab"].tap()
     }
     @MainActor private func name(_ app: XCUIApplication, _ value: String) {
@@ -67,7 +67,7 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertTrue(label(app, "battingTotal").contains("3"))
         tap(app, "fieldEnd"); app.buttons["保存并结束本轮"].tap()
         toRecords(app)
-        app.segmentedControls["recordSceneFilter"].buttons["随手工具"].tap()
+        app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["随手工具"].tap()
         let record = app.staticTexts["Batting round"].firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }
@@ -109,7 +109,7 @@ final class FieldToolsUITests: XCTestCase {
         mapTap(app, x: 0.02, y: 0.5)
         XCTAssertTrue(app.staticTexts["50%"].exists)
         tap(app, "pitchReplay")
-        XCTAssertTrue(app.navigationBars["逐球回看"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["逐球回看"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "右上")).firstMatch.exists)
         app.buttons["下一球"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@", "偏左")).firstMatch.exists)
@@ -119,7 +119,7 @@ final class FieldToolsUITests: XCTestCase {
         XCTAssertFalse(app.buttons["上一球"].isEnabled)
         app.buttons["播放"].tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: app.buttons["下一球"])], timeout: 5), .completed)
-        app.buttons["完成"].tap()
+        app.buttons["notebookBack"].tap()
         XCTAssertTrue(app.staticTexts["50%"].exists)
     }
 
@@ -204,7 +204,7 @@ final class FieldToolsUITests: XCTestCase {
         tap(app, "fieldUndo"); XCTAssertTrue(app.staticTexts["gameSides"].label.contains("0"))
         tap(app, "fieldSave"); shot("phase00-game")
         app.terminate(); app = launch(reset: false)
-        app.buttons["recordsTab"].tap(); app.segmentedControls["recordSceneFilter"].buttons["团训"].tap()
+        app.buttons["recordsTab"].tap(); app.descendants(matching: .any).matching(identifier: "recordSceneFilter").firstMatch.buttons["团训"].tap()
         let record = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "record_", "Game round")).firstMatch
         XCTAssertTrue(record.waitForExistence(timeout: 5)); record.tap()
         if app.buttons["打开记录"].isHittable { app.buttons["打开记录"].tap() }

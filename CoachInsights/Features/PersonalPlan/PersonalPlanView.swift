@@ -3,67 +3,15 @@ import SwiftUI
 struct PersonalPlanListView: View {
     @EnvironmentObject private var store: PersonalPlanStore
     @State private var creating = false
-    @State private var selection: UUID?
-
     var body: some View {
-        GeometryReader { geometry in
-            let wide = geometry.size.width >= 720
-            HStack(spacing: 0) {
-                list(wide: wide).frame(width: wide && !store.plans.isEmpty ? max(265, geometry.size.width * 0.34) : geometry.size.width)
-                if wide, let plan = selection.flatMap({ store.plan($0) }) ?? store.plans.first {
-                    Divider()
-                    PersonalPlanDetailView(id: plan.id, embedded: true).id(plan.id)
-                        .frame(maxWidth: .infinity)
-                }
-            }
+        let documents = store.plans.map { plan in
+            NotebookDocument(id: plan.id, title: plan.title, audience: plan.athlete, date: plan.date,
+                             lead: plan.goal, footer: "查看计划", rowDetail: plan.athlete)
         }
-        .navigationTitle(PocketTool.personalPlan.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $creating) { PersonalPlanEditor() }
-    }
-
-    private func list(wide: Bool) -> some View {
-        List {
-            if let issue = store.readIssue {
-                Section {
-                    Text(issue).foregroundStyle(.red)
-                    Button("重试读取") { store.reload() }
-                }
-            }
-            HStack(alignment: .top) {
-                NotebookHeading(title: "个人训练计划", detail: "本机保存 · "+String(store.plans.count)+" 份计划")
-                Button("新建", systemImage: "plus") { creating = true }
-                    .buttonStyle(.borderedProminent).accessibilityIdentifier("newPersonalPlan").disabled(store.readIssue != nil)
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
-            if let first = store.plans.first {
-                if !wide {
-                    Section("最近保存") {
-                        NavigationLink { PersonalPlanDetailView(id: first.id) } label: {
-                            LatestTrainingCard(title: first.title, audience: first.athlete.isEmpty ? "个人训练" : first.athlete,
-                                               date: first.date, summary: first.goal, action: "查看计划", icon: "list.clipboard")
-                        }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
-                    }
-                }
-                let remaining = wide ? store.plans : Array(store.plans.dropFirst())
-                if !remaining.isEmpty {
-                    Section(wide ? "已保存计划" : "其他计划") {
-                        ForEach(remaining) { plan in
-                            let row = NotebookToolRow(title: plan.title, detail: plan.date.formatted(date: .abbreviated, time: .omitted), icon: "list.clipboard")
-                            if wide {
-                                Button { selection = plan.id } label: { row }.buttonStyle(.plain)
-                                    .listRowBackground(plan.id == (selection ?? first.id) ? Notebook.inset : Notebook.paper)
-                            } else {
-                                NavigationLink { PersonalPlanDetailView(id: plan.id) } label: { row }
-                            }
-                        }
-                    }
-                }
-            } else {
-                ContentUnavailableView("还没有个人训练计划", systemImage: "list.clipboard", description: Text("点「新建」开始填写。"))
-                    .listRowBackground(Color.clear)
-            }
-        }
-        .notebookForm()
+        DocumentLibrary(title: "个人训练计划", noun: "计划", icon: "list.clipboard", documents: documents,
+                        issue: store.readIssue, createID: "newPersonalPlan", retry: store.reload,
+                        create: { creating = true }) { id, embedded in PersonalPlanDetailView(id: id, embedded: embedded) }
+            .navigationDestination(isPresented: $creating) { PersonalPlanEditor() }
     }
 }
 
@@ -79,27 +27,19 @@ struct PersonalPlanDetailView: View {
     var body: some View {
         Group {
             if let plan = store.plan(id) {
-                ScrollView {
-                    NotebookColumns {
-                        PersonalPlanSummary(content: plan.card)
-                        VStack(alignment: .leading, spacing: 16) {
-                            NavigationLink { ShareCardPreview(content: plan.card) } label: {
-                                Label("预览与分享图片", systemImage: "square.and.arrow.up")
-                            }.buttonStyle(.borderedProminent).accessibilityIdentifier("personalPlanShare")
-                            Button("编辑") { editing = plan }.accessibilityIdentifier("editPersonalPlan")
-                            Button("删除计划", systemImage: "trash", role: .destructive) { confirmingDeletion = true }
-                                .accessibilityIdentifier("deletePersonalPlan")
-                        }.notebookPanel()
-                    }.padding(20)
+                if embedded {
+                    VStack(alignment: .leading, spacing: 10) { actions(plan); PersonalPlanSummary(content: plan.card) }
+                } else {
+                    DocumentReader(sections: plan.card.sections.filter { $0.heading != "球员" }.map(\.heading)) { PersonalPlanSummary(content: plan.card) } actions: { actions(plan) }
+                        .notebookPageTitle("计划详情")
                 }
             } else {
                 ContentUnavailableView("计划已不存在", systemImage: "list.bullet.clipboard")
             }
         }
         .background(Theme.paper)
-        .navigationTitle(embedded ? "个人训练计划" : "计划详情")
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(item: $editing) { PersonalPlanEditor(original: $0) }
+        .notebookDestination(item: $editing) { PersonalPlanEditor(original: $0) }
         .alert("删除这份计划？", isPresented: $confirmingDeletion) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
@@ -113,15 +53,32 @@ struct PersonalPlanDetailView: View {
             Button("好", role: .cancel) {}
         } message: { Text(issue ?? "") }
     }
+    private func actions(_ plan: PersonalPlan) -> some View {
+        DocumentActions {
+        NavigationLink { ShareCardPreview(content: plan.card) } label: { Label("预览与分享图片", systemImage: "square.and.arrow.up") }
+            .buttonStyle(DocumentButtonStyle(primary: true)).accessibilityIdentifier("personalPlanShare")
+        } secondary: {
+        Button { editing = plan } label: { Label("编辑", systemImage: "pencil") }
+            .buttonStyle(DocumentButtonStyle()).accessibilityIdentifier("editPersonalPlan")
+        if embedded {
+            NavigationLink { PersonalPlanDetailView(id: id) } label: { Label("打开", systemImage: "arrow.up.right") }
+                .buttonStyle(DocumentButtonStyle())
+        } else {
+            Button(role: .destructive) { confirmingDeletion = true } label: { Image(systemName: "trash").accessibilityLabel("删除计划") }
+                .buttonStyle(DocumentButtonStyle()).accessibilityIdentifier("deletePersonalPlan")
+        }
+        }
+    }
+
 }
 
 private struct PersonalPlanEditor: View {
+    @State private var showingPreview = false
     @EnvironmentObject private var store: PersonalPlanStore
     @Environment(\.dismiss) private var dismiss
     private let original: PersonalPlan?
     @State private var initial: PersonalPlan
     @State private var draft: PersonalPlan
-    @State private var previewing = false
     @State private var confirmingDiscard = false
     @State private var issue: String?
 
@@ -133,47 +90,13 @@ private struct PersonalPlanEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { geometry in
-                if geometry.size.width >= 700 {
-                    HStack(spacing: 0) {
-                        fields.frame(maxWidth: 520)
-                        Divider()
-                        preview
-                    }
-                } else {
-                    VStack(spacing: 0) {
-                        Picker("计划编辑视图", selection: $previewing) {
-                            Text("填写").tag(false)
-                            Text("预览").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .accessibilityIdentifier("personalPlanEditorMode")
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        if previewing { preview } else { fields }
-                    }
-                }
-            }
-            .background(Theme.paper)
-            .navigationTitle(original == nil ? "新建个人训练计划" : "编辑个人训练计划")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        if draft == initial { dismiss() } else { confirmingDiscard = true }
-                    }
-                    .accessibilityIdentifier("cancelPersonalPlan")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
-                        do { try store.save(draft, replacing: original); dismiss() }
-                        catch { issue = error.localizedDescription }
-                    }
-                    .disabled(!draft.canSave)
-                    .accessibilityIdentifier("savePersonalPlan")
-                }
-            }
+        Group {
+            DocumentEditorLayout(title: original == nil ? "新建计划" : "编辑计划", context: "单次训练", navigationTitle: "填写个人计划",
+                                 canSave: draft.canSave, saveID: "savePersonalPlan", cancelID: "cancelPersonalPlan",
+                                 cancel: { if draft == initial { dismiss() } else { confirmingDiscard = true } }, save: {
+                do { try store.save(draft, replacing: original); dismiss() }
+                catch { issue = error.localizedDescription }
+            }, showingPreview: $showingPreview) { fields } preview: { preview }
             .alert("放弃未保存的修改？", isPresented: $confirmingDiscard) {
                 Button("继续编辑", role: .cancel) {}
                 Button("放弃修改", role: .destructive) { dismiss() }
@@ -193,9 +116,17 @@ private struct PersonalPlanEditor: View {
                 NotebookInput(title: "球员姓名") { TextField("球员姓名", text: $draft.athlete).accessibilityIdentifier("personalPlanAthlete") }
                 NotebookInput(title: "训练目标") { TextField("这次训练希望达到什么？", text: $draft.goal, axis: .vertical).lineLimit(2...6).accessibilityIdentifier("personalPlanGoal") }
                 NotebookInput(title: "训练项目 · 必填") { TextField("逐行填写项目、组数或时长", text: $draft.drills, axis: .vertical).lineLimit(3...10).accessibilityIdentifier("personalPlanDrills") }
-                DatePicker("训练日期", selection: $draft.date, displayedComponents: .date)
-                NotebookInput(title: "教练署名") { TextField("署名", text: $draft.author).accessibilityIdentifier("personalPlanAuthor") }
-            }.padding(20)
+                NotebookColumns(minimumWidth: 300, leadingFraction: 0.48, spacing: 10) {
+                  NotebookInput(title: "训练日期") { DatePicker("训练日期", selection: $draft.date, displayedComponents: .date).labelsHidden() }
+                  NotebookInput(title: "教练署名") { TextField("署名", text: $draft.author).accessibilityIdentifier("personalPlanAuthor") }
+                }
+              HStack {
+                Button("取消编辑") { if draft == initial { dismiss() } else { confirmingDiscard = true } }
+                    .buttonStyle(DocumentButtonStyle())
+                Button { showingPreview = true } label: { Label("预览内容", systemImage: "eye") }
+                    .buttonStyle(DocumentButtonStyle())
+            }
+          }.padding(20)
         }.scrollDismissesKeyboard(.interactively)
     }
 
@@ -210,14 +141,18 @@ private struct PersonalPlanSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(content.date, style: .date).font(.subheadline).foregroundStyle(.secondary)
+            Label("个人训练计划", systemImage: "list.bullet.clipboard").font(.caption.bold()).foregroundStyle(Theme.burgundy)
             Text(content.title.isEmpty ? "个人训练计划" : content.title)
                 .font(.title.bold()).accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("personalPlanPreviewTitle")
-            ForEach(content.sections, id: \.heading) { section in
+            HStack {
+                Text(content.date, style: .date)
+                if let athlete = content.sections.first(where: { $0.heading == "球员" }) { Text("/ " + athlete.body) }
+            }.font(.subheadline).foregroundStyle(.secondary)
+            ForEach(content.sections.filter { $0.heading != "球员" }, id: \.heading) { section in
                 VStack(alignment: .leading, spacing: 8) {
                     Divider()
-                    Text(section.heading).font(.headline).foregroundStyle(Theme.burgundy)
+                    Text(section.heading).font(.headline).foregroundStyle(Theme.burgundy).id(section.heading)
                     if section.heading == "训练项目" { NumberedInstructions(text: section.body) } else { Text(section.body).textSelection(.enabled) }
                 }
             }

@@ -16,9 +16,10 @@ struct VideoSourcePicker:View {
     @State private var issue:String?
     @State private var task:Task<Void,Never>?
     var body:some View {
-        NavigationStack {
+        Group {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
+                    NotebookHeading(title: choosingLeft ? "选择第一段视频" : "选择第二段视频", detail: "本机素材")
                     SourceSelectionStrip(first: choosingLeft ? nil : otherName, second: choosingLeft ? otherName : nil, choosingLeft: choosingLeft)
                     NotebookColumns {
                         VStack(alignment: .leading, spacing: 12) {
@@ -44,8 +45,9 @@ struct VideoSourcePicker:View {
                     if busy { ProgressView("导入到本机…",value:progress);Button("取消导入") { task?.cancel() } }
                     if let issue { Text(issue).foregroundStyle(.red) }
                 }.padding()
-            }.background(Notebook.paper).navigationTitle(choosingLeft ? "选择第一段视频" : "选择第二段视频").navigationBarTitleDisplayMode(.inline)
-            .toolbar { Button("取消") { task?.cancel();onCancel() }.accessibilityIdentifier("cancelVideoPicker") }
+            }.background(Notebook.paper).notebookPageTitle(choosingLeft ? "选择第一段视频" : "选择第二段视频", backID: "cancelVideoPicker") {
+                task?.cancel(); onCancel()
+            }
             .task { do { candidates=try repository.assets().filter{$0.id != excluding}.sorted{$0.createdAt>$1.createdAt} } catch { issue=error.localizedDescription } }
             .fileImporter(isPresented:$files,allowedContentTypes:[.movie]) { result in switch result { case .success(let url):importVideo(url);case .failure(let error):issue=error.localizedDescription } }
             .sheet(isPresented:$photos) { PhotoImportView { result in photos=false;switch result { case .success(let value):importVideo(value.url,timing:value.timing);case .failure(let error):if !(error is CancellationError) { issue=error.localizedDescription } } } }
@@ -123,7 +125,9 @@ struct SourceSelectionStrip: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(left ? "A" : "B").font(.caption.bold()).foregroundStyle(Theme.burgundy)
                     Text((left ? first : second) ?? (left == choosingLeft ? "请选择素材" : "等待选择")).font(.subheadline).lineLimit(2)
-                }.frame(maxWidth: .infinity, alignment: .leading).notebookPanel()
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                    .background(left == choosingLeft ? Theme.burgundy.opacity(0.06) : Notebook.paper, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(left == choosingLeft ? Theme.burgundy : Notebook.rule) }
             }
         }
     }
