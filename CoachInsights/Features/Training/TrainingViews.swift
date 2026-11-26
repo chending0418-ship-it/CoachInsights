@@ -301,12 +301,19 @@ struct PlanRunView: View {
         NotebookColumns {
           VStack(alignment: .leading) {
             if store.run == nil, let plan, let stage = plan.stages.first {
-              Text("准备开始").font(.caption).foregroundStyle(Notebook.fieldGreen)
+              HStack {
+                Text("准备开始").font(.caption).foregroundStyle(Notebook.fieldGreen)
+                Spacer()
+                Text("1 / \(plan.stages.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+              }
               Text(stage.name).font(.title.bold())
               Text(String(format: "%02d:00", stage.minutes)).font(.system(size: 56, weight: .semibold)).monospacedDigit()
               Text(stage.instructions)
-              ProgressView(value: 0).tint(Notebook.fieldGreen)
-              startButton
+              ProgressView(value: 1).tint(Notebook.fieldGreen).accessibilityLabel("当前环节剩余时间")
+              HStack(spacing: 8) {
+                startButton
+                Button("延长 1 分钟", systemImage: "plus") {}.buttonStyle(NotebookActionStyle()).disabled(true)
+              }
             }
             if let run = store.run {
           TimelineView(.periodic(from: .now, by: 1)) { clock in
@@ -353,12 +360,12 @@ struct PlanRunView: View {
             .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Notebook.rule) }
           VStack(alignment: .leading, spacing: 12) {
         if let plan {
-          Picker("选择团训计划", selection: Binding(get: { plan.id }, set: { selected = $0 })) {
-            ForEach(plans) { Text($0.title).tag($0.id) }
-          }
               let ordered = store.run.flatMap { $0.finished ? nil : $0.plan } ?? plan
               NotebookHeading(title: "环节顺序", detail: ordered.summary)
               StageAgenda(stages: ordered.stages, current: store.run?.index)
+          Picker("选择团训计划", selection: Binding(get: { plan.id }, set: { selected = $0 })) {
+            ForEach(plans) { Text($0.title).tag($0.id) }
+          }
               if store.run != nil { startButton }
         } else {
           Text("先编排训练环节，再按顺序计时。").foregroundStyle(.secondary)
